@@ -114,7 +114,6 @@ const configs: Record<
       { key: "parentPhone", label: "Parent", placeholder: "Choisir un parent", type: "select" },
       { key: "studentId", label: "Élève", placeholder: "Choisir un élève", type: "select" },
       { key: "theme", label: "Thème", placeholder: "Choisir un thème", type: "select" },
-      { key: "direction", label: "Sens", placeholder: "Choisir le sens", type: "select" },
       { key: "message", label: "Message", placeholder: "Message au parent" },
       { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
       { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
@@ -578,8 +577,9 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       id: nextId,
       parentPhone: form.parentPhone,
       studentId: form.studentId ?? "",
+      teacherId: "",
       theme: form.theme,
-      direction: form.direction || "École vers parent",
+      direction: "École vers parent",
       message: form.message,
       status: form.status || "Nouveau",
       date: form.date || formatDate(new Date()),
@@ -737,10 +737,6 @@ function getSelectOptions(
 
   if (key === "theme") {
     return messageThemes;
-  }
-
-  if (key === "direction") {
-    return ["École vers parent", "Parent vers école"];
   }
 
   if (key === "className") {

@@ -28,6 +28,7 @@ export default function HomeScreen({ navigation }: any) {
     ? Math.round((paymentRows.filter((payment) => payment.status === "PAYE").length / paymentRows.length) * 100)
     : 0;
   const userName = session?.user.name ?? "Administrateur";
+  const unreadMessages = getUnreadMessagesCount(session, messagesData, studentsData);
 
   if (session?.role === "teacher") {
     const assignedClasses = session.user.assignedClasses ?? [];
@@ -142,6 +143,11 @@ export default function HomeScreen({ navigation }: any) {
               icon="reader-outline"
               label="Notes"
               onPress={() => navigation.navigate("TeacherGrades")}
+            />
+            <QuickAction
+              icon="chatbubbles-outline"
+              label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
+              onPress={() => navigation.navigate("Messages")}
             />
           </View>
         </ScrollView>
@@ -273,7 +279,7 @@ export default function HomeScreen({ navigation }: any) {
             />
             <QuickAction
               icon="chatbubbles-outline"
-              label="Messages"
+              label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
               onPress={() => navigation.navigate("Messages")}
             />
           </View>
@@ -423,7 +429,7 @@ export default function HomeScreen({ navigation }: any) {
           <ActivityItem
             icon="chatbubbles-outline"
             title="Messages parents"
-            description={`${messagesData.length} échange(s) école-parent`}
+            description={`${unreadMessages} non lu(s) • ${messagesData.length} échange(s)`}
             color="#0F766E"
             onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
           />
@@ -462,7 +468,7 @@ export default function HomeScreen({ navigation }: any) {
           />
           <QuickAction
             icon="chatbubbles-outline"
-            label="Messages"
+            label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
             onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
           />
           <QuickAction
@@ -484,6 +490,37 @@ export default function HomeScreen({ navigation }: any) {
       </ScrollView>
     </View>
   );
+}
+
+function getUnreadMessagesCount(session: any, messagesData: any[], studentsData: any[]) {
+  if (session?.role === "school_admin") {
+    return messagesData.filter(
+      (message) => message.status === "Nouveau" && message.direction === "Parent vers école"
+    ).length;
+  }
+
+  if (session?.role === "teacher") {
+    const assignedClasses = session.user.assignedClasses ?? [];
+    const teacherParents = studentsData
+      .filter((student) => assignedClasses.includes(student.className))
+      .map((student) => student.parentPhone);
+
+    return messagesData.filter(
+      (message) =>
+        message.status === "Nouveau" &&
+        (message.teacherId === session.user.id || teacherParents.includes(message.parentPhone)) &&
+        message.direction === "Parent vers enseignant"
+    ).length;
+  }
+
+  const parentPhone = session?.user.parentPhone ?? session?.user.children?.[0]?.parentPhone;
+
+  return messagesData.filter(
+    (message) =>
+      message.status === "Nouveau" &&
+      message.parentPhone === parentPhone &&
+      (message.direction === "École vers parent" || message.direction === "Enseignant vers parent")
+  ).length;
 }
 
 type StatCardProps = {

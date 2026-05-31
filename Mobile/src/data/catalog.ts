@@ -79,8 +79,14 @@ export type SchoolMessage = {
   id: string;
   parentPhone: string;
   studentId?: string;
+  teacherId?: string;
   theme: string;
-  direction: "École vers parent" | "Parent vers école" | string;
+  direction:
+    | "École vers parent"
+    | "Parent vers école"
+    | "Enseignant vers parent"
+    | "Parent vers enseignant"
+    | string;
   message: string;
   status: "Nouveau" | "En cours" | "Traité" | string;
   date: string;
@@ -231,6 +237,28 @@ export const schoolMessages: SchoolMessage[] = [
     direction: "École vers parent",
     message: "Merci de passer à l'école cette semaine pour échanger avec le titulaire.",
     status: "En cours",
+    date: "31-05-2026",
+  },
+  {
+    id: "MSG3",
+    parentPhone: "+243 820 000 001",
+    studentId: "1",
+    teacherId: "T1",
+    theme: "Résultats scolaires",
+    direction: "Enseignant vers parent",
+    message: "Jean doit renforcer les exercices de mathématiques cette semaine.",
+    status: "Nouveau",
+    date: "31-05-2026",
+  },
+  {
+    id: "MSG4",
+    parentPhone: "+243 820 000 001",
+    studentId: "2",
+    teacherId: "T2",
+    theme: "Absence",
+    direction: "Parent vers enseignant",
+    message: "Marie sera absente demain matin pour un rendez-vous médical.",
+    status: "Nouveau",
     date: "31-05-2026",
   },
 ];

@@ -3,7 +3,7 @@ import { Alert, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
-import { AdminEntity } from "../context/AdminDataContext";
+import { AdminEntity, useAdminData } from "../context/AdminDataContext";
 
 type MenuItem = {
   label: string;
@@ -39,6 +39,7 @@ const teacherMenuItems: MenuItem[] = [
   { label: "📚 Mes classes", route: "Classes" },
   { label: "✅ Appel des présences", route: "TeacherAttendance" },
   { label: "📝 Gestion des notes", route: "TeacherGrades" },
+  { label: "💬 Messages parents", route: "Messages" },
   { label: "📢 Annonces de l'école", route: "Announcements" },
   { label: "🆘 Support", message: "Le module support sera connecté à l'administration." },
 ];
@@ -46,8 +47,10 @@ const teacherMenuItems: MenuItem[] = [
 export default function MenuScreen() {
   const navigation = useNavigation<any>();
   const { session, logout } = useAuth();
+  const { messagesData, studentsData } = useAdminData();
   const isParentStudent = session?.role === "parent_student";
   const isTeacher = session?.role === "teacher";
+  const unreadMessages = getUnreadMessagesCount(session, messagesData, studentsData);
   const menuItems = isParentStudent
     ? parentMenuItems
     : isTeacher
@@ -100,7 +103,12 @@ export default function MenuScreen() {
             Alert.alert("Information", item.message ?? "Cette action sera disponible bientôt.");
           }}
         >
-          <Text style={styles.itemText}>{item.label}</Text>
+          <View style={styles.itemLabelBox}>
+            <Text style={styles.itemText}>{item.label}</Text>
+            {(item.entity === "messages" || item.route === "Messages") && unreadMessages > 0 && (
+              <Text style={styles.badge}>{unreadMessages}</Text>
+            )}
+          </View>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
       ))}
@@ -110,6 +118,37 @@ export default function MenuScreen() {
       </TouchableOpacity>
     </View>
   );
+}
+
+function getUnreadMessagesCount(session: any, messagesData: any[], studentsData: any[]) {
+  if (session?.role === "school_admin") {
+    return messagesData.filter(
+      (message) => message.status === "Nouveau" && message.direction === "Parent vers école"
+    ).length;
+  }
+
+  if (session?.role === "teacher") {
+    const assignedClasses = session.user.assignedClasses ?? [];
+    const teacherParents = studentsData
+      .filter((student) => assignedClasses.includes(student.className))
+      .map((student) => student.parentPhone);
+
+    return messagesData.filter(
+      (message) =>
+        message.status === "Nouveau" &&
+        (message.teacherId === session.user.id || teacherParents.includes(message.parentPhone)) &&
+        message.direction === "Parent vers enseignant"
+    ).length;
+  }
+
+  const parentPhone = session?.user.parentPhone ?? session?.user.children?.[0]?.parentPhone;
+
+  return messagesData.filter(
+    (message) =>
+      message.status === "Nouveau" &&
+      message.parentPhone === parentPhone &&
+      (message.direction === "École vers parent" || message.direction === "Enseignant vers parent")
+  ).length;
 }
 
 const styles = StyleSheet.create({
@@ -137,6 +176,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   itemText: { fontSize: 16, fontWeight: "600", color: "#111827" },
+  itemLabelBox: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
+  },
+  badge: {
+    minWidth: 24,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#DC2626",
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
+    marginLeft: 8,
+  },
   chevron: { fontSize: 28, color: "#9CA3AF" },
   logout: {
     backgroundColor: "#EF4444",

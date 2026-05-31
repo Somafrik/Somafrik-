@@ -16,51 +16,122 @@ import StudentSwitcher from "../components/StudentSwitcher";
 
 export default function MessagesScreen({ navigation }: any) {
   const { session, selectedStudentId } = useAuth();
-  const { createItem, messagesData } = useAdminData();
+  const { createItem, messagesData, studentsData, teachersData } = useAdminData();
   const [theme, setTheme] = useState(messageThemes[0]);
   const [message, setMessage] = useState("");
+  const [recipient, setRecipient] = useState<"school" | "teacher">("school");
+  const [selectedTeacherId, setSelectedTeacherId] = useState(session?.user.id ?? "");
+  const [teacherStudentId, setTeacherStudentId] = useState("");
+
+  const role = session?.role;
   const parentPhone =
     session?.user.parentPhone ??
     session?.user.children?.[0]?.parentPhone ??
     "";
+  const assignedClasses = session?.user.assignedClasses ?? [];
+  const teacherStudents = studentsData.filter((student) => assignedClasses.includes(student.className));
+  const parentChildren = session?.user.children ?? [];
 
-  const parentMessages = useMemo(
-    () => messagesData.filter((item) => item.parentPhone === parentPhone),
-    [messagesData, parentPhone]
-  );
+  const availableTeachers = useMemo(() => {
+    if (role !== "parent_student") {
+      return teachersData;
+    }
+
+    const childrenClasses = parentChildren.map((child) => child.className);
+    return teachersData.filter((teacher) =>
+      (teacher.assignments ?? []).some((assignment) => childrenClasses.includes(assignment.className))
+    );
+  }, [parentChildren, role, teachersData]);
+
+  const visibleMessages = useMemo(() => {
+    if (role === "teacher") {
+      return messagesData.filter(
+        (item) =>
+          (item.direction === "Parent vers enseignant" || item.direction === "Enseignant vers parent") &&
+          (item.teacherId === session?.user.id ||
+            teacherStudents.some((student) => student.parentPhone === item.parentPhone))
+      );
+    }
+
+    if (role === "school_admin") {
+      return messagesData;
+    }
+
+    return messagesData.filter((item) => item.parentPhone === parentPhone);
+  }, [messagesData, parentPhone, role, session?.user.id, teacherStudents]);
+
+  const unreadCount = getUnreadMessagesCount(role, session, visibleMessages);
 
   const sendMessage = () => {
-    if (!parentPhone || !message.trim()) {
+    if (!message.trim()) {
       Alert.alert("Message incomplet", "Veuillez écrire votre message avant l'envoi.");
       return;
     }
 
-    createItem("messages", {
-      id: `messages-${Date.now()}`,
-      parentPhone,
-      studentId: selectedStudentId ?? "",
-      theme,
-      direction: "Parent vers école",
-      message: message.trim(),
-      status: "Nouveau",
-      date: formatDate(new Date()),
-    });
+    if (role === "parent_student") {
+      const teacherId = recipient === "teacher" ? selectedTeacherId || availableTeachers[0]?.id : "";
 
-    setMessage("");
-    Alert.alert("Message envoyé", "L'école recevra votre demande.");
+      if (recipient === "teacher" && !teacherId) {
+        Alert.alert("Enseignant requis", "Veuillez choisir un enseignant.");
+        return;
+      }
+
+      createItem("messages", {
+        id: `messages-${Date.now()}`,
+        parentPhone,
+        studentId: selectedStudentId ?? parentChildren[0]?.id ?? "",
+        teacherId,
+        theme,
+        direction: recipient === "teacher" ? "Parent vers enseignant" : "Parent vers école",
+        message: message.trim(),
+        status: "Nouveau",
+        date: formatDate(new Date()),
+      });
+
+      setMessage("");
+      Alert.alert("Message envoyé", recipient === "teacher" ? "L'enseignant recevra votre message." : "L'école recevra votre demande.");
+      return;
+    }
+
+    if (role === "teacher") {
+      const student =
+        teacherStudents.find((item) => item.id === teacherStudentId) ?? teacherStudents[0];
+
+      if (!student) {
+        Alert.alert("Parent introuvable", "Aucun parent n'est lié à vos classes.");
+        return;
+      }
+
+      createItem("messages", {
+        id: `messages-${Date.now()}`,
+        parentPhone: student.parentPhone,
+        studentId: student.id,
+        teacherId: session?.user.id ?? "",
+        theme,
+        direction: "Enseignant vers parent",
+        message: message.trim(),
+        status: "Nouveau",
+        date: formatDate(new Date()),
+      });
+
+      setMessage("");
+      Alert.alert("Message envoyé", "Le parent recevra votre message.");
+    }
   };
 
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {session?.role === "parent_student" && <StudentSwitcher />}
+        {role === "parent_student" && <StudentSwitcher />}
 
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Messages</Text>
-            <Text style={styles.subtitle}>Échanges entre l'école et le parent</Text>
+            <Text style={styles.subtitle}>
+              {unreadCount} non lu(s) • école, parents et enseignants
+            </Text>
           </View>
-          {session?.role === "school_admin" && (
+          {role === "school_admin" && (
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.adminButton}
@@ -71,9 +142,93 @@ export default function MessagesScreen({ navigation }: any) {
           )}
         </View>
 
-        {session?.role === "parent_student" && (
+        {(role === "parent_student" || role === "teacher") && (
           <View style={styles.composeCard}>
-            <Text style={styles.cardTitle}>Écrire à l'école</Text>
+            <Text style={styles.cardTitle}>
+              {role === "teacher" ? "Écrire à un parent" : "Écrire un message"}
+            </Text>
+
+            {role === "teacher" && (
+              <>
+                <Text style={styles.label}>Parent</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.themeList}
+                >
+                  {teacherStudents.map((student) => {
+                    const selected = (teacherStudentId || teacherStudents[0]?.id) === student.id;
+
+                    return (
+                      <TouchableOpacity
+                        key={student.id}
+                        activeOpacity={0.85}
+                        style={[styles.themeChip, selected && styles.themeChipActive]}
+                        onPress={() => setTeacherStudentId(student.id)}
+                      >
+                        <Text style={[styles.themeText, selected && styles.themeTextActive]}>
+                          {student.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+
+            {role === "parent_student" && (
+              <>
+                <Text style={styles.label}>Destinataire</Text>
+                <View style={styles.segmentRow}>
+                  <SegmentButton
+                    label="École"
+                    selected={recipient === "school"}
+                    onPress={() => setRecipient("school")}
+                  />
+                  <SegmentButton
+                    label="Enseignant"
+                    selected={recipient === "teacher"}
+                    onPress={() => {
+                      setRecipient("teacher");
+                      setSelectedTeacherId((current) => current || availableTeachers[0]?.id || "");
+                    }}
+                  />
+                </View>
+              </>
+            )}
+
+            {role === "parent_student" && recipient === "teacher" && (
+              <>
+                <Text style={styles.label}>Enseignant</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.themeList}
+                >
+                  {availableTeachers.map((teacher) => (
+                    <TouchableOpacity
+                      key={teacher.id}
+                      activeOpacity={0.85}
+                      style={[
+                        styles.themeChip,
+                        selectedTeacherId === teacher.id && styles.themeChipActive,
+                      ]}
+                      onPress={() => setSelectedTeacherId(teacher.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.themeText,
+                          selectedTeacherId === teacher.id && styles.themeTextActive,
+                        ]}
+                      >
+                        {teacher.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
             <Text style={styles.label}>Thème</Text>
             <ScrollView
               horizontal
@@ -102,7 +257,7 @@ export default function MessagesScreen({ navigation }: any) {
             <TextInput
               value={message}
               onChangeText={setMessage}
-              placeholder="Expliquez votre demande..."
+              placeholder="Expliquez votre message..."
               placeholderTextColor="#94A3B8"
               multiline
               style={styles.messageInput}
@@ -116,31 +271,42 @@ export default function MessagesScreen({ navigation }: any) {
         )}
 
         <Text style={styles.sectionTitle}>Historique</Text>
-        {parentMessages.map((item) => {
+        {visibleMessages.map((item) => {
           const fromSchool = item.direction === "École vers parent";
+          const fromTeacher = item.direction === "Enseignant vers parent";
+          const teacher = teachersData.find((row) => row.id === item.teacherId);
 
           return (
             <View key={item.id} style={styles.messageCard}>
               <View style={styles.messageTop}>
-                <View style={[styles.directionIcon, fromSchool ? styles.schoolIcon : styles.parentIcon]}>
+                <View
+                  style={[
+                    styles.directionIcon,
+                    fromSchool ? styles.schoolIcon : fromTeacher ? styles.teacherIcon : styles.parentIcon,
+                  ]}
+                >
                   <Ionicons
-                    name={fromSchool ? "school-outline" : "person-outline"}
+                    name={fromSchool ? "school-outline" : fromTeacher ? "school-outline" : "person-outline"}
                     size={18}
-                    color={fromSchool ? "#2563EB" : "#0F766E"}
+                    color={fromSchool ? "#2563EB" : fromTeacher ? "#7C3AED" : "#0F766E"}
                   />
                 </View>
                 <View style={styles.messageHeaderText}>
                   <Text style={styles.messageTheme}>{item.theme}</Text>
-                  <Text style={styles.messageMeta}>{item.direction} • {item.date}</Text>
+                  <Text style={styles.messageMeta}>
+                    {item.direction} • {teacher?.name ?? item.parentPhone} • {item.date}
+                  </Text>
                 </View>
-                <Text style={styles.status}>{item.status}</Text>
+                <Text style={[styles.status, item.status === "Nouveau" && styles.unreadStatus]}>
+                  {item.status}
+                </Text>
               </View>
               <Text style={styles.messageBody}>{item.message}</Text>
             </View>
           );
         })}
 
-        {parentMessages.length === 0 && (
+        {visibleMessages.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="chatbubbles-outline" size={24} color="#94A3B8" />
             <Text style={styles.emptyText}>Aucun message pour ce compte.</Text>
@@ -149,6 +315,49 @@ export default function MessagesScreen({ navigation }: any) {
       </ScrollView>
     </View>
   );
+}
+
+function SegmentButton({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={[styles.segmentButton, selected && styles.segmentButtonActive]}
+      onPress={onPress}
+    >
+      <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function getUnreadMessagesCount(role: string | undefined, session: any, messages: any[]) {
+  if (role === "school_admin") {
+    return messages.filter(
+      (message) => message.status === "Nouveau" && message.direction === "Parent vers école"
+    ).length;
+  }
+
+  if (role === "teacher") {
+    return messages.filter(
+      (message) =>
+        message.status === "Nouveau" &&
+        message.direction === "Parent vers enseignant" &&
+        message.teacherId === session?.user.id
+    ).length;
+  }
+
+  return messages.filter(
+    (message) =>
+      message.status === "Nouveau" &&
+      (message.direction === "École vers parent" || message.direction === "Enseignant vers parent")
+  ).length;
 }
 
 function formatDate(date: Date) {
@@ -184,6 +393,22 @@ const styles = StyleSheet.create({
   },
   cardTitle: { color: "#0F172A", fontSize: 18, fontWeight: "900", marginBottom: 12 },
   label: { color: "#334155", fontSize: 12, fontWeight: "900", marginBottom: 8 },
+  segmentRow: {
+    backgroundColor: "#F1F5F9",
+    borderRadius: 16,
+    padding: 4,
+    flexDirection: "row",
+    marginBottom: 14,
+  },
+  segmentButton: {
+    flex: 1,
+    borderRadius: 13,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  segmentButtonActive: { backgroundColor: "#0F172A" },
+  segmentText: { color: "#64748B", fontWeight: "900" },
+  segmentTextActive: { color: "#FFFFFF" },
   themeList: { gap: 8, paddingRight: 4, marginBottom: 14 },
   themeChip: {
     borderWidth: 1,
@@ -236,6 +461,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   schoolIcon: { backgroundColor: "#EFF6FF" },
+  teacherIcon: { backgroundColor: "#F5F3FF" },
   parentIcon: { backgroundColor: "#ECFDF5" },
   messageHeaderText: { flex: 1 },
   messageTheme: { color: "#0F172A", fontSize: 15, fontWeight: "900" },
@@ -248,6 +474,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     fontSize: 11,
     fontWeight: "900",
+  },
+  unreadStatus: {
+    color: "#B45309",
+    backgroundColor: "#FEF3C7",
   },
   messageBody: { color: "#334155", fontWeight: "700", lineHeight: 20 },
   emptyState: {
