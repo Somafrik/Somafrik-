@@ -3,31 +3,37 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
+import { AdminEntity } from "../context/AdminDataContext";
 
-const adminMenuItems = [
-  "🏫 Profil école",
-  "⚙️ Paramètres",
-  "👥 Utilisateurs",
-  "📊 Rapports",
-  "📢 Annonces",
-  "🆘 Support",
+type MenuItem = {
+  label: string;
+  entity?: AdminEntity;
+};
+
+const adminMenuItems: MenuItem[] = [
+  { label: "👥 Élèves", entity: "students" },
+  { label: "👨‍🏫 Enseignants", entity: "teachers" },
+  { label: "📚 Classes", entity: "classes" },
+  { label: "💰 Paiements", entity: "payments" },
+  { label: "📢 Annonces", entity: "announcements" },
+  { label: "🆘 Support" },
 ];
 
-const parentMenuItems = [
-  "👨‍👩‍👧 Compte parent",
-  "📚 Suivi scolaire",
-  "💰 Situation des frais",
-  "📢 Annonces de l'école",
-  "🆘 Support",
+const parentMenuItems: MenuItem[] = [
+  { label: "👨‍👩‍👧 Compte parent" },
+  { label: "📚 Suivi scolaire" },
+  { label: "💰 Situation des frais" },
+  { label: "📢 Annonces de l'école" },
+  { label: "🆘 Support" },
 ];
 
-const teacherMenuItems = [
-  "👨‍🏫 Profil enseignant",
-  "📚 Mes classes",
-  "✅ Appel des présences",
-  "📝 Gestion des notes",
-  "📢 Annonces de l'école",
-  "🆘 Support",
+const teacherMenuItems: MenuItem[] = [
+  { label: "👨‍🏫 Profil enseignant" },
+  { label: "📚 Mes classes" },
+  { label: "✅ Appel des présences" },
+  { label: "📝 Gestion des notes" },
+  { label: "📢 Annonces de l'école" },
+  { label: "🆘 Support" },
 ];
 
 export default function MenuScreen() {
@@ -70,8 +76,16 @@ export default function MenuScreen() {
       )}
 
       {menuItems.map((item) => (
-        <TouchableOpacity key={item} style={styles.item}>
-          <Text style={styles.itemText}>{item}</Text>
+        <TouchableOpacity
+          key={item.label}
+          style={styles.item}
+          onPress={() => {
+            if (item.entity) {
+              navigation.navigate("AdminCrud", { entity: item.entity });
+            }
+          }}
+        >
+          <Text style={styles.itemText}>{item.label}</Text>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
       ))}

@@ -15,6 +15,8 @@ import StudentPaymentsScreen from "../screens/StudentPaymentsScreen";
 import TeachersScreen from "../screens/TeachersScreen";
 import PaymentsScreen from "../screens/PaymentsScreen";
 import AnnouncementsScreen from "../screens/AnnouncementsScreen";
+import AdminCrudScreen from "../screens/AdminCrudScreen";
+import { AdminEntity } from "../context/AdminDataContext";
 
 export type UserRole = "school_admin" | "teacher" | "parent_student";
 
@@ -46,6 +48,9 @@ export type RootStackParamList = {
   Teachers: undefined;
   Payments: undefined;
   Announcements: undefined;
+  AdminCrud: {
+    entity: AdminEntity;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -86,6 +91,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Teachers" component={TeachersScreen} />
         <Stack.Screen name="Payments" component={PaymentsScreen} />
         <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
+        <Stack.Screen name="AdminCrud" component={AdminCrudScreen} options={{ title: "Administration" }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

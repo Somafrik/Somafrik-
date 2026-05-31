@@ -16,23 +16,28 @@ export default function SchoolManagementScreen({
       <Text style={styles.title}>Gestion de l'école</Text>
 
       <MenuCard
+        title="👥 Élèves"
+        onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
+      />
+
+      <MenuCard
         title="👨‍🏫 Enseignants"
-        onPress={() => navigation.navigate("Teachers")}
+        onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
       />
 
       <MenuCard
         title="📚 Classes"
-        onPress={() => navigation.navigate("Classes")}
+        onPress={() => navigation.navigate("AdminCrud", { entity: "classes" })}
       />
 
       <MenuCard
         title="💰 Paiements"
-        onPress={() => navigation.navigate("Payments")}
+        onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
       />
 
       <MenuCard
         title="📢 Annonces"
-        onPress={() => navigation.navigate("Announcements")}
+        onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
       />
     </ScrollView>
   );

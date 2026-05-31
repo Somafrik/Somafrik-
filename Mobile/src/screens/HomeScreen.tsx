@@ -299,10 +299,7 @@ export default function HomeScreen({ navigation }: any) {
         {/* Bienvenue */}
         <View style={styles.welcomeCard}>
           <View>
-            <Text style={styles.welcomeTitle}>Bonjour 👋</Text>
-            <Text style={styles.welcomeText}>
-              {userName}, bienvenue dans votre espace SchoolLink.
-            </Text>
+            <Text style={styles.welcomeTitle}>Bonjour {userName}</Text>
           </View>
 
           <View style={styles.welcomeIcon}>
@@ -388,22 +385,27 @@ export default function HomeScreen({ navigation }: any) {
           <QuickAction
             icon="add-circle-outline"
             label="Élèves"
-            onPress={() => navigation.navigate("Students")}
+            onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
           />
           <QuickAction
             icon="person-add-outline"
             label="Profs"
-            onPress={() => navigation.navigate("Teachers")}
+            onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
           />
           <QuickAction
             icon="card-outline"
             label="Paiements"
-            onPress={() => navigation.navigate("Payments")}
+            onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
           />
           <QuickAction
             icon="megaphone-outline"
             label="Annonces"
-            onPress={() => navigation.navigate("Announcements")}
+            onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+          />
+          <QuickAction
+            icon="grid-outline"
+            label="Classes"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "classes" })}
           />
         </View>
       </ScrollView>
