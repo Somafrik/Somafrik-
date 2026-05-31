@@ -8,9 +8,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import {
   announcements,
+  getStudentById,
   getPaymentRate,
   getPresenceRate,
+  notes,
   payments,
+  presences,
   school,
   students,
   teachers,
@@ -23,6 +26,133 @@ export default function HomeScreen({ navigation }: any) {
   const presenceRate = getPresenceRate(studentIds);
   const paymentRate = getPaymentRate(studentIds);
   const userName = session?.user.name ?? "Administrateur";
+
+  if (session?.role === "parent_student" && session.user.id) {
+    const student = getStudentById(session.user.id);
+    const studentNotes = notes.filter((note) => note.studentId === session.user.id);
+    const studentPresences = presences.filter((presence) => presence.studentId === session.user.id);
+    const studentPayments = payments.filter((payment) => payment.studentId === session.user.id);
+    const average =
+      studentNotes.length === 0
+        ? 0
+        : studentNotes.reduce((sum, note) => sum + note.value, 0) / studentNotes.length;
+    const presentCount = studentPresences.filter((presence) => presence.present).length;
+    const paidCount = studentPayments.filter((payment) => payment.status === "PAYE").length;
+    const latestAnnouncement = announcements[0];
+
+    return (
+      <View style={styles.screen}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.schoolCard}>
+            <View style={styles.schoolIconBox}>
+              <Ionicons name="person-circle-outline" size={30} color="#2563EB" />
+            </View>
+
+            <View style={styles.schoolInfo}>
+              <Text style={styles.schoolName}>{student?.name ?? session.user.name}</Text>
+              <Text style={styles.schoolCity}>{student?.className ?? "Classe non renseignée"}</Text>
+              <Text style={styles.schoolTagline}>{school.name}</Text>
+            </View>
+          </View>
+
+          <View style={styles.parentWelcomeCard}>
+            <View>
+              <Text style={styles.welcomeTitle}>Suivi scolaire</Text>
+              <Text style={styles.welcomeText}>
+                Consultez les résultats, présences et paiements de l'élève.
+              </Text>
+            </View>
+
+            <View style={styles.welcomeIcon}>
+              <Ionicons name="book-outline" size={28} color="#FFFFFF" />
+            </View>
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Résumé de l'élève</Text>
+            <Text style={styles.sectionLink}>Aujourd'hui</Text>
+          </View>
+
+          <View style={styles.statsGrid}>
+            <StatCard
+              icon="school-outline"
+              value={average.toFixed(1)}
+              label="Moyenne"
+              color="#2563EB"
+              bg="#EFF6FF"
+            />
+
+            <StatCard
+              icon="checkmark-circle-outline"
+              value={`${presentCount}/${studentPresences.length}`}
+              label="Présences"
+              color="#16A34A"
+              bg="#ECFDF5"
+            />
+
+            <StatCard
+              icon="document-text-outline"
+              value={String(studentNotes.length)}
+              label="Notes"
+              color="#7C3AED"
+              bg="#F5F3FF"
+            />
+
+            <StatCard
+              icon="card-outline"
+              value={`${paidCount}/${studentPayments.length}`}
+              label="Paiements"
+              color="#EA580C"
+              bg="#FFF7ED"
+            />
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Accès rapides</Text>
+          </View>
+
+          <View style={styles.actionsGrid}>
+            <QuickAction
+              icon="person-outline"
+              label="Profil"
+              onPress={() => navigation.navigate("StudentDetail", { studentId: session.user.id })}
+            />
+            <QuickAction
+              icon="book-outline"
+              label="Notes"
+              onPress={() => navigation.navigate("StudentNotes", { studentId: session.user.id })}
+            />
+            <QuickAction
+              icon="calendar-outline"
+              label="Présences"
+              onPress={() => navigation.navigate("StudentPresences", { studentId: session.user.id })}
+            />
+            <QuickAction
+              icon="card-outline"
+              label="Paiements"
+              onPress={() => navigation.navigate("StudentPayments", { studentId: session.user.id })}
+            />
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Dernière annonce</Text>
+          </View>
+
+          <View style={styles.activityCard}>
+            <ActivityItem
+              icon="megaphone-outline"
+              title={latestAnnouncement?.title ?? "Aucune annonce"}
+              description={latestAnnouncement?.message ?? "Les annonces de l'école apparaîtront ici."}
+              color="#7C3AED"
+            />
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -345,6 +475,22 @@ const styles = StyleSheet.create({
     marginBottom: 26,
     shadowColor: "#1D4ED8",
     shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+
+  parentWelcomeCard: {
+    backgroundColor: "#0F766E",
+    borderRadius: 30,
+    padding: 22,
+    minHeight: 128,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 26,
+    shadowColor: "#0F766E",
+    shadowOpacity: 0.24,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,
