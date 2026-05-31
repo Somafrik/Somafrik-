@@ -37,9 +37,15 @@ export default function ClassesScreen({ navigation }: any) {
             <Text style={styles.subtitle}>Gérez les classes et les élèves</Text>
           </View>
 
-          <TouchableOpacity activeOpacity={0.85} style={styles.addButton}>
-            <Ionicons name="add" size={26} color="#FFFFFF" />
-          </TouchableOpacity>
+          {session?.role === "school_admin" && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.addButton}
+              onPress={() => navigation.navigate("AdminCrud", { entity: "classes" })}
+            >
+              <Ionicons name="add" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.searchBox}>
@@ -51,7 +57,11 @@ export default function ClassesScreen({ navigation }: any) {
           />
         </View>
 
-        <View style={styles.summaryCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.summaryCard}
+          onPress={() => navigation.navigate("Students", { className: "Toutes les classes" })}
+        >
           <View>
             <Text style={styles.summaryValue}>{visibleClasses.length}</Text>
             <Text style={styles.summaryLabel}>Classes actives</Text>
@@ -63,7 +73,7 @@ export default function ClassesScreen({ navigation }: any) {
             <Text style={styles.summaryValue}>{totalStudents}</Text>
             <Text style={styles.summaryLabel}>Élèves inscrits</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>Liste des classes</Text>
 

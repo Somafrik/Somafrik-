@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
+import { messageThemes } from "../data/catalog";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
 
@@ -38,6 +39,7 @@ const configs: Record<
     fields: [
       { key: "name", label: "Nom", placeholder: "Nom complet" },
       { key: "matricule", label: "Matricule", placeholder: "MAT005" },
+      { key: "gender", label: "Sexe", placeholder: "Choisir le sexe", type: "select" },
       { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
       { key: "parentPhone", label: "Téléphone parent", placeholder: "+243 ..." },
     ],
@@ -48,6 +50,7 @@ const configs: Record<
     fields: [
       { key: "id", label: "ID enseignant", placeholder: "T5" },
       { key: "name", label: "Nom", placeholder: "Nom complet" },
+      { key: "gender", label: "Sexe", placeholder: "Choisir le sexe", type: "select" },
       { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
     ],
   },
@@ -56,7 +59,7 @@ const configs: Record<
     addLabel: "Ajouter une classe",
     fields: [
       { key: "name", label: "Nom de classe", placeholder: "4ème A" },
-      { key: "teacherId", label: "Responsable", placeholder: "T1" },
+      { key: "teacherId", label: "Responsable", placeholder: "Choisir un enseignant", type: "select" },
     ],
   },
   courses: {
@@ -72,7 +75,7 @@ const configs: Record<
     title: "Affectations profs",
     addLabel: "Affecter un cours",
     fields: [
-      { key: "teacherId", label: "ID enseignant", placeholder: "T1" },
+      { key: "teacherId", label: "ID enseignant", placeholder: "Choisir un enseignant", type: "select" },
       { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
       { key: "course", label: "Cours", placeholder: "Choisir un cours", type: "select" },
     ],
@@ -104,6 +107,19 @@ const configs: Record<
       { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
     ],
   },
+  messages: {
+    title: "Messages parents",
+    addLabel: "Écrire à un parent",
+    fields: [
+      { key: "parentPhone", label: "Parent", placeholder: "Choisir un parent", type: "select" },
+      { key: "studentId", label: "Élève", placeholder: "Choisir un élève", type: "select" },
+      { key: "theme", label: "Thème", placeholder: "Choisir un thème", type: "select" },
+      { key: "direction", label: "Sens", placeholder: "Choisir le sens", type: "select" },
+      { key: "message", label: "Message", placeholder: "Message au parent" },
+      { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
+      { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
+    ],
+  },
 };
 
 export default function AdminCrudScreen({ route }: Props) {
@@ -113,6 +129,7 @@ export default function AdminCrudScreen({ route }: Props) {
     createItem,
     updateItem,
     deleteItem,
+    studentsData,
     teachersData,
     classesData,
     coursesData,
@@ -369,6 +386,9 @@ export default function AdminCrudScreen({ route }: Props) {
             <ScrollView style={styles.selectorList}>
               {getSelectOptions(
                 selectField?.key,
+                entity,
+                studentsData,
+                teachersData,
                 classesData,
                 coursesData,
                 paymentStatusesData,
@@ -489,6 +509,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       id: nextId,
       name: form.name,
       matricule: form.matricule,
+      gender: form.gender || "Non renseigné",
       className: form.className,
       schoolCode: "SCH001",
       parentPhone: form.parentPhone ?? "",
@@ -500,6 +521,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     return {
       id: form.id.trim(),
       name: form.name,
+      gender: form.gender || "Non renseigné",
       phone: form.phone,
       assignments: [],
     };
@@ -550,6 +572,20 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     };
   }
 
+  if (entity === "messages") {
+    if (!form.parentPhone || !form.theme || !form.message) return null;
+    return {
+      id: nextId,
+      parentPhone: form.parentPhone,
+      studentId: form.studentId ?? "",
+      theme: form.theme,
+      direction: form.direction || "École vers parent",
+      message: form.message,
+      status: form.status || "Nouveau",
+      date: form.date || formatDate(new Date()),
+    };
+  }
+
   if (!form.title || !form.message) return null;
   return {
     id: nextId,
@@ -564,19 +600,23 @@ function getPrimaryText(entity: AdminEntity, item: any) {
   if (entity === "paymentStatuses") return item.label;
   if (entity === "announcements") return item.title;
   if (entity === "assignments") return `${item.className} - ${item.course}`;
+  if (entity === "messages") return item.theme;
   return item.name;
 }
 
 function getSecondaryText(entity: AdminEntity, item: any) {
-  if (entity === "students") return `${item.matricule} • ${item.className}`;
+  if (entity === "students") return `${item.matricule} • ${item.gender ?? "Sexe non renseigné"} • ${item.className}`;
   if (entity === "teachers") {
-    return `ID : ${item.id} • ${item.phone}`;
+    return `ID : ${item.id} • ${item.gender ?? "Sexe non renseigné"} • ${item.phone}`;
   }
   if (entity === "classes") return `Responsable : ${item.teacherId || "Non assigné"}`;
   if (entity === "courses") return `${item.className} • Coefficient : ${item.coefficient}`;
   if (entity === "assignments") return `Enseignant : ${item.teacherId}`;
   if (entity === "paymentStatuses") return `Code : ${item.value}`;
   if (entity === "payments") return `Élève ${item.studentId} • ${item.date} • ${item.status}`;
+  if (entity === "messages") {
+    return `${item.direction} • ${item.parentPhone} • ${item.status} • ${item.date}`;
+  }
   return `${item.date} • ${item.message}`;
 }
 
@@ -599,6 +639,22 @@ function validateBusinessRules({
   coursesData,
   assignmentsData,
 }: BusinessValidationInput) {
+  if (entity === "classes") {
+    const teacherId = normalize(item.teacherId);
+
+    if (!teacherId) {
+      return null;
+    }
+
+    const teacherExists = teachersData.some((teacher) => normalize(teacher.id) === teacherId);
+
+    if (!teacherExists) {
+      return "Classe impossible : cet ID responsable n'est pas enregistré dans les enseignants.";
+    }
+
+    return null;
+  }
+
   if (entity !== "assignments") {
     return null;
   }
@@ -652,11 +708,41 @@ function normalize(value: unknown) {
 
 function getSelectOptions(
   key: string | undefined,
+  entity: AdminEntity,
+  studentsData: any[],
+  teachersData: any[],
   classesData: any[],
   coursesData: any[],
   paymentStatusesData: any[],
   form: Record<string, string>
 ) {
+  if (key === "gender") {
+    return ["Masculin", "Féminin"];
+  }
+
+  if (key === "teacherId") {
+    return teachersData.map((teacher) => teacher.id).filter(Boolean);
+  }
+
+  if (key === "parentPhone") {
+    return [...new Set(studentsData.map((student) => student.parentPhone).filter(Boolean))];
+  }
+
+  if (key === "studentId") {
+    return studentsData
+      .filter((student) => !form.parentPhone || student.parentPhone === form.parentPhone)
+      .map((student) => student.id)
+      .filter(Boolean);
+  }
+
+  if (key === "theme") {
+    return messageThemes;
+  }
+
+  if (key === "direction") {
+    return ["École vers parent", "Parent vers école"];
+  }
+
   if (key === "className") {
     return classesData.map((schoolClass) => schoolClass.name).filter(Boolean);
   }
@@ -670,6 +756,10 @@ function getSelectOptions(
   }
 
   if (key === "status") {
+    if (entity === "messages") {
+      return ["Nouveau", "En cours", "Traité"];
+    }
+
     return paymentStatusesData.map((status) => status.value).filter(Boolean);
   }
 

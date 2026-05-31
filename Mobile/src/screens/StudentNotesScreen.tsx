@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, notes } from "../data/catalog";
@@ -7,7 +7,7 @@ import StudentSwitcher from "../components/StudentSwitcher";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentNotes">;
 
-export default function StudentNotesScreen({ route }: Partial<Props>) {
+export default function StudentNotesScreen({ route, navigation }: Partial<Props>) {
   const { selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
   const student = studentId ? getStudentById(studentId) : undefined;
@@ -23,10 +23,14 @@ export default function StudentNotesScreen({ route }: Partial<Props>) {
       <Text style={styles.title}>Notes</Text>
       <Text style={styles.subtitle}>{student?.name ?? "Élève"}</Text>
 
-      <View style={styles.summaryCard}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.summaryCard}
+        onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
+      >
         <Text style={styles.summaryLabel}>Moyenne générale</Text>
         <Text style={styles.summaryValue}>{average.toFixed(1)}/20</Text>
-      </View>
+      </TouchableOpacity>
 
       <FlatList
         data={studentNotes}
@@ -34,7 +38,11 @@ export default function StudentNotesScreen({ route }: Partial<Props>) {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={<Text style={styles.empty}>Aucune note enregistrée.</Text>}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.card}
+            onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
+          >
             <View>
               <Text style={styles.subject}>{item.subject}</Text>
               <Text style={styles.meta}>
@@ -42,7 +50,7 @@ export default function StudentNotesScreen({ route }: Partial<Props>) {
               </Text>
             </View>
             <Text style={styles.grade}>{item.value}/20</Text>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </View>

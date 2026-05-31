@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, presences } from "../data/catalog";
@@ -7,7 +7,7 @@ import StudentSwitcher from "../components/StudentSwitcher";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPresences">;
 
-export default function StudentPresencesScreen({ route }: Partial<Props>) {
+export default function StudentPresencesScreen({ route, navigation }: Partial<Props>) {
   const { selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
   const student = studentId ? getStudentById(studentId) : undefined;
@@ -26,22 +26,30 @@ export default function StudentPresencesScreen({ route }: Partial<Props>) {
       <Text style={styles.title}>Présences</Text>
       <Text style={styles.subtitle}>{student?.name ?? "Élève"}</Text>
 
-      <View style={styles.summaryCard}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.summaryCard}
+        onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
+      >
         <Text style={styles.summaryLabel}>Taux de présence</Text>
         <Text style={styles.summaryValue}>{rate}%</Text>
-      </View>
+      </TouchableOpacity>
 
       <FlatList
         data={presencesEleve}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={<Text style={styles.empty}>Aucune présence enregistrée.</Text>}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.card}
+            onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
+          >
             <Text style={styles.name}>{item.date}</Text>
             <Text style={[styles.badge, item.present ? styles.success : styles.danger]}>
               {item.present ? "Présent" : "Absent"}
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </View>

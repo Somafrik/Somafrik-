@@ -10,6 +10,7 @@ const teachers = [
   {
     id: "T1",
     name: "Jean Kabeya",
+    gender: "Masculin",
     phone: "+243 810 000 101",
     password: "1234",
     assignments: [
@@ -21,6 +22,7 @@ const teachers = [
   {
     id: "T2",
     name: "Marie Mukendi",
+    gender: "Féminin",
     phone: "+243 810 000 102",
     password: "1234",
     assignments: [
@@ -31,6 +33,7 @@ const teachers = [
   {
     id: "T3",
     name: "Patrick Ilunga",
+    gender: "Masculin",
     phone: "+243 810 000 103",
     password: "1234",
     assignments: [
@@ -41,6 +44,7 @@ const teachers = [
   {
     id: "T4",
     name: "Sarah Mbuyi",
+    gender: "Féminin",
     phone: "+243 810 000 104",
     password: "1234",
     assignments: [
@@ -58,10 +62,10 @@ const classes = [
 ];
 
 const students = [
-  { id: "1", name: "Jean Dupont", matricule: "MAT001", className: "6ème A", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 001" },
-  { id: "2", name: "Marie Martin", matricule: "MAT002", className: "6ème A", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 001" },
-  { id: "3", name: "Paul Bernard", matricule: "MAT003", className: "6ème B", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 003" },
-  { id: "4", name: "Sarah Mbala", matricule: "MAT004", className: "5ème A", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 004" },
+  { id: "1", name: "Jean Dupont", matricule: "MAT001", gender: "Masculin", className: "6ème A", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 001" },
+  { id: "2", name: "Marie Martin", matricule: "MAT002", gender: "Féminin", className: "6ème A", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 001" },
+  { id: "3", name: "Paul Bernard", matricule: "MAT003", gender: "Masculin", className: "6ème B", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 003" },
+  { id: "4", name: "Sarah Mbala", matricule: "MAT004", gender: "Féminin", className: "5ème A", schoolCode: "SCH001", pin: "1234", parentPhone: "+243 820 000 004" },
 ];
 
 const notes = [

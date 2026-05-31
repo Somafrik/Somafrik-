@@ -2,6 +2,7 @@ export type Student = {
   id: string;
   name: string;
   matricule: string;
+  gender: "Masculin" | "Féminin" | string;
   className: string;
   schoolCode: string;
   parentPhone: string;
@@ -10,6 +11,7 @@ export type Student = {
 export type Teacher = {
   id: string;
   name: string;
+  gender: "Masculin" | "Féminin" | string;
   phone: string;
   assignments?: TeacherAssignment[];
   assignedClasses?: string[];
@@ -73,6 +75,17 @@ export type Announcement = {
   date: string;
 };
 
+export type SchoolMessage = {
+  id: string;
+  parentPhone: string;
+  studentId?: string;
+  theme: string;
+  direction: "École vers parent" | "Parent vers école" | string;
+  message: string;
+  status: "Nouveau" | "En cours" | "Traité" | string;
+  date: string;
+};
+
 export const school = {
   id: "SCH001",
   code: "SCH001",
@@ -85,6 +98,7 @@ export const teachers: Teacher[] = [
   {
     id: "T1",
     name: "Jean Kabeya",
+    gender: "Masculin",
     phone: "+243 810 000 101",
     assignments: [
       { className: "6ème A", course: "Mathématiques" },
@@ -95,6 +109,7 @@ export const teachers: Teacher[] = [
   {
     id: "T2",
     name: "Marie Mukendi",
+    gender: "Féminin",
     phone: "+243 810 000 102",
     assignments: [
       { className: "6ème A", course: "Français" },
@@ -104,6 +119,7 @@ export const teachers: Teacher[] = [
   {
     id: "T3",
     name: "Patrick Ilunga",
+    gender: "Masculin",
     phone: "+243 810 000 103",
     assignments: [
       { className: "6ème B", course: "Sciences" },
@@ -113,6 +129,7 @@ export const teachers: Teacher[] = [
   {
     id: "T4",
     name: "Sarah Mbuyi",
+    gender: "Féminin",
     phone: "+243 810 000 104",
     assignments: [
       { className: "5ème A", course: "Histoire" },
@@ -148,10 +165,10 @@ export const classes: SchoolClass[] = [
 ];
 
 export const students: Student[] = [
-  { id: "1", name: "Jean Dupont", matricule: "MAT001", className: "6ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 001" },
-  { id: "2", name: "Marie Martin", matricule: "MAT002", className: "6ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 001" },
-  { id: "3", name: "Paul Bernard", matricule: "MAT003", className: "6ème B", schoolCode: "SCH001", parentPhone: "+243 820 000 003" },
-  { id: "4", name: "Sarah Mbala", matricule: "MAT004", className: "5ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 004" },
+  { id: "1", name: "Jean Dupont", matricule: "MAT001", gender: "Masculin", className: "6ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 001" },
+  { id: "2", name: "Marie Martin", matricule: "MAT002", gender: "Féminin", className: "6ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 001" },
+  { id: "3", name: "Paul Bernard", matricule: "MAT003", gender: "Masculin", className: "6ème B", schoolCode: "SCH001", parentPhone: "+243 820 000 003" },
+  { id: "4", name: "Sarah Mbala", matricule: "MAT004", gender: "Féminin", className: "5ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 004" },
 ];
 
 export const notes: NoteItem[] = [
@@ -183,6 +200,39 @@ export const paymentStatuses: PaymentStatus[] = [
 export const announcements: Announcement[] = [
   { id: "A1", title: "Réunion des parents", message: "Réunion générale samedi à 10h00.", date: "30-05-2026" },
   { id: "A2", title: "Examens", message: "Les évaluations commencent le 10 juin.", date: "29-05-2026" },
+];
+
+export const messageThemes = [
+  "Dérogation paiement",
+  "Absence",
+  "Discipline",
+  "Résultats scolaires",
+  "Santé",
+  "Transport",
+  "Autre",
+];
+
+export const schoolMessages: SchoolMessage[] = [
+  {
+    id: "MSG1",
+    parentPhone: "+243 820 000 001",
+    studentId: "1",
+    theme: "Dérogation paiement",
+    direction: "Parent vers école",
+    message: "Demande de dérogation pour régler la deuxième tranche le 10 du mois prochain.",
+    status: "Nouveau",
+    date: "31-05-2026",
+  },
+  {
+    id: "MSG2",
+    parentPhone: "+243 820 000 001",
+    studentId: "2",
+    theme: "Résultats scolaires",
+    direction: "École vers parent",
+    message: "Merci de passer à l'école cette semaine pour échanger avec le titulaire.",
+    status: "En cours",
+    date: "31-05-2026",
+  },
 ];
 
 export function getStudentById(studentId: string) {

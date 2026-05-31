@@ -1,29 +1,47 @@
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getTeacherClasses, getTeacherCourses, teachers } from "../data/catalog";
+import { getTeacherClasses, getTeacherCourses } from "../data/catalog";
+import { useAdminData } from "../context/AdminDataContext";
 
-export default function TeachersScreen() {
+export default function TeachersScreen({ navigation }: any) {
+  const { teachersData } = useAdminData();
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Enseignants</Text>
       <Text style={styles.subtitle}>Équipe pédagogique active</Text>
 
-      {teachers.map((teacher) => {
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.addButton}
+        onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
+      >
+        <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.addButtonText}>Ajouter un enseignant</Text>
+      </TouchableOpacity>
+
+      {teachersData.map((teacher) => {
         const teacherClasses = getTeacherClasses(teacher);
         const teacherCourses = getTeacherCourses(teacher);
 
         return (
-          <View key={teacher.id} style={styles.card}>
+          <TouchableOpacity
+            key={teacher.id}
+            activeOpacity={0.85}
+            style={styles.card}
+            onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
+          >
             <View style={styles.iconBox}>
               <Ionicons name="school-outline" size={24} color="#2563EB" />
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.name}>{teacher.name}</Text>
+              <Text style={styles.meta}>Sexe : {teacher.gender ?? "Non renseigné"}</Text>
               <Text style={styles.meta}>{teacherCourses.join(", ") || "Cours non renseignés"}</Text>
               <Text style={styles.meta}>Classes : {teacherClasses.join(", ") || "Non assignées"}</Text>
             </View>
             <Text style={styles.phone}>{teacher.phone}</Text>
-          </View>
+          </TouchableOpacity>
         );
       })}
     </ScrollView>
@@ -49,6 +67,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: "#64748B",
     fontWeight: "700",
+  },
+  addButton: {
+    backgroundColor: "#2563EB",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    marginLeft: 8,
   },
   card: {
     backgroundColor: "#FFFFFF",

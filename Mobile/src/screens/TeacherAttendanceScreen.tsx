@@ -25,14 +25,18 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
 
         return (
           <View key={className} style={styles.classCard}>
-            <View style={styles.classHeader}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.classHeader}
+              onPress={() => navigation.navigate("Students", { className })}
+            >
               <View>
                 <Text style={styles.className}>{className}</Text>
                 <Text style={styles.meta}>{classCourses.join(", ") || "Cours non renseignés"}</Text>
                 <Text style={styles.meta}>{presentCount}/{rows.length} présent(s)</Text>
               </View>
               <Ionicons name="checkbox-outline" size={24} color="#16A34A" />
-            </View>
+            </TouchableOpacity>
 
             {rows.map((student) => {
               const latest = [...presences]

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, payments } from "../data/catalog";
@@ -7,7 +7,7 @@ import StudentSwitcher from "../components/StudentSwitcher";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPayments">;
 
-export default function StudentPaymentsScreen({ route }: Partial<Props>) {
+export default function StudentPaymentsScreen({ route, navigation }: Partial<Props>) {
   const { selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
   const student = studentId ? getStudentById(studentId) : undefined;
@@ -25,17 +25,25 @@ export default function StudentPaymentsScreen({ route }: Partial<Props>) {
       <Text style={styles.title}>Paiements</Text>
       <Text style={styles.subtitle}>{student?.name ?? "Élève"}</Text>
 
-      <View style={styles.summaryCard}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.summaryCard}
+        onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
+      >
         <Text style={styles.summaryLabel}>Total payé</Text>
         <Text style={styles.summaryValue}>{totalPaid.toLocaleString()} FC</Text>
-      </View>
+      </TouchableOpacity>
 
       <FlatList
         data={paiementsEleve}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={<Text style={styles.empty}>Aucun paiement enregistré.</Text>}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.card}
+            onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
+          >
             <View>
               <Text style={styles.name}>{item.amount.toLocaleString()} FC</Text>
               <Text style={styles.meta}>Date : {item.date}</Text>
@@ -43,7 +51,7 @@ export default function StudentPaymentsScreen({ route }: Partial<Props>) {
             <Text style={[styles.badge, item.status === "PAYE" ? styles.success : styles.warning]}>
               {item.status === "PAYE" ? "Payé" : "En attente"}
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </View>

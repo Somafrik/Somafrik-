@@ -81,9 +81,15 @@ export default function StudentsScreen({ route, navigation }: any) {
             </Text>
           </View>
 
-          <TouchableOpacity activeOpacity={0.85} style={styles.addButton}>
-            <Ionicons name="add" size={26} color="#FFFFFF" />
-          </TouchableOpacity>
+          {session?.role === "school_admin" && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.addButton}
+              onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
+            >
+              <Ionicons name="add" size={26} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.searchBox}>
@@ -154,7 +160,7 @@ export default function StudentsScreen({ route, navigation }: any) {
                       {student.name}
                     </Text>
                     <Text style={styles.studentInfo} numberOfLines={1}>
-                      {student.matricule}
+                      {student.matricule} • {student.gender ?? "Sexe non renseigné"}
                     </Text>
                   </View>
 

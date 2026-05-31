@@ -5,6 +5,7 @@ import {
   PaymentItem,
   PaymentStatus,
   SchoolClass,
+  SchoolMessage,
   Student,
   Teacher,
   TeacherAssignment,
@@ -13,6 +14,7 @@ import {
   courses,
   payments,
   paymentStatuses,
+  schoolMessages,
   students,
   teacherAssignments,
   teachers,
@@ -26,7 +28,8 @@ export type AdminEntity =
   | "assignments"
   | "payments"
   | "paymentStatuses"
-  | "announcements";
+  | "announcements"
+  | "messages";
 
 type AdminDataContextValue = {
   studentsData: Student[];
@@ -37,6 +40,7 @@ type AdminDataContextValue = {
   paymentsData: PaymentItem[];
   paymentStatusesData: PaymentStatus[];
   announcementsData: Announcement[];
+  messagesData: SchoolMessage[];
   getItems: (entity: AdminEntity) => any[];
   createItem: (entity: AdminEntity, item: any) => void;
   updateItem: (entity: AdminEntity, item: any) => void;
@@ -54,6 +58,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [paymentsData, setPaymentsData] = useState<PaymentItem[]>(payments);
   const [paymentStatusesData, setPaymentStatusesData] = useState<PaymentStatus[]>(paymentStatuses);
   const [announcementsData, setAnnouncementsData] = useState<Announcement[]>(announcements);
+  const [messagesData, setMessagesData] = useState<SchoolMessage[]>(schoolMessages);
 
   const value = useMemo<AdminDataContextValue>(() => {
     const state = {
@@ -65,6 +70,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       payments: paymentsData,
       paymentStatuses: paymentStatusesData,
       announcements: announcementsData,
+      messages: messagesData,
     };
 
     const setters = {
@@ -76,6 +82,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       payments: setPaymentsData,
       paymentStatuses: setPaymentStatusesData,
       announcements: setAnnouncementsData,
+      messages: setMessagesData,
     };
 
     return {
@@ -87,6 +94,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       paymentsData,
       paymentStatusesData,
       announcementsData,
+      messagesData,
       getItems: (entity) => state[entity],
       createItem: (entity, item) => setters[entity]((items: any[]) => [item, ...items]),
       updateItem: (entity, item) =>
@@ -99,6 +107,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     assignmentsData,
     classesData,
     coursesData,
+    messagesData,
     paymentsData,
     paymentStatusesData,
     studentsData,

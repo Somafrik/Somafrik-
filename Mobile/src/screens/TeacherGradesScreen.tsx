@@ -17,13 +17,17 @@ export default function TeacherGradesScreen({ navigation }: any) {
 
         return (
           <View key={`${assignment.className}-${assignment.course}`} style={styles.assignmentCard}>
-            <View style={styles.assignmentHeader}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.assignmentHeader}
+              onPress={() => navigation.navigate("Students", { className: assignment.className })}
+            >
               <View>
                 <Text style={styles.assignmentTitle}>{assignment.course}</Text>
                 <Text style={styles.meta}>{assignment.className} • {classStudents.length} élève(s)</Text>
               </View>
               <Ionicons name="reader-outline" size={24} color="#7C3AED" />
-            </View>
+            </TouchableOpacity>
 
             {classStudents.map((student) => {
               const studentNotes = notes.filter(

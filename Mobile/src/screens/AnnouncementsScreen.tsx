@@ -1,15 +1,31 @@
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { announcements } from "../data/catalog";
+import { useAdminData } from "../context/AdminDataContext";
 
-export default function AnnouncementsScreen() {
+export default function AnnouncementsScreen({ navigation }: any) {
+  const { announcementsData } = useAdminData();
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Annonces</Text>
       <Text style={styles.subtitle}>Communications envoyées aux familles</Text>
 
-      {announcements.map((announcement) => (
-        <View key={announcement.id} style={styles.card}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.addButton}
+        onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+      >
+        <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.addButtonText}>Nouvelle annonce</Text>
+      </TouchableOpacity>
+
+      {announcementsData.map((announcement) => (
+        <TouchableOpacity
+          key={announcement.id}
+          activeOpacity={0.85}
+          style={styles.card}
+          onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+        >
           <View style={styles.iconBox}>
             <Ionicons name="megaphone-outline" size={24} color="#7C3AED" />
           </View>
@@ -18,7 +34,7 @@ export default function AnnouncementsScreen() {
             <Text style={styles.message}>{announcement.message}</Text>
             <Text style={styles.date}>{announcement.date}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
     </ScrollView>
   );
@@ -43,6 +59,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: "#64748B",
     fontWeight: "700",
+  },
+  addButton: {
+    backgroundColor: "#7C3AED",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    marginLeft: 8,
   },
   card: {
     backgroundColor: "#FFFFFF",

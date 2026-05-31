@@ -16,6 +16,7 @@ import TeachersScreen from "../screens/TeachersScreen";
 import PaymentsScreen from "../screens/PaymentsScreen";
 import AnnouncementsScreen from "../screens/AnnouncementsScreen";
 import AdminCrudScreen from "../screens/AdminCrudScreen";
+import MessagesScreen from "../screens/MessagesScreen";
 import { AdminEntity } from "../context/AdminDataContext";
 
 export type UserRole = "school_admin" | "teacher" | "parent_student";
@@ -48,6 +49,7 @@ export type RootStackParamList = {
   Teachers: undefined;
   Payments: undefined;
   Announcements: undefined;
+  Messages: undefined;
   AdminCrud: {
     entity: AdminEntity;
   };
@@ -91,6 +93,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Teachers" component={TeachersScreen} />
         <Stack.Screen name="Payments" component={PaymentsScreen} />
         <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
+        <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages" }} />
         <Stack.Screen name="AdminCrud" component={AdminCrudScreen} options={{ title: "Administration" }} />
       </Stack.Navigator>
     </NavigationContainer>

@@ -20,7 +20,7 @@ import { useAdminData } from "../context/AdminDataContext";
 
 export default function HomeScreen({ navigation }: any) {
   const { session, selectedStudentId } = useAuth();
-  const { studentsData, teachersData, paymentsData, announcementsData } = useAdminData();
+  const { studentsData, teachersData, paymentsData, announcementsData, messagesData } = useAdminData();
   const studentIds = studentsData.map((student) => student.id);
   const presenceRate = getPresenceRate(studentIds);
   const paymentRows = paymentsData.filter((payment) => studentIds.includes(payment.studentId));
@@ -45,7 +45,11 @@ export default function HomeScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          <View style={styles.schoolCard}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.schoolCard}
+            onPress={() => navigation.navigate("Classes")}
+          >
             <View style={styles.schoolIconBox}>
               <Ionicons name="school-outline" size={28} color="#2563EB" />
             </View>
@@ -55,9 +59,13 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.schoolCity}>{courses.join(", ") || "Cours non renseignés"}</Text>
               <Text style={styles.schoolTagline}>{assignedClasses.join(", ") || school.name}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          <View style={styles.teacherWelcomeCard}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.teacherWelcomeCard}
+            onPress={() => navigation.navigate("TeacherAttendance")}
+          >
             <View>
               <Text style={styles.welcomeTitle}>Espace enseignant</Text>
               <Text style={styles.welcomeText}>
@@ -68,7 +76,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.welcomeIcon}>
               <Ionicons name="reader-outline" size={28} color="#FFFFFF" />
             </View>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Mes classes</Text>
@@ -82,6 +90,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Classes"
               color="#2563EB"
               bg="#EFF6FF"
+              onPress={() => navigation.navigate("Classes")}
             />
             <StatCard
               icon="people-outline"
@@ -89,6 +98,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Élèves"
               color="#7C3AED"
               bg="#F5F3FF"
+              onPress={() => navigation.navigate("TeacherStudents")}
             />
             <StatCard
               icon="checkmark-circle-outline"
@@ -96,6 +106,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Présence"
               color="#16A34A"
               bg="#ECFDF5"
+              onPress={() => navigation.navigate("TeacherAttendance")}
             />
             <StatCard
               icon="book-outline"
@@ -103,6 +114,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Cours"
               color="#EA580C"
               bg="#FFF7ED"
+              onPress={() => navigation.navigate("TeacherGrades")}
             />
           </View>
 
@@ -158,7 +170,11 @@ export default function HomeScreen({ navigation }: any) {
         >
           <StudentSwitcher />
 
-          <View style={styles.schoolCard}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.schoolCard}
+            onPress={() => navigation.navigate("StudentDetail", { studentId: selectedStudentId })}
+          >
             <View style={styles.schoolIconBox}>
               <Ionicons name="person-circle-outline" size={30} color="#2563EB" />
             </View>
@@ -168,9 +184,13 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.schoolCity}>{student?.className ?? "Classe non renseignée"}</Text>
               <Text style={styles.schoolTagline}>{school.name}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          <View style={styles.parentWelcomeCard}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.parentWelcomeCard}
+            onPress={() => navigation.navigate("StudentNotes", { studentId: selectedStudentId })}
+          >
             <View>
               <Text style={styles.welcomeTitle}>Suivi scolaire</Text>
               <Text style={styles.welcomeText}>
@@ -181,7 +201,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.welcomeIcon}>
               <Ionicons name="book-outline" size={28} color="#FFFFFF" />
             </View>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Résumé de l'élève</Text>
@@ -195,6 +215,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Moyenne"
               color="#2563EB"
               bg="#EFF6FF"
+              onPress={() => navigation.navigate("StudentNotes", { studentId: selectedStudentId })}
             />
 
             <StatCard
@@ -203,6 +224,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Présences"
               color="#16A34A"
               bg="#ECFDF5"
+              onPress={() => navigation.navigate("StudentPresences", { studentId: selectedStudentId })}
             />
 
             <StatCard
@@ -211,6 +233,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Notes"
               color="#7C3AED"
               bg="#F5F3FF"
+              onPress={() => navigation.navigate("StudentNotes", { studentId: selectedStudentId })}
             />
 
             <StatCard
@@ -219,6 +242,7 @@ export default function HomeScreen({ navigation }: any) {
               label="Paiements"
               color="#EA580C"
               bg="#FFF7ED"
+              onPress={() => navigation.navigate("StudentPayments", { studentId: selectedStudentId })}
             />
           </View>
 
@@ -247,6 +271,11 @@ export default function HomeScreen({ navigation }: any) {
               label="Paiements"
               onPress={() => navigation.navigate("StudentPayments", { studentId: selectedStudentId })}
             />
+            <QuickAction
+              icon="chatbubbles-outline"
+              label="Messages"
+              onPress={() => navigation.navigate("Messages")}
+            />
           </View>
 
           <View style={styles.sectionHeader}>
@@ -259,6 +288,7 @@ export default function HomeScreen({ navigation }: any) {
               title={latestAnnouncement?.title ?? "Aucune annonce"}
               description={latestAnnouncement?.message ?? "Les annonces de l'école apparaîtront ici."}
               color="#7C3AED"
+              onPress={() => navigation.navigate("Announcements")}
             />
           </View>
         </ScrollView>
@@ -285,7 +315,11 @@ export default function HomeScreen({ navigation }: any) {
         </View> */}
 
         {/* Établissement */}
-        <View style={styles.schoolCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.schoolCard}
+          onPress={() => navigation.navigate("SchoolManagement")}
+        >
           <View style={styles.schoolIconBox}>
             <Ionicons name="school-outline" size={28} color="#2563EB" />
           </View>
@@ -295,10 +329,14 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.schoolCity}>{school.city}</Text>
             <Text style={styles.schoolTagline}>{school.slogan}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Bienvenue */}
-        <View style={styles.welcomeCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.welcomeCard}
+          onPress={() => navigation.navigate("SchoolManagement")}
+        >
           <View>
             <Text style={styles.welcomeTitle}>Bonjour {userName}</Text>
           </View>
@@ -306,7 +344,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.welcomeIcon}>
             <Ionicons name="grid-outline" size={28} color="#FFFFFF" />
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Statistiques */}
         <View style={styles.sectionHeader}>
@@ -321,6 +359,7 @@ export default function HomeScreen({ navigation }: any) {
             label="Élèves"
             color="#2563EB"
             bg="#EFF6FF"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
           />
 
           <StatCard
@@ -329,6 +368,7 @@ export default function HomeScreen({ navigation }: any) {
             label="Enseignants"
             color="#7C3AED"
             bg="#F5F3FF"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
           />
 
           <StatCard
@@ -337,6 +377,7 @@ export default function HomeScreen({ navigation }: any) {
             label="Présence"
             color="#16A34A"
             bg="#ECFDF5"
+            onPress={() => navigation.navigate("Students", { className: "Toutes les classes" })}
           />
 
           <StatCard
@@ -345,6 +386,7 @@ export default function HomeScreen({ navigation }: any) {
             label="Paiements"
             color="#EA580C"
             bg="#FFF7ED"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
           />
         </View>
 
@@ -360,6 +402,7 @@ export default function HomeScreen({ navigation }: any) {
             title="Paiement reçu"
             description={`${paymentsData.filter((payment) => payment.status === "PAYE").length} paiement(s) validé(s)`}
             color="#16A34A"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
           />
 
           <ActivityItem
@@ -367,6 +410,7 @@ export default function HomeScreen({ navigation }: any) {
             title="Élèves inscrits"
             description={`${studentsData.length} dossier(s) actif(s)`}
             color="#2563EB"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
           />
 
           <ActivityItem
@@ -374,6 +418,14 @@ export default function HomeScreen({ navigation }: any) {
             title="Annonce publiée"
             description={`${announcementsData.length} communication(s) envoyée(s)`}
             color="#7C3AED"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+          />
+          <ActivityItem
+            icon="chatbubbles-outline"
+            title="Messages parents"
+            description={`${messagesData.length} échange(s) école-parent`}
+            color="#0F766E"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
           />
         </View>
 
@@ -409,6 +461,11 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
           />
           <QuickAction
+            icon="chatbubbles-outline"
+            label="Messages"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
+          />
+          <QuickAction
             icon="grid-outline"
             label="Classes"
             onPress={() => navigation.navigate("AdminCrud", { entity: "classes" })}
@@ -435,18 +492,19 @@ type StatCardProps = {
   label: string;
   color: string;
   bg: string;
+  onPress?: () => void;
 };
 
-function StatCard({ icon, value, label, color, bg }: StatCardProps) {
+function StatCard({ icon, value, label, color, bg, onPress }: StatCardProps) {
   return (
-    <View style={styles.statCard}>
+    <TouchableOpacity activeOpacity={0.85} style={styles.statCard} onPress={onPress}>
       <View style={[styles.statIconBox, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={24} color={color} />
       </View>
 
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -455,11 +513,12 @@ type ActivityItemProps = {
   title: string;
   description: string;
   color: string;
+  onPress?: () => void;
 };
 
-function ActivityItem({ icon, title, description, color }: ActivityItemProps) {
+function ActivityItem({ icon, title, description, color, onPress }: ActivityItemProps) {
   return (
-    <View style={styles.activityItem}>
+    <TouchableOpacity activeOpacity={0.85} style={styles.activityItem} onPress={onPress}>
       <View style={[styles.activityIcon, { backgroundColor: `${color}15` }]}>
         <Ionicons name={icon} size={22} color={color} />
       </View>
@@ -470,7 +529,7 @@ function ActivityItem({ icon, title, description, color }: ActivityItemProps) {
       </View>
 
       <Ionicons name="chevron-forward-outline" size={18} color="#CBD5E1" />
-    </View>
+    </TouchableOpacity>
   );
 }
 

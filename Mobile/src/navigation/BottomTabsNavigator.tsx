@@ -70,6 +70,11 @@ const tabConfig: Record<
     icon: "wallet-outline",
     focusedIcon: "wallet",
   },
+  Messages: {
+    label: "Messages",
+    icon: "chatbubbles-outline",
+    focusedIcon: "chatbubbles",
+  },
   TeacherStudents: {
     label: "Élèves",
     icon: "people-outline",

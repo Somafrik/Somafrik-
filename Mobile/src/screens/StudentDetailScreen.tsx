@@ -46,25 +46,34 @@ export default function StudentDetailScreen({
         <View style={styles.profileInfo}>
           <Text style={styles.title}>{student.name}</Text>
           <Text style={styles.info}>Matricule : {student.matricule}</Text>
+          <Text style={styles.info}>Sexe : {student.gender ?? "Non renseigné"}</Text>
           <Text style={styles.info}>Classe : {student.className}</Text>
           <Text style={styles.info}>Établissement : {student.schoolCode}</Text>
         </View>
       </View>
 
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation?.navigate("StudentNotes", { studentId: student.id })}
+        >
           <Text style={styles.statValue}>
             {notes.filter((item) => item.studentId === student.id).length}
           </Text>
           <Text style={styles.statLabel}>Notes</Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.statCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.statCard}
+          onPress={() => navigation?.navigate("StudentPresences", { studentId: student.id })}
+        >
           <Text style={styles.statValue}>
             {presences.filter((item) => item.studentId === student.id && item.present).length}
           </Text>
           <Text style={styles.statLabel}>Présences</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       <StudentAction

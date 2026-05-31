@@ -6,6 +6,7 @@ export type StudentSummary = {
   id: string;
   name: string;
   matricule: string;
+  gender?: string;
   className: string;
   schoolCode: string;
   parentPhone: string;

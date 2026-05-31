@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Alert, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
@@ -8,6 +8,8 @@ import { AdminEntity } from "../context/AdminDataContext";
 type MenuItem = {
   label: string;
   entity?: AdminEntity;
+  route?: string;
+  message?: string;
 };
 
 const adminMenuItems: MenuItem[] = [
@@ -18,25 +20,27 @@ const adminMenuItems: MenuItem[] = [
   { label: "🔁 Affectations profs", entity: "assignments" },
   { label: "💰 Paiements", entity: "payments" },
   { label: "⚙️ Statuts paiement", entity: "paymentStatuses" },
+  { label: "💬 Messages parents", entity: "messages" },
   { label: "📢 Annonces", entity: "announcements" },
-  { label: "🆘 Support" },
+  { label: "🆘 Support", message: "Le module support sera connecté au centre d'assistance de l'école." },
 ];
 
 const parentMenuItems: MenuItem[] = [
-  { label: "👨‍👩‍👧 Compte parent" },
-  { label: "📚 Suivi scolaire" },
-  { label: "💰 Situation des frais" },
-  { label: "📢 Annonces de l'école" },
-  { label: "🆘 Support" },
+  { label: "👨‍👩‍👧 Compte parent", route: "Profil" },
+  { label: "📚 Suivi scolaire", route: "Notes" },
+  { label: "💰 Situation des frais", route: "FraisEleve" },
+  { label: "💬 Messages école", route: "Messages" },
+  { label: "📢 Annonces de l'école", route: "Announcements" },
+  { label: "🆘 Support", message: "Le module support sera connecté au secrétariat de l'école." },
 ];
 
 const teacherMenuItems: MenuItem[] = [
-  { label: "👨‍🏫 Profil enseignant" },
-  { label: "📚 Mes classes" },
-  { label: "✅ Appel des présences" },
-  { label: "📝 Gestion des notes" },
-  { label: "📢 Annonces de l'école" },
-  { label: "🆘 Support" },
+  { label: "👨‍🏫 Profil enseignant", message: "Votre profil enseignant sera disponible ici." },
+  { label: "📚 Mes classes", route: "Classes" },
+  { label: "✅ Appel des présences", route: "TeacherAttendance" },
+  { label: "📝 Gestion des notes", route: "TeacherGrades" },
+  { label: "📢 Annonces de l'école", route: "Announcements" },
+  { label: "🆘 Support", message: "Le module support sera connecté à l'administration." },
 ];
 
 export default function MenuScreen() {
@@ -85,7 +89,15 @@ export default function MenuScreen() {
           onPress={() => {
             if (item.entity) {
               navigation.navigate("AdminCrud", { entity: item.entity });
+              return;
             }
+
+            if (item.route) {
+              navigation.navigate(item.route as never);
+              return;
+            }
+
+            Alert.alert("Information", item.message ?? "Cette action sera disponible bientôt.");
           }}
         >
           <Text style={styles.itemText}>{item.label}</Text>

@@ -51,6 +51,11 @@ export default function SchoolManagementScreen({
       />
 
       <MenuCard
+        title="💬 Messages parents"
+        onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
+      />
+
+      <MenuCard
         title="📢 Annonces"
         onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
       />
