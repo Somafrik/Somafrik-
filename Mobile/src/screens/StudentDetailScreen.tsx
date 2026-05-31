@@ -9,6 +9,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, notes, payments, presences } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
+import StudentSwitcher from "../components/StudentSwitcher";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -18,10 +20,11 @@ type Props = NativeStackScreenProps<
 export default function StudentDetailScreen({
   route,
   navigation,
-}: Props) {
-  const { studentId } = route.params;
+}: Partial<Props>) {
+  const { selectedStudentId } = useAuth();
+  const studentId = selectedStudentId ?? route?.params?.studentId;
 
-  const student = getStudentById(studentId);
+  const student = studentId ? getStudentById(studentId) : undefined;
 
   if (!student) {
     return (
@@ -33,6 +36,8 @@ export default function StudentDetailScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      <StudentSwitcher />
+
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{student.name.charAt(0)}</Text>
@@ -66,21 +71,21 @@ export default function StudentDetailScreen({
         icon="book-outline"
         label="Notes"
         detail="Bulletins et évaluations"
-        onPress={() => navigation.navigate("StudentNotes", { studentId: student.id })}
+        onPress={() => navigation?.navigate("StudentNotes", { studentId: student.id })}
       />
 
       <StudentAction
         icon="calendar-outline"
         label="Présences"
         detail="Suivi des absences"
-        onPress={() => navigation.navigate("StudentPresences", { studentId: student.id })}
+        onPress={() => navigation?.navigate("StudentPresences", { studentId: student.id })}
       />
 
       <StudentAction
         icon="card-outline"
         label="Paiements"
         detail={`${payments.filter((item) => item.studentId === student.id).length} opération(s)`}
-        onPress={() => navigation.navigate("StudentPayments", { studentId: student.id })}
+        onPress={() => navigation?.navigate("StudentPayments", { studentId: student.id })}
       />
     </ScrollView>
   );

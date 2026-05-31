@@ -3,7 +3,9 @@ import { LoginResponse } from "../services/api";
 
 type AuthContextValue = {
   session: LoginResponse | null;
+  selectedStudentId: string | null;
   setSession: (session: LoginResponse | null) => void;
+  setSelectedStudentId: (studentId: string) => void;
   logout: () => void;
 };
 
@@ -11,14 +13,22 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<LoginResponse | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+
+  const saveSession = (nextSession: LoginResponse | null) => {
+    setSession(nextSession);
+    setSelectedStudentId(nextSession?.user.children?.[0]?.id ?? null);
+  };
 
   const value = useMemo(
     () => ({
       session,
-      setSession,
-      logout: () => setSession(null),
+      selectedStudentId,
+      setSession: saveSession,
+      setSelectedStudentId,
+      logout: () => saveSession(null),
     }),
-    [session]
+    [session, selectedStudentId]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

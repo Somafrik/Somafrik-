@@ -19,19 +19,128 @@ import {
   teachers,
 } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
+import StudentSwitcher from "../components/StudentSwitcher";
 
 export default function HomeScreen({ navigation }: any) {
-  const { session } = useAuth();
+  const { session, selectedStudentId } = useAuth();
   const studentIds = students.map((student) => student.id);
   const presenceRate = getPresenceRate(studentIds);
   const paymentRate = getPaymentRate(studentIds);
   const userName = session?.user.name ?? "Administrateur";
 
-  if (session?.role === "parent_student" && session.user.id) {
-    const student = getStudentById(session.user.id);
-    const studentNotes = notes.filter((note) => note.studentId === session.user.id);
-    const studentPresences = presences.filter((presence) => presence.studentId === session.user.id);
-    const studentPayments = payments.filter((payment) => payment.studentId === session.user.id);
+  if (session?.role === "teacher") {
+    const assignedClasses = session.user.assignedClasses ?? [];
+    const courses = session.user.courses ?? [];
+    const teacherStudents = students.filter((student) => assignedClasses.includes(student.className));
+    const teacherStudentIds = teacherStudents.map((student) => student.id);
+    const teacherPresenceRate = getPresenceRate(teacherStudentIds);
+    const teacherNotes = notes.filter(
+      (note) => teacherStudentIds.includes(note.studentId) && courses.includes(note.subject)
+    );
+
+    return (
+      <View style={styles.screen}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.schoolCard}>
+            <View style={styles.schoolIconBox}>
+              <Ionicons name="school-outline" size={28} color="#2563EB" />
+            </View>
+
+            <View style={styles.schoolInfo}>
+              <Text style={styles.schoolName}>{userName}</Text>
+              <Text style={styles.schoolCity}>{courses.join(", ") || "Cours non renseignés"}</Text>
+              <Text style={styles.schoolTagline}>{assignedClasses.join(", ") || school.name}</Text>
+            </View>
+          </View>
+
+          <View style={styles.teacherWelcomeCard}>
+            <View>
+              <Text style={styles.welcomeTitle}>Espace enseignant</Text>
+              <Text style={styles.welcomeText}>
+                Suivez vos classes, l'appel et les résultats des élèves.
+              </Text>
+            </View>
+
+            <View style={styles.welcomeIcon}>
+              <Ionicons name="reader-outline" size={28} color="#FFFFFF" />
+            </View>
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Mes classes</Text>
+            <Text style={styles.sectionLink}>Aujourd'hui</Text>
+          </View>
+
+          <View style={styles.statsGrid}>
+            <StatCard
+              icon="grid-outline"
+              value={String(assignedClasses.length)}
+              label="Classes"
+              color="#2563EB"
+              bg="#EFF6FF"
+            />
+            <StatCard
+              icon="people-outline"
+              value={String(teacherStudents.length)}
+              label="Élèves"
+              color="#7C3AED"
+              bg="#F5F3FF"
+            />
+            <StatCard
+              icon="checkmark-circle-outline"
+              value={`${teacherPresenceRate}%`}
+              label="Présence"
+              color="#16A34A"
+              bg="#ECFDF5"
+            />
+            <StatCard
+              icon="book-outline"
+              value={String(courses.length)}
+              label="Cours"
+              color="#EA580C"
+              bg="#FFF7ED"
+            />
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Actions rapides</Text>
+          </View>
+
+          <View style={styles.actionsGrid}>
+            <QuickAction
+              icon="grid-outline"
+              label="Classes"
+              onPress={() => navigation.navigate("Classes")}
+            />
+            <QuickAction
+              icon="people-outline"
+              label="Élèves"
+              onPress={() => navigation.navigate("TeacherStudents")}
+            />
+            <QuickAction
+              icon="checkbox-outline"
+              label="Appel"
+              onPress={() => navigation.navigate("TeacherAttendance")}
+            />
+            <QuickAction
+              icon="reader-outline"
+              label="Notes"
+              onPress={() => navigation.navigate("TeacherGrades")}
+            />
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (session?.role === "parent_student" && selectedStudentId) {
+    const student = getStudentById(selectedStudentId);
+    const studentNotes = notes.filter((note) => note.studentId === selectedStudentId);
+    const studentPresences = presences.filter((presence) => presence.studentId === selectedStudentId);
+    const studentPayments = payments.filter((payment) => payment.studentId === selectedStudentId);
     const average =
       studentNotes.length === 0
         ? 0
@@ -46,13 +155,15 @@ export default function HomeScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
+          <StudentSwitcher />
+
           <View style={styles.schoolCard}>
             <View style={styles.schoolIconBox}>
               <Ionicons name="person-circle-outline" size={30} color="#2563EB" />
             </View>
 
             <View style={styles.schoolInfo}>
-              <Text style={styles.schoolName}>{student?.name ?? session.user.name}</Text>
+              <Text style={styles.schoolName}>{student?.name ?? "Élève"}</Text>
               <Text style={styles.schoolCity}>{student?.className ?? "Classe non renseignée"}</Text>
               <Text style={styles.schoolTagline}>{school.name}</Text>
             </View>
@@ -118,22 +229,22 @@ export default function HomeScreen({ navigation }: any) {
             <QuickAction
               icon="person-outline"
               label="Profil"
-              onPress={() => navigation.navigate("StudentDetail", { studentId: session.user.id })}
+              onPress={() => navigation.navigate("StudentDetail", { studentId: selectedStudentId })}
             />
             <QuickAction
               icon="book-outline"
               label="Notes"
-              onPress={() => navigation.navigate("StudentNotes", { studentId: session.user.id })}
+              onPress={() => navigation.navigate("StudentNotes", { studentId: selectedStudentId })}
             />
             <QuickAction
               icon="calendar-outline"
               label="Présences"
-              onPress={() => navigation.navigate("StudentPresences", { studentId: session.user.id })}
+              onPress={() => navigation.navigate("StudentPresences", { studentId: selectedStudentId })}
             />
             <QuickAction
               icon="card-outline"
               label="Paiements"
-              onPress={() => navigation.navigate("StudentPayments", { studentId: session.user.id })}
+              onPress={() => navigation.navigate("StudentPayments", { studentId: selectedStudentId })}
             />
           </View>
 
@@ -490,6 +601,22 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 26,
     shadowColor: "#0F766E",
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+
+  teacherWelcomeCard: {
+    backgroundColor: "#4338CA",
+    borderRadius: 30,
+    padding: 22,
+    minHeight: 128,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 26,
+    shadowColor: "#4338CA",
     shadowOpacity: 0.24,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },

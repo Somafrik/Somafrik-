@@ -2,12 +2,15 @@ import { View, Text, StyleSheet, FlatList } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, payments } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
+import StudentSwitcher from "../components/StudentSwitcher";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPayments">;
 
-export default function StudentPaymentsScreen({ route }: Props) {
-  const { studentId } = route.params;
-  const student = getStudentById(studentId);
+export default function StudentPaymentsScreen({ route }: Partial<Props>) {
+  const { selectedStudentId } = useAuth();
+  const studentId = selectedStudentId ?? route?.params?.studentId;
+  const student = studentId ? getStudentById(studentId) : undefined;
 
   const paiementsEleve = payments.filter(
     (paiement) => paiement.studentId === studentId
@@ -18,6 +21,7 @@ export default function StudentPaymentsScreen({ route }: Props) {
 
   return (
     <View style={styles.container}>
+      <StudentSwitcher />
       <Text style={styles.title}>Paiements</Text>
       <Text style={styles.subtitle}>{student?.name ?? "Élève"}</Text>
 

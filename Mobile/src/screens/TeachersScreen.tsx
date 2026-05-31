@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { classes, teachers } from "../data/catalog";
+import { getTeacherClasses, getTeacherCourses, teachers } from "../data/catalog";
 
 export default function TeachersScreen() {
   return (
@@ -9,7 +9,8 @@ export default function TeachersScreen() {
       <Text style={styles.subtitle}>Équipe pédagogique active</Text>
 
       {teachers.map((teacher) => {
-        const teacherClass = classes.find((item) => item.teacherId === teacher.id);
+        const teacherClasses = getTeacherClasses(teacher);
+        const teacherCourses = getTeacherCourses(teacher);
 
         return (
           <View key={teacher.id} style={styles.card}>
@@ -18,8 +19,8 @@ export default function TeachersScreen() {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.name}>{teacher.name}</Text>
-              <Text style={styles.meta}>{teacher.subject}</Text>
-              <Text style={styles.meta}>Classe : {teacherClass?.name ?? "Non assignée"}</Text>
+              <Text style={styles.meta}>{teacherCourses.join(", ") || "Cours non renseignés"}</Text>
+              <Text style={styles.meta}>Classes : {teacherClasses.join(", ") || "Non assignées"}</Text>
             </View>
             <Text style={styles.phone}>{teacher.phone}</Text>
           </View>

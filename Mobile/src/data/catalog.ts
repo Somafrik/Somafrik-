@@ -10,8 +10,15 @@ export type Student = {
 export type Teacher = {
   id: string;
   name: string;
-  subject: string;
   phone: string;
+  assignments?: TeacherAssignment[];
+  assignedClasses?: string[];
+  courses?: string[];
+};
+
+export type TeacherAssignment = {
+  className: string;
+  course: string;
 };
 
 export type SchoolClass = {
@@ -60,10 +67,43 @@ export const school = {
 };
 
 export const teachers: Teacher[] = [
-  { id: "T1", name: "Jean Kabeya", subject: "Mathématiques", phone: "+243 810 000 101" },
-  { id: "T2", name: "Marie Mukendi", subject: "Français", phone: "+243 810 000 102" },
-  { id: "T3", name: "Patrick Ilunga", subject: "Sciences", phone: "+243 810 000 103" },
-  { id: "T4", name: "Sarah Mbuyi", subject: "Histoire", phone: "+243 810 000 104" },
+  {
+    id: "T1",
+    name: "Jean Kabeya",
+    phone: "+243 810 000 101",
+    assignments: [
+      { className: "6ème A", course: "Mathématiques" },
+      { className: "6ème B", course: "Mathématiques" },
+      { className: "5ème A", course: "Physique" },
+    ],
+  },
+  {
+    id: "T2",
+    name: "Marie Mukendi",
+    phone: "+243 810 000 102",
+    assignments: [
+      { className: "6ème A", course: "Français" },
+      { className: "5ème B", course: "Français" },
+    ],
+  },
+  {
+    id: "T3",
+    name: "Patrick Ilunga",
+    phone: "+243 810 000 103",
+    assignments: [
+      { className: "6ème B", course: "Sciences" },
+      { className: "5ème A", course: "Sciences" },
+    ],
+  },
+  {
+    id: "T4",
+    name: "Sarah Mbuyi",
+    phone: "+243 810 000 104",
+    assignments: [
+      { className: "5ème A", course: "Histoire" },
+      { className: "5ème B", course: "Histoire" },
+    ],
+  },
 ];
 
 export const classes: SchoolClass[] = [
@@ -75,7 +115,7 @@ export const classes: SchoolClass[] = [
 
 export const students: Student[] = [
   { id: "1", name: "Jean Dupont", matricule: "MAT001", className: "6ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 001" },
-  { id: "2", name: "Marie Martin", matricule: "MAT002", className: "6ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 002" },
+  { id: "2", name: "Marie Martin", matricule: "MAT002", className: "6ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 001" },
   { id: "3", name: "Paul Bernard", matricule: "MAT003", className: "6ème B", schoolCode: "SCH001", parentPhone: "+243 820 000 003" },
   { id: "4", name: "Sarah Mbala", matricule: "MAT004", className: "5ème A", schoolCode: "SCH001", parentPhone: "+243 820 000 004" },
 ];
@@ -112,6 +152,14 @@ export function getStudentById(studentId: string) {
 
 export function getTeacherById(teacherId: string) {
   return teachers.find((teacher) => teacher.id === teacherId);
+}
+
+export function getTeacherClasses(teacher: Teacher | undefined) {
+  return [...new Set((teacher?.assignments ?? []).map((assignment) => assignment.className))];
+}
+
+export function getTeacherCourses(teacher: Teacher | undefined) {
+  return [...new Set((teacher?.assignments ?? []).map((assignment) => assignment.course))];
 }
 
 export function getPresenceRate(studentIds: string[]) {

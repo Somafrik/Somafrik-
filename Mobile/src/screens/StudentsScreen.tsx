@@ -9,15 +9,22 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { getPaymentRate, getPresenceRate, presences, students } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
 
 export default function StudentsScreen({ route, navigation }: any) {
+  const { session } = useAuth();
   const className = route?.params?.className ?? "Toutes les classes";
   const [query, setQuery] = useState("");
+  const assignedClasses = session?.role === "teacher" ? session.user.assignedClasses ?? [] : [];
+  const availableStudents =
+    session?.role === "teacher"
+      ? students.filter((student) => assignedClasses.includes(student.className))
+      : students;
 
   const classStudents =
     className === "Toutes les classes"
-      ? students
-      : students.filter((student) => student.className === className);
+      ? availableStudents
+      : availableStudents.filter((student) => student.className === className);
 
   const filteredStudents = classStudents.filter((student) => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -34,6 +41,17 @@ export default function StudentsScreen({ route, navigation }: any) {
 
   const presenceRate = getPresenceRate(classStudents.map((student) => student.id));
   const paymentRate = getPaymentRate(classStudents.map((student) => student.id));
+  const classGroups = filteredStudents.reduce<Record<string, typeof filteredStudents>>(
+    (groups, student) => {
+      const key = student.className;
+      return {
+        ...groups,
+        [key]: [...(groups[key] ?? []), student],
+      };
+    },
+    {}
+  );
+  const groupedClassNames = Object.keys(classGroups).sort();
 
   return (
     <View style={styles.screen}>
@@ -96,58 +114,81 @@ export default function StudentsScreen({ route, navigation }: any) {
 
         <Text style={styles.sectionTitle}>Liste des élèves</Text>
 
-        {filteredStudents.map((student) => {
-          const lastPresence = [...presences]
-            .reverse()
-            .find((presence) => presence.studentId === student.id);
-          const isPresent = lastPresence?.present ?? false;
-          const status = isPresent ? "Présent" : "Absent";
+        {groupedClassNames.map((groupName) => (
+          <View key={groupName} style={styles.classSection}>
+            <View style={styles.classSectionHeader}>
+              <Text style={styles.classSectionTitle}>{groupName}</Text>
+              <Text style={styles.classSectionCount}>
+                {classGroups[groupName].length} élève(s)
+              </Text>
+            </View>
 
-          return (
-            <TouchableOpacity
-              key={student.id}
-              activeOpacity={0.85}
-              style={styles.studentCard}
-              onPress={() =>
-                navigation.navigate("StudentDetail", {
-                  studentId: student.id,
-                })
-              }
-            >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {student.name.charAt(0)}
-                </Text>
-              </View>
+            {classGroups[groupName].map((student, index) => {
+              const lastPresence = [...presences]
+                .reverse()
+                .find((presence) => presence.studentId === student.id);
+              const isPresent = lastPresence?.present ?? false;
+              const status = isPresent ? "P" : "A";
 
-              <View style={styles.studentContent}>
-                <Text style={styles.studentName}>{student.name}</Text>
-                <Text style={styles.studentInfo}>{student.matricule}</Text>
-                <Text style={styles.studentClass}>{student.className}</Text>
-              </View>
-
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor: isPresent ? "#ECFDF5" : "#FEF2F2",
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusText,
-                    {
-                      color: isPresent ? "#16A34A" : "#DC2626",
-                    },
-                  ]}
+              return (
+                <TouchableOpacity
+                  key={student.id}
+                  activeOpacity={0.85}
+                  style={styles.studentRow}
+                  onPress={() =>
+                    navigation.navigate("StudentDetail", {
+                      studentId: student.id,
+                    })
+                  }
                 >
-                  {status}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+                  <Text style={styles.rowIndex}>{index + 1}</Text>
+
+                  <View style={styles.studentContent}>
+                    <Text style={styles.studentName} numberOfLines={1}>
+                      {student.name}
+                    </Text>
+                    <Text style={styles.studentInfo} numberOfLines={1}>
+                      {student.matricule}
+                    </Text>
+                  </View>
+
+                  {className === "Toutes les classes" && (
+                    <Text style={styles.studentClass} numberOfLines={1}>
+                      {student.className}
+                    </Text>
+                  )}
+
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor: isPresent ? "#ECFDF5" : "#FEF2F2",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        {
+                          color: isPresent ? "#16A34A" : "#DC2626",
+                        },
+                      ]}
+                    >
+                      {status}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
+
+        {filteredStudents.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="search-outline" size={22} color="#94A3B8" />
+            <Text style={styles.emptyText}>Aucun élève trouvé</Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -160,21 +201,21 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingTop: 52,
-    paddingHorizontal: 20,
+    paddingTop: 42,
+    paddingHorizontal: 14,
     paddingBottom: 120,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 16,
   },
 
   backButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 14,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
@@ -186,7 +227,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: "900",
     color: "#0F172A",
     letterSpacing: -0.7,
@@ -194,131 +235,171 @@ const styles = StyleSheet.create({
 
   subtitle: {
     marginTop: 4,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     color: "#64748B",
   },
 
   addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     backgroundColor: "#2563EB",
     alignItems: "center",
     justifyContent: "center",
   },
 
   searchBox: {
-    height: 56,
-    borderRadius: 22,
+    height: 46,
+    borderRadius: 16,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 12,
   },
 
   searchInput: {
     flex: 1,
     marginLeft: 10,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "600",
     color: "#0F172A",
   },
 
   summaryCard: {
     backgroundColor: "#0F172A",
-    borderRadius: 28,
-    padding: 22,
+    borderRadius: 20,
+    padding: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: 20,
   },
 
   summaryValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "900",
     color: "#FFFFFF",
   },
 
   summaryLabel: {
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "700",
     color: "#CBD5E1",
   },
 
   summaryDivider: {
     width: 1,
-    height: 42,
+    height: 34,
     backgroundColor: "rgba(255,255,255,0.18)",
   },
 
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "900",
     color: "#0F172A",
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
-  studentCard: {
+  classSection: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 26,
-    padding: 16,
+    borderRadius: 16,
     marginBottom: 14,
+    overflow: "hidden",
+  },
+
+  classSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+
+  classSectionTitle: {
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  classSectionCount: {
+    color: "#2563EB",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
+  studentRow: {
+    minHeight: 46,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
     flexDirection: "row",
     alignItems: "center",
   },
 
-  avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 14,
-  },
-
-  avatarText: {
-    fontSize: 22,
+  rowIndex: {
+    width: 28,
+    color: "#94A3B8",
+    fontSize: 11,
     fontWeight: "900",
-    color: "#2563EB",
+    textAlign: "center",
   },
 
   studentContent: {
     flex: 1,
+    minWidth: 0,
   },
 
   studentName: {
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: "900",
     color: "#0F172A",
   },
 
   studentInfo: {
-    marginTop: 4,
-    fontSize: 13,
+    marginTop: 2,
+    fontSize: 10,
     fontWeight: "700",
     color: "#64748B",
   },
 
   studentClass: {
-    marginTop: 4,
-    fontSize: 13,
+    width: 58,
+    marginHorizontal: 8,
+    fontSize: 10,
     fontWeight: "800",
     color: "#2563EB",
+    textAlign: "right",
   },
 
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    minWidth: 26,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
     borderRadius: 999,
+    alignItems: "center",
   },
 
   statusText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "900",
+  },
+
+  emptyState: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 18,
+    alignItems: "center",
+  },
+
+  emptyText: {
+    marginTop: 8,
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
   },
 });

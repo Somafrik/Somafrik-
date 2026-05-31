@@ -56,16 +56,51 @@ app.post("/api/login", (req, res) => {
     return res.json({ role, user: { id: "ADMIN1", name: "Administrateur" }, school });
   }
 
-  const student = students.find(
+  if (role === "teacher") {
+    const teacher = teachers.find(
+      (item) =>
+        (item.id === identifier || item.phone === identifier) &&
+        item.password === pin
+    );
+
+    if (teacher) {
+      const assignedClasses = [...new Set(teacher.assignments.map((item) => item.className))];
+      const courses = [...new Set(teacher.assignments.map((item) => item.course))];
+      const { password: _password, ...safeTeacher } = teacher;
+
+      return res.json({
+        role,
+        user: {
+          ...safeTeacher,
+          assignedClasses,
+          courses,
+        },
+        school,
+      });
+    }
+  }
+
+  const matchedStudents = students.filter(
     (item) =>
       item.schoolCode === schoolCode &&
       (item.matricule === identifier || item.parentPhone === identifier) &&
       item.pin === pin
   );
 
-  if (student) {
-    const { pin: _pin, ...safeStudent } = student;
-    return res.json({ role, user: safeStudent, school });
+  if (matchedStudents.length > 0) {
+    const children = matchedStudents.map(({ pin: _pin, ...safeStudent }) => safeStudent);
+    const firstStudent = children[0];
+
+    return res.json({
+      role,
+      user: {
+        id: `PARENT-${firstStudent.parentPhone}`,
+        name: "Parent SchoolLink",
+        parentPhone: firstStudent.parentPhone,
+        children,
+      },
+      school,
+    });
   }
 
   return res.status(401).json({ message: "Identifiants incorrects" });
@@ -131,7 +166,13 @@ app.get("/api/students/:id/payments", (req, res) => {
 });
 
 app.get("/api/teachers", (req, res) => {
-  res.json(teachers);
+  res.json(
+    teachers.map(({ password, ...teacher }) => ({
+      ...teacher,
+      assignedClasses: [...new Set(teacher.assignments.map((item) => item.className))],
+      courses: [...new Set(teacher.assignments.map((item) => item.course))],
+    }))
+  );
 });
 
 app.get("/api/payments", (req, res) => {

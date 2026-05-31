@@ -33,9 +33,11 @@ export default function LoginScreen({ navigation, route }: Props) {
   const identifierPlaceholder =
     role === "school_admin"
       ? "Identifiant administrateur"
-      : "Téléphone parent ou matricule";
+      : role === "teacher"
+        ? "Téléphone ou code enseignant"
+        : "Téléphone parent ou matricule";
   const secretPlaceholder =
-    role === "school_admin" ? "Mot de passe" : "Code PIN";
+    role === "parent_student" ? "Code PIN" : "Mot de passe";
 
   const handleLogin = async () => {
     if (!schoolCode.trim() || !identifier.trim() || !pin.trim()) {
@@ -95,9 +97,9 @@ export default function LoginScreen({ navigation, route }: Props) {
         placeholder={secretPlaceholder}
         value={pin}
         onChangeText={setPin}
-        keyboardType={role === "school_admin" ? "default" : "number-pad"}
+        keyboardType={role === "parent_student" ? "number-pad" : "default"}
         secureTextEntry
-        maxLength={role === "school_admin" ? undefined : 6}
+        maxLength={role === "parent_student" ? 6 : undefined}
         style={styles.input}
       />
 
@@ -119,7 +121,13 @@ export default function LoginScreen({ navigation, route }: Props) {
         style={styles.demoButton}
         onPress={() => {
           setSchoolCode("SCH001");
-          setIdentifier(role === "school_admin" ? "admin" : "MAT001");
+          setIdentifier(
+            role === "school_admin"
+              ? "admin"
+              : role === "teacher"
+                ? "+243 810 000 101"
+                : "+243 820 000 001"
+          );
           setPin("1234");
         }}
       >

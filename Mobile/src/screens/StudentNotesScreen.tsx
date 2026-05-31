@@ -2,12 +2,16 @@ import { View, Text, StyleSheet, FlatList } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, notes } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
+import StudentSwitcher from "../components/StudentSwitcher";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentNotes">;
 
-export default function StudentNotesScreen({ route }: Props) {
-  const student = getStudentById(route.params.studentId);
-  const studentNotes = notes.filter((note) => note.studentId === route.params.studentId);
+export default function StudentNotesScreen({ route }: Partial<Props>) {
+  const { selectedStudentId } = useAuth();
+  const studentId = selectedStudentId ?? route?.params?.studentId;
+  const student = studentId ? getStudentById(studentId) : undefined;
+  const studentNotes = notes.filter((note) => note.studentId === studentId);
   const average =
     studentNotes.length === 0
       ? 0
@@ -15,6 +19,7 @@ export default function StudentNotesScreen({ route }: Props) {
 
   return (
     <View style={styles.container}>
+      <StudentSwitcher />
       <Text style={styles.title}>Notes</Text>
       <Text style={styles.subtitle}>{student?.name ?? "Élève"}</Text>
 

@@ -2,12 +2,15 @@ import { View, Text, StyleSheet, FlatList } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, presences } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
+import StudentSwitcher from "../components/StudentSwitcher";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPresences">;
 
-export default function StudentPresencesScreen({ route }: Props) {
-  const { studentId } = route.params;
-  const student = getStudentById(studentId);
+export default function StudentPresencesScreen({ route }: Partial<Props>) {
+  const { selectedStudentId } = useAuth();
+  const studentId = selectedStudentId ?? route?.params?.studentId;
+  const student = studentId ? getStudentById(studentId) : undefined;
 
   const presencesEleve = presences.filter(
     (presence) => presence.studentId === studentId
@@ -19,6 +22,7 @@ export default function StudentPresencesScreen({ route }: Props) {
 
   return (
     <View style={styles.container}>
+      <StudentSwitcher />
       <Text style={styles.title}>Présences</Text>
       <Text style={styles.subtitle}>{student?.name ?? "Élève"}</Text>
 

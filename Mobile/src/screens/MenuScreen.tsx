@@ -2,8 +2,9 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
+import StudentSwitcher from "../components/StudentSwitcher";
 
-const menuItems = [
+const adminMenuItems = [
   "🏫 Profil école",
   "⚙️ Paramètres",
   "👥 Utilisateurs",
@@ -12,9 +13,33 @@ const menuItems = [
   "🆘 Support",
 ];
 
+const parentMenuItems = [
+  "👨‍👩‍👧 Compte parent",
+  "📚 Suivi scolaire",
+  "💰 Situation des frais",
+  "📢 Annonces de l'école",
+  "🆘 Support",
+];
+
+const teacherMenuItems = [
+  "👨‍🏫 Profil enseignant",
+  "📚 Mes classes",
+  "✅ Appel des présences",
+  "📝 Gestion des notes",
+  "📢 Annonces de l'école",
+  "🆘 Support",
+];
+
 export default function MenuScreen() {
   const navigation = useNavigation<any>();
   const { session, logout } = useAuth();
+  const isParentStudent = session?.role === "parent_student";
+  const isTeacher = session?.role === "teacher";
+  const menuItems = isParentStudent
+    ? parentMenuItems
+    : isTeacher
+      ? teacherMenuItems
+      : adminMenuItems;
 
   const handleLogout = () => {
     logout();
@@ -28,6 +53,21 @@ export default function MenuScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Menu</Text>
       <Text style={styles.userName}>{session?.user.name ?? "Utilisateur"}</Text>
+
+      {isParentStudent && (
+        <>
+          <StudentSwitcher />
+          <Text style={styles.childrenCount}>
+            {session?.user.children?.length ?? 0} enfant(s) lié(s) à ce compte
+          </Text>
+        </>
+      )}
+
+      {isTeacher && (
+        <Text style={styles.childrenCount}>
+          {(session?.user.courses ?? []).join(", ")} • {(session?.user.assignedClasses ?? []).join(", ")}
+        </Text>
+      )}
 
       {menuItems.map((item) => (
         <TouchableOpacity key={item} style={styles.item}>
@@ -51,6 +91,12 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     color: "#64748B",
     fontWeight: "700",
+  },
+  childrenCount: {
+    color: "#2563EB",
+    fontWeight: "800",
+    marginTop: -8,
+    marginBottom: 14,
   },
   item: {
     backgroundColor: "#FFFFFF",

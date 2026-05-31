@@ -8,9 +8,20 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { classes, getPresenceRate, getTeacherById, students } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
 
 export default function ClassesScreen({ navigation }: any) {
-  const totalStudents = students.length;
+  const { session } = useAuth();
+  const assignedClasses = session?.role === "teacher" ? session.user.assignedClasses ?? [] : [];
+  const visibleClasses =
+    session?.role === "teacher"
+      ? classes.filter((item) => assignedClasses.includes(item.name))
+      : classes;
+  const visibleStudents =
+    session?.role === "teacher"
+      ? students.filter((student) => assignedClasses.includes(student.className))
+      : students;
+  const totalStudents = visibleStudents.length;
 
   return (
     <View style={styles.screen}>
@@ -40,7 +51,7 @@ export default function ClassesScreen({ navigation }: any) {
 
         <View style={styles.summaryCard}>
           <View>
-            <Text style={styles.summaryValue}>{classes.length}</Text>
+            <Text style={styles.summaryValue}>{visibleClasses.length}</Text>
             <Text style={styles.summaryLabel}>Classes actives</Text>
           </View>
 
@@ -54,7 +65,7 @@ export default function ClassesScreen({ navigation }: any) {
 
         <Text style={styles.sectionTitle}>Liste des classes</Text>
 
-        {classes.map((item) => {
+        {visibleClasses.map((item) => {
           const classStudents = students.filter((student) => student.className === item.name);
           const teacher = getTeacherById(item.teacherId);
           const presenceRate = getPresenceRate(classStudents.map((student) => student.id));
