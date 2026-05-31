@@ -17,25 +17,27 @@ export default function BottomTabsNavigator() {
         headerShown: false,
         tabBarShowLabel: false,
 
-       tabBarStyle: {
+ tabBarStyle: {
   position: "absolute",
-  left: 16,
-  right: 16,
+  left: 20,
+  right: 20,
   bottom: 15,
-
-  height: 72,
-
+  height: 70,
   backgroundColor: "#0F172A",
-
   borderRadius: 25,
-
   borderTopWidth: 0,
-
   elevation: 12,
-
   shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 5,
+  },
+  tabBarItemStyle: {
+  paddingHorizontal: 0,
+},
   shadowOpacity: 0.15,
   shadowRadius: 10,
+  overflow: "hidden",
 },
 
         tabBarIcon: ({ focused }) => {
