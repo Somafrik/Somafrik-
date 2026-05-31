@@ -15,11 +15,14 @@ import {
   students,
   teachers,
 } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
 
 export default function HomeScreen({ navigation }: any) {
+  const { session } = useAuth();
   const studentIds = students.map((student) => student.id);
   const presenceRate = getPresenceRate(studentIds);
   const paymentRate = getPaymentRate(studentIds);
+  const userName = session?.user.name ?? "Administrateur";
 
   return (
     <View style={styles.screen}>
@@ -57,7 +60,7 @@ export default function HomeScreen({ navigation }: any) {
           <View>
             <Text style={styles.welcomeTitle}>Bonjour 👋</Text>
             <Text style={styles.welcomeText}>
-              Bienvenue dans votre espace administrateur.
+              {userName}, bienvenue dans votre espace SchoolLink.
             </Text>
           </View>
 

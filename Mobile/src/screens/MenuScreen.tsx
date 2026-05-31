@@ -1,5 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../context/AuthContext";
 
 const menuItems = [
   "🏫 Profil école",
@@ -11,9 +13,21 @@ const menuItems = [
 ];
 
 export default function MenuScreen() {
+  const navigation = useNavigation<any>();
+  const { session, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "RoleSelection" }],
+    });
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Menu</Text>
+      <Text style={styles.userName}>{session?.user.name ?? "Utilisateur"}</Text>
 
       {menuItems.map((item) => (
         <TouchableOpacity key={item} style={styles.item}>
@@ -22,7 +36,7 @@ export default function MenuScreen() {
         </TouchableOpacity>
       ))}
 
-      <TouchableOpacity style={styles.logout}>
+      <TouchableOpacity style={styles.logout} onPress={handleLogout}>
         <Text style={styles.logoutText}>Déconnexion</Text>
       </TouchableOpacity>
     </View>
@@ -32,6 +46,12 @@ export default function MenuScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F7FB", padding: 20 },
   title: { fontSize: 28, fontWeight: "800", marginBottom: 24, color: "#111827" },
+  userName: {
+    marginTop: -16,
+    marginBottom: 18,
+    color: "#64748B",
+    fontWeight: "700",
+  },
   item: {
     backgroundColor: "#FFFFFF",
     padding: 18,
