@@ -7,39 +7,11 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
-const classes = [
-  {
-    id: "1",
-    name: "6ème A",
-    students: 32,
-    teacher: "Jean Kabeya",
-    presence: "94%",
-  },
-  {
-    id: "2",
-    name: "6ème B",
-    students: 28,
-    teacher: "Marie Mukendi",
-    presence: "91%",
-  },
-  {
-    id: "3",
-    name: "5ème A",
-    students: 30,
-    teacher: "Patrick Ilunga",
-    presence: "89%",
-  },
-  {
-    id: "4",
-    name: "5ème B",
-    students: 31,
-    teacher: "Sarah Mbuyi",
-    presence: "96%",
-  },
-];
+import { classes, getPresenceRate, getTeacherById, students } from "../data/catalog";
 
 export default function ClassesScreen({ navigation }: any) {
+  const totalStudents = students.length;
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -68,56 +40,62 @@ export default function ClassesScreen({ navigation }: any) {
 
         <View style={styles.summaryCard}>
           <View>
-            <Text style={styles.summaryValue}>12</Text>
+            <Text style={styles.summaryValue}>{classes.length}</Text>
             <Text style={styles.summaryLabel}>Classes actives</Text>
           </View>
 
           <View style={styles.summaryDivider} />
 
           <View>
-            <Text style={styles.summaryValue}>348</Text>
+            <Text style={styles.summaryValue}>{totalStudents}</Text>
             <Text style={styles.summaryLabel}>Élèves inscrits</Text>
           </View>
         </View>
 
         <Text style={styles.sectionTitle}>Liste des classes</Text>
 
-        {classes.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            activeOpacity={0.85}
-            style={styles.classCard}
-            onPress={() =>
-              navigation.navigate("Students", {
-                className: item.name,
-              })
-            }
-          >
-            <View style={styles.classIconBox}>
-              <Ionicons name="grid-outline" size={26} color="#2563EB" />
-            </View>
+        {classes.map((item) => {
+          const classStudents = students.filter((student) => student.className === item.name);
+          const teacher = getTeacherById(item.teacherId);
+          const presenceRate = getPresenceRate(classStudents.map((student) => student.id));
 
-            <View style={styles.classContent}>
-              <View style={styles.classTopRow}>
-                <Text style={styles.className}>{item.name}</Text>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{item.presence}</Text>
-                </View>
+          return (
+            <TouchableOpacity
+              key={item.id}
+              activeOpacity={0.85}
+              style={styles.classCard}
+              onPress={() =>
+                navigation.navigate("Students", {
+                  className: item.name,
+                })
+              }
+            >
+              <View style={styles.classIconBox}>
+                <Ionicons name="grid-outline" size={26} color="#2563EB" />
               </View>
 
-              <Text style={styles.classInfo}>{item.students} élèves</Text>
-              <Text style={styles.classTeacher}>
-                Professeur principal : {item.teacher}
-              </Text>
-            </View>
+              <View style={styles.classContent}>
+                <View style={styles.classTopRow}>
+                  <Text style={styles.className}>{item.name}</Text>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{presenceRate}%</Text>
+                  </View>
+                </View>
 
-            <Ionicons
-              name="chevron-forward-outline"
-              size={20}
-              color="#CBD5E1"
-            />
-          </TouchableOpacity>
-        ))}
+                <Text style={styles.classInfo}>{classStudents.length} élèves</Text>
+                <Text style={styles.classTeacher}>
+                  Professeur principal : {teacher?.name ?? "Non assigné"}
+                </Text>
+              </View>
+
+              <Ionicons
+                name="chevron-forward-outline"
+                size={20}
+                color="#CBD5E1"
+              />
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );

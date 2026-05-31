@@ -1,30 +1,43 @@
 import { View, Text, StyleSheet, FlatList } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { paiements } from "../data/paiements";
+import { getStudentById, payments } from "../data/catalog";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPayments">;
 
 export default function StudentPaymentsScreen({ route }: Props) {
   const { studentId } = route.params;
+  const student = getStudentById(studentId);
 
-  const paiementsEleve = paiements.filter(
-    (paiement) => paiement.eleveId === studentId
+  const paiementsEleve = payments.filter(
+    (paiement) => paiement.studentId === studentId
   );
+  const totalPaid = paiementsEleve
+    .filter((paiement) => paiement.status === "PAYE")
+    .reduce((sum, paiement) => sum + paiement.amount, 0);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Paiements</Text>
+      <Text style={styles.subtitle}>{student?.name ?? "Élève"}</Text>
+
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryLabel}>Total payé</Text>
+        <Text style={styles.summaryValue}>{totalPaid.toLocaleString()} FC</Text>
+      </View>
 
       <FlatList
         data={paiementsEleve}
         keyExtractor={(item) => item.id}
+        ListEmptyComponent={<Text style={styles.empty}>Aucun paiement enregistré.</Text>}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.name}>{item.montant} FC</Text>
-            <Text>Date : {item.date}</Text>
-            <Text>
-              Statut : {item.statut === "PAYE" ? "Payé" : "En attente"}
+            <View>
+              <Text style={styles.name}>{item.amount.toLocaleString()} FC</Text>
+              <Text style={styles.meta}>Date : {item.date}</Text>
+            </View>
+            <Text style={[styles.badge, item.status === "PAYE" ? styles.success : styles.warning]}>
+              {item.status === "PAYE" ? "Payé" : "En attente"}
             </Text>
           </View>
         )}
@@ -34,14 +47,30 @@ export default function StudentPaymentsScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  title: { fontSize: 26, fontWeight: "bold", marginBottom: 20 },
+  container: { flex: 1, padding: 20, backgroundColor: "#F8FAFC" },
+  title: { fontSize: 30, fontWeight: "900", color: "#0F172A" },
+  subtitle: { marginTop: 4, marginBottom: 20, color: "#64748B", fontWeight: "700" },
+  summaryCard: {
+    backgroundColor: "#2563EB",
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 18,
+  },
+  summaryLabel: { color: "#DBEAFE", fontWeight: "700" },
+  summaryValue: { color: "#FFFFFF", fontSize: 32, fontWeight: "900", marginTop: 6 },
   card: {
     backgroundColor: "#fff",
     padding: 15,
     marginBottom: 10,
-    borderRadius: 10,
-    elevation: 2,
+    borderRadius: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  name: { fontSize: 18, fontWeight: "bold" },
+  name: { fontSize: 18, fontWeight: "900", color: "#0F172A" },
+  meta: { marginTop: 4, color: "#64748B", fontWeight: "600" },
+  badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontWeight: "900" },
+  success: { backgroundColor: "#DCFCE7", color: "#166534" },
+  warning: { backgroundColor: "#FEF3C7", color: "#92400E" },
+  empty: { color: "#64748B", fontWeight: "700" },
 });

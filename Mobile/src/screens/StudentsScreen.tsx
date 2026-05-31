@@ -7,45 +7,33 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-
-const students = [
-  {
-    id: "1",
-    name: "Jean Kabeya",
-    className: "6ème A",
-    matricule: "SL-2026-001",
-    status: "Présent",
-  },
-  {
-    id: "2",
-    name: "Marie Mukendi",
-    className: "6ème A",
-    matricule: "SL-2026-002",
-    status: "Présente",
-  },
-  {
-    id: "3",
-    name: "Patrick Ilunga",
-    className: "6ème B",
-    matricule: "SL-2026-003",
-    status: "Absent",
-  },
-  {
-    id: "4",
-    name: "Sarah Mbuyi",
-    className: "5ème A",
-    matricule: "SL-2026-004",
-    status: "Présente",
-  },
-];
+import { useState } from "react";
+import { getPaymentRate, getPresenceRate, presences, students } from "../data/catalog";
 
 export default function StudentsScreen({ route, navigation }: any) {
   const className = route?.params?.className ?? "Toutes les classes";
+  const [query, setQuery] = useState("");
 
-  const filteredStudents =
+  const classStudents =
     className === "Toutes les classes"
       ? students
       : students.filter((student) => student.className === className);
+
+  const filteredStudents = classStudents.filter((student) => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return (
+      student.name.toLowerCase().includes(normalizedQuery) ||
+      student.matricule.toLowerCase().includes(normalizedQuery)
+    );
+  });
+
+  const presenceRate = getPresenceRate(classStudents.map((student) => student.id));
+  const paymentRate = getPaymentRate(classStudents.map((student) => student.id));
 
   return (
     <View style={styles.screen}>
@@ -79,6 +67,8 @@ export default function StudentsScreen({ route, navigation }: any) {
           <TextInput
             placeholder="Rechercher un élève"
             placeholderTextColor="#94A3B8"
+            value={query}
+            onChangeText={setQuery}
             style={styles.searchInput}
           />
         </View>
@@ -92,14 +82,14 @@ export default function StudentsScreen({ route, navigation }: any) {
           <View style={styles.summaryDivider} />
 
           <View>
-            <Text style={styles.summaryValue}>94%</Text>
+            <Text style={styles.summaryValue}>{presenceRate}%</Text>
             <Text style={styles.summaryLabel}>Présence</Text>
           </View>
 
           <View style={styles.summaryDivider} />
 
           <View>
-            <Text style={styles.summaryValue}>87%</Text>
+            <Text style={styles.summaryValue}>{paymentRate}%</Text>
             <Text style={styles.summaryLabel}>Paiements</Text>
           </View>
         </View>
@@ -107,7 +97,11 @@ export default function StudentsScreen({ route, navigation }: any) {
         <Text style={styles.sectionTitle}>Liste des élèves</Text>
 
         {filteredStudents.map((student) => {
-          const isPresent = student.status.toLowerCase().includes("présent");
+          const lastPresence = [...presences]
+            .reverse()
+            .find((presence) => presence.studentId === student.id);
+          const isPresent = lastPresence?.present ?? false;
+          const status = isPresent ? "Présent" : "Absent";
 
           return (
             <TouchableOpacity
@@ -148,7 +142,7 @@ export default function StudentsScreen({ route, navigation }: any) {
                     },
                   ]}
                 >
-                  {student.status}
+                  {status}
                 </Text>
               </View>
             </TouchableOpacity>

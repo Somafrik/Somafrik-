@@ -1,54 +1,55 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
-
-const payments = [
-  { id: "1", name: "Jean Kabeya", amount: "120 €", status: "Payé" },
-  { id: "2", name: "Marie Mukendi", amount: "90 €", status: "Impayé" },
-  { id: "3", name: "Patrick Okito", amount: "150 €", status: "Payé" },
-];
+import { payments, students } from "../data/catalog";
 
 export default function PaymentsScreen() {
+  const paidPayments = payments.filter((payment) => payment.status === "PAYE");
+  const pendingPayments = payments.filter((payment) => payment.status === "EN_ATTENTE");
+  const totalPaid = paidPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Paiements</Text>
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>Montant encaissé ce mois</Text>
-        <Text style={styles.summaryAmount}>450 000 €</Text>
-        <Text style={styles.summarySub}>87% des paiements réglés</Text>
+        <Text style={styles.summaryAmount}>{totalPaid.toLocaleString()} FC</Text>
+        <Text style={styles.summarySub}>
+          {Math.round((paidPayments.length / payments.length) * 100)}% des paiements réglés
+        </Text>
       </View>
 
       <View style={styles.row}>
         <View style={styles.smallCard}>
-          <Text style={styles.smallNumber}>320</Text>
+          <Text style={styles.smallNumber}>{paidPayments.length}</Text>
           <Text style={styles.smallLabel}>Payés</Text>
         </View>
 
         <View style={styles.smallCard}>
-          <Text style={styles.smallNumber}>48</Text>
+          <Text style={styles.smallNumber}>{pendingPayments.length}</Text>
           <Text style={styles.smallLabel}>Impayés</Text>
         </View>
       </View>
 
       <Text style={styles.sectionTitle}>Paiements récents</Text>
 
-      {payments.map((payment) => (
-        <View key={payment.id} style={styles.paymentCard}>
-          <View>
-            <Text style={styles.name}>{payment.name}</Text>
-            <Text style={styles.subtitle}>{payment.amount}</Text>
-          </View>
+      {payments.map((payment) => {
+        const student = students.find((item) => item.id === payment.studentId);
+        const isPending = payment.status === "EN_ATTENTE";
 
-          <Text
-            style={[
-              styles.badge,
-              payment.status === "Impayé" && styles.badgeDanger,
-            ]}
-          >
-            {payment.status}
-          </Text>
-        </View>
-      ))}
+        return (
+          <View key={payment.id} style={styles.paymentCard}>
+            <View>
+              <Text style={styles.name}>{student?.name ?? "Élève inconnu"}</Text>
+              <Text style={styles.subtitle}>{payment.amount.toLocaleString()} FC • {payment.date}</Text>
+            </View>
+
+            <Text style={[styles.badge, isPending && styles.badgeDanger]}>
+              {isPending ? "En attente" : "Payé"}
+            </Text>
+          </View>
+        );
+      })}
 
       <TouchableOpacity style={styles.button}>
         <Text style={styles.buttonText}>Enregistrer un paiement</Text>

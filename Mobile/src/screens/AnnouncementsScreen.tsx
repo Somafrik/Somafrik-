@@ -1,22 +1,82 @@
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { announcements } from "../data/catalog";
 
 export default function AnnouncementsScreen() {
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Annonces</Text>
-      <Text>Liste des annonces ici.</Text>
-    </View>
+      <Text style={styles.subtitle}>Communications envoyées aux familles</Text>
+
+      {announcements.map((announcement) => (
+        <View key={announcement.id} style={styles.card}>
+          <View style={styles.iconBox}>
+            <Ionicons name="megaphone-outline" size={24} color="#7C3AED" />
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardTitle}>{announcement.title}</Text>
+            <Text style={styles.message}>{announcement.message}</Text>
+            <Text style={styles.date}>{announcement.date}</Text>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
+    backgroundColor: "#F8FAFC",
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 120,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 16,
+    fontSize: 32,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  subtitle: {
+    marginTop: 6,
+    marginBottom: 20,
+    color: "#64748B",
+    fontWeight: "700",
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 14,
+    flexDirection: "row",
+  },
+  iconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 18,
+    backgroundColor: "#F5F3FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
+  message: {
+    marginTop: 6,
+    color: "#475569",
+    fontWeight: "600",
+    lineHeight: 20,
+  },
+  date: {
+    marginTop: 8,
+    color: "#7C3AED",
+    fontWeight: "800",
   },
 });

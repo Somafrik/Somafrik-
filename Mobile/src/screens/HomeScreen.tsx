@@ -6,8 +6,21 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import {
+  announcements,
+  getPaymentRate,
+  getPresenceRate,
+  payments,
+  school,
+  students,
+  teachers,
+} from "../data/catalog";
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }: any) {
+  const studentIds = students.map((student) => student.id);
+  const presenceRate = getPresenceRate(studentIds);
+  const paymentRate = getPaymentRate(studentIds);
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -33,9 +46,9 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.schoolInfo}>
-            <Text style={styles.schoolName}>Université de Kinshasa</Text>
-            <Text style={styles.schoolCity}>Kinshasa</Text>
-            <Text style={styles.schoolTagline}>Excellence et Innovation</Text>
+            <Text style={styles.schoolName}>{school.name}</Text>
+            <Text style={styles.schoolCity}>{school.city}</Text>
+            <Text style={styles.schoolTagline}>{school.slogan}</Text>
           </View>
         </View>
 
@@ -62,7 +75,7 @@ export default function HomeScreen() {
         <View style={styles.statsGrid}>
           <StatCard
             icon="people-outline"
-            value="248"
+            value={String(students.length)}
             label="Élèves"
             color="#2563EB"
             bg="#EFF6FF"
@@ -70,7 +83,7 @@ export default function HomeScreen() {
 
           <StatCard
             icon="person-outline"
-            value="18"
+            value={String(teachers.length)}
             label="Enseignants"
             color="#7C3AED"
             bg="#F5F3FF"
@@ -78,7 +91,7 @@ export default function HomeScreen() {
 
           <StatCard
             icon="checkmark-circle-outline"
-            value="94%"
+            value={`${presenceRate}%`}
             label="Présence"
             color="#16A34A"
             bg="#ECFDF5"
@@ -86,7 +99,7 @@ export default function HomeScreen() {
 
           <StatCard
             icon="card-outline"
-            value="87%"
+            value={`${paymentRate}%`}
             label="Paiements"
             color="#EA580C"
             bg="#FFF7ED"
@@ -103,21 +116,21 @@ export default function HomeScreen() {
           <ActivityItem
             icon="cash-outline"
             title="Paiement reçu"
-            description="Frais scolaires validés"
+            description={`${payments.filter((payment) => payment.status === "PAYE").length} paiement(s) validé(s)`}
             color="#16A34A"
           />
 
           <ActivityItem
             icon="person-add-outline"
-            title="Nouvelle inscription"
-            description="Un nouvel élève ajouté"
+            title="Élèves inscrits"
+            description={`${students.length} dossier(s) actif(s)`}
             color="#2563EB"
           />
 
           <ActivityItem
             icon="megaphone-outline"
             title="Annonce publiée"
-            description="Communication envoyée aux parents"
+            description={`${announcements.length} communication(s) envoyée(s)`}
             color="#7C3AED"
           />
         </View>
@@ -128,10 +141,26 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.actionsGrid}>
-          <QuickAction icon="add-circle-outline" label="Ajouter élève" />
-          <QuickAction icon="person-add-outline" label="Ajouter prof" />
-          <QuickAction icon="card-outline" label="Paiement" />
-          <QuickAction icon="megaphone-outline" label="Annonce" />
+          <QuickAction
+            icon="add-circle-outline"
+            label="Élèves"
+            onPress={() => navigation.navigate("Students")}
+          />
+          <QuickAction
+            icon="person-add-outline"
+            label="Profs"
+            onPress={() => navigation.navigate("Teachers")}
+          />
+          <QuickAction
+            icon="card-outline"
+            label="Paiements"
+            onPress={() => navigation.navigate("Payments")}
+          />
+          <QuickAction
+            icon="megaphone-outline"
+            label="Annonces"
+            onPress={() => navigation.navigate("Announcements")}
+          />
         </View>
       </ScrollView>
     </View>
@@ -186,11 +215,12 @@ function ActivityItem({ icon, title, description, color }: ActivityItemProps) {
 type QuickActionProps = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  onPress: () => void;
 };
 
-function QuickAction({ icon, label }: QuickActionProps) {
+function QuickAction({ icon, label, onPress }: QuickActionProps) {
   return (
-    <TouchableOpacity activeOpacity={0.85} style={styles.quickAction}>
+    <TouchableOpacity activeOpacity={0.85} style={styles.quickAction} onPress={onPress}>
       <View style={styles.quickActionIcon}>
         <Ionicons name={icon} size={22} color="#2563EB" />
       </View>

@@ -17,28 +17,28 @@ export default function BottomTabsNavigator() {
         headerShown: false,
         tabBarShowLabel: false,
 
- tabBarStyle: {
-  position: "absolute",
-  left: 20,
-  right: 20,
-  bottom: 15,
-  height: 70,
-  backgroundColor: "#0F172A",
-  borderRadius: 25,
-  borderTopWidth: 0,
-  elevation: 12,
-  shadowColor: "#000",
-  shadowOffset: {
-    width: 0,
-    height: 5,
-  },
-  tabBarItemStyle: {
-  paddingHorizontal: 0,
-},
-  shadowOpacity: 0.15,
-  shadowRadius: 10,
-  overflow: "hidden",
-},
+        tabBarStyle: {
+          position: "absolute",
+          left: 20,
+          right: 20,
+          bottom: 15,
+          height: 70,
+          backgroundColor: "#0F172A",
+          borderRadius: 25,
+          borderTopWidth: 0,
+          elevation: 12,
+          shadowColor: "#000",
+          shadowOffset: {
+            width: 0,
+            height: 5,
+          },
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
+          overflow: "hidden",
+        },
+        tabBarItemStyle: {
+          paddingHorizontal: 0,
+        },
 
         tabBarIcon: ({ focused }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
