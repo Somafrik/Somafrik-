@@ -152,7 +152,8 @@ app.get("/api/announcements", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5001;
+const HOST = "0.0.0.0";
 
-app.listen(PORT, () => {
-  console.log(`Serveur lancé sur le port ${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Serveur lancé sur http://${HOST}:${PORT}`);
 });

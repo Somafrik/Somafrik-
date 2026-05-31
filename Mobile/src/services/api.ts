@@ -1,8 +1,6 @@
-import { Platform } from "react-native";
 import { UserRole } from "../navigation/AppNavigator";
 
-const API_HOST = Platform.OS === "android" ? "10.0.2.2" : "localhost";
-export const API_BASE_URL = `http://${API_HOST}:5001/api`;
+export const API_BASE_URL = "http://192.168.1.141:5001/api";
 
 type LoginPayload = {
   role: UserRole;
