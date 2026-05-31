@@ -17,8 +17,17 @@ export type Teacher = {
 };
 
 export type TeacherAssignment = {
+  id?: string;
+  teacherId?: string;
   className: string;
   course: string;
+};
+
+export type Course = {
+  id: string;
+  className: string;
+  name: string;
+  coefficient: number;
 };
 
 export type SchoolClass = {
@@ -48,7 +57,13 @@ export type PaymentItem = {
   studentId: string;
   amount: number;
   date: string;
-  status: "PAYE" | "EN_ATTENTE";
+  status: string;
+};
+
+export type PaymentStatus = {
+  id: string;
+  label: string;
+  value: "PAYE" | "EN_ATTENTE" | string;
 };
 
 export type Announcement = {
@@ -106,6 +121,25 @@ export const teachers: Teacher[] = [
   },
 ];
 
+export const courses: Course[] = [
+  { id: "COURSE1", className: "6ème A", name: "Mathématiques", coefficient: 2 },
+  { id: "COURSE2", className: "6ème A", name: "Français", coefficient: 1 },
+  { id: "COURSE3", className: "6ème B", name: "Mathématiques", coefficient: 2 },
+  { id: "COURSE4", className: "6ème B", name: "Sciences", coefficient: 2 },
+  { id: "COURSE5", className: "5ème A", name: "Physique", coefficient: 2 },
+  { id: "COURSE6", className: "5ème A", name: "Histoire", coefficient: 1 },
+  { id: "COURSE7", className: "5ème B", name: "Français", coefficient: 1 },
+  { id: "COURSE8", className: "5ème B", name: "Histoire", coefficient: 1 },
+];
+
+export const teacherAssignments: TeacherAssignment[] = teachers.flatMap((teacher) =>
+  (teacher.assignments ?? []).map((assignment, index) => ({
+    id: `${teacher.id}-ASSIGNMENT-${index + 1}`,
+    teacherId: teacher.id,
+    ...assignment,
+  }))
+);
+
 export const classes: SchoolClass[] = [
   { id: "C1", name: "6ème A", teacherId: "T1" },
   { id: "C2", name: "6ème B", teacherId: "T2" },
@@ -135,15 +169,20 @@ export const presences: PresenceItem[] = [
 ];
 
 export const payments: PaymentItem[] = [
-  { id: "PAY1", studentId: "1", amount: 25000, date: "2026-05-10", status: "PAYE" },
-  { id: "PAY2", studentId: "1", amount: 15000, date: "2026-05-25", status: "EN_ATTENTE" },
-  { id: "PAY3", studentId: "2", amount: 25000, date: "2026-05-10", status: "PAYE" },
-  { id: "PAY4", studentId: "3", amount: 25000, date: "2026-05-12", status: "PAYE" },
+  { id: "PAY1", studentId: "1", amount: 25000, date: "10-05-2026", status: "PAYE" },
+  { id: "PAY2", studentId: "1", amount: 15000, date: "25-05-2026", status: "EN_ATTENTE" },
+  { id: "PAY3", studentId: "2", amount: 25000, date: "10-05-2026", status: "PAYE" },
+  { id: "PAY4", studentId: "3", amount: 25000, date: "12-05-2026", status: "PAYE" },
+];
+
+export const paymentStatuses: PaymentStatus[] = [
+  { id: "STATUS1", label: "Payé", value: "PAYE" },
+  { id: "STATUS2", label: "En attente", value: "EN_ATTENTE" },
 ];
 
 export const announcements: Announcement[] = [
-  { id: "A1", title: "Réunion des parents", message: "Réunion générale samedi à 10h00.", date: "2026-05-30" },
-  { id: "A2", title: "Examens", message: "Les évaluations commencent le 10 juin.", date: "2026-05-29" },
+  { id: "A1", title: "Réunion des parents", message: "Réunion générale samedi à 10h00.", date: "30-05-2026" },
+  { id: "A2", title: "Examens", message: "Les évaluations commencent le 10 juin.", date: "29-05-2026" },
 ];
 
 export function getStudentById(studentId: string) {

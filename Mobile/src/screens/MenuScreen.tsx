@@ -14,7 +14,10 @@ const adminMenuItems: MenuItem[] = [
   { label: "👥 Élèves", entity: "students" },
   { label: "👨‍🏫 Enseignants", entity: "teachers" },
   { label: "📚 Classes", entity: "classes" },
+  { label: "📖 Cours", entity: "courses" },
+  { label: "🔁 Affectations profs", entity: "assignments" },
   { label: "💰 Paiements", entity: "payments" },
+  { label: "⚙️ Statuts paiement", entity: "paymentStatuses" },
   { label: "📢 Annonces", entity: "announcements" },
   { label: "🆘 Support" },
 ];

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
@@ -21,6 +21,7 @@ type Field = {
   label: string;
   placeholder: string;
   keyboardType?: "default" | "numeric";
+  type?: "text" | "select" | "date";
 };
 
 const configs: Record<
@@ -37,7 +38,7 @@ const configs: Record<
     fields: [
       { key: "name", label: "Nom", placeholder: "Nom complet" },
       { key: "matricule", label: "Matricule", placeholder: "MAT005" },
-      { key: "className", label: "Classe", placeholder: "6ème A" },
+      { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
       { key: "parentPhone", label: "Téléphone parent", placeholder: "+243 ..." },
     ],
   },
@@ -45,13 +46,9 @@ const configs: Record<
     title: "Gestion des enseignants",
     addLabel: "Ajouter un enseignant",
     fields: [
+      { key: "id", label: "ID enseignant", placeholder: "T5" },
       { key: "name", label: "Nom", placeholder: "Nom complet" },
       { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
-      {
-        key: "assignments",
-        label: "Classes et cours",
-        placeholder: "6ème A:Mathématiques, 5ème A:Physique",
-      },
     ],
   },
   classes: {
@@ -62,14 +59,40 @@ const configs: Record<
       { key: "teacherId", label: "Responsable", placeholder: "T1" },
     ],
   },
+  courses: {
+    title: "Gestion des cours",
+    addLabel: "Ajouter un cours",
+    fields: [
+      { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
+      { key: "name", label: "Nom du cours", placeholder: "Mathématiques" },
+      { key: "coefficient", label: "Coefficient", placeholder: "2", keyboardType: "numeric" },
+    ],
+  },
+  assignments: {
+    title: "Affectations profs",
+    addLabel: "Affecter un cours",
+    fields: [
+      { key: "teacherId", label: "ID enseignant", placeholder: "T1" },
+      { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
+      { key: "course", label: "Cours", placeholder: "Choisir un cours", type: "select" },
+    ],
+  },
   payments: {
     title: "Gestion des paiements",
     addLabel: "Ajouter un paiement",
     fields: [
       { key: "studentId", label: "ID élève", placeholder: "1" },
       { key: "amount", label: "Montant", placeholder: "25000", keyboardType: "numeric" },
-      { key: "date", label: "Date", placeholder: "2026-05-31" },
-      { key: "status", label: "Statut", placeholder: "PAYE ou EN_ATTENTE" },
+      { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
+      { key: "status", label: "Statut", placeholder: "Choisir un statut", type: "select" },
+    ],
+  },
+  paymentStatuses: {
+    title: "Statuts de paiement",
+    addLabel: "Ajouter un statut",
+    fields: [
+      { key: "label", label: "Libellé", placeholder: "Payé" },
+      { key: "value", label: "Code", placeholder: "PAYE" },
     ],
   },
   announcements: {
@@ -78,31 +101,67 @@ const configs: Record<
     fields: [
       { key: "title", label: "Titre", placeholder: "Réunion des parents" },
       { key: "message", label: "Message", placeholder: "Votre message" },
-      { key: "date", label: "Date", placeholder: "2026-05-31" },
+      { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
     ],
   },
 };
 
 export default function AdminCrudScreen({ route }: Props) {
   const { entity } = route.params;
-  const { getItems, createItem, updateItem, deleteItem } = useAdminData();
+  const {
+    getItems,
+    createItem,
+    updateItem,
+    deleteItem,
+    teachersData,
+    classesData,
+    coursesData,
+    assignmentsData,
+    paymentStatusesData,
+  } = useAdminData();
   const config = configs[entity];
   const items = getItems(entity);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [visible, setVisible] = useState(false);
+  const [selectField, setSelectField] = useState<Field | null>(null);
+  const [selectedCourseClass, setSelectedCourseClass] = useState("");
+  const [dateField, setDateField] = useState<Field | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
-  const statsLabel = useMemo(() => `${items.length} élément(s)`, [items.length]);
+  useEffect(() => {
+    if (entity === "courses" && !selectedCourseClass && classesData.length > 0) {
+      setSelectedCourseClass(classesData[0].name);
+    }
+  }, [classesData, entity, selectedCourseClass]);
+
+  const visibleItems = useMemo(() => {
+    if (entity !== "courses" || !selectedCourseClass) {
+      return items;
+    }
+
+    return items.filter((item: any) => normalize(item.className) === normalize(selectedCourseClass));
+  }, [entity, items, selectedCourseClass]);
+
+  const statsLabel = useMemo(() => `${visibleItems.length} élément(s)`, [visibleItems.length]);
 
   const openCreate = () => {
     setEditingItem(null);
-    setForm({});
+    setForm({
+      ...getInitialForm(entity),
+      ...(entity === "courses" && selectedCourseClass
+        ? { className: selectedCourseClass }
+        : {}),
+    });
     setVisible(true);
   };
 
   const openEdit = (item: any) => {
     setEditingItem(item);
     setForm(itemToForm(entity, item));
+    if (entity === "courses") {
+      setSelectedCourseClass(item.className);
+    }
     setVisible(true);
   };
 
@@ -114,10 +173,29 @@ export default function AdminCrudScreen({ route }: Props) {
       return;
     }
 
+    const businessError = validateBusinessRules({
+      entity,
+      item: nextItem,
+      editingId: editingItem?.id,
+      teachersData,
+      classesData,
+      coursesData,
+      assignmentsData,
+    });
+
+    if (businessError) {
+      Alert.alert("Règle métier", businessError);
+      return;
+    }
+
     if (editingItem) {
       updateItem(entity as any, nextItem as any);
     } else {
       createItem(entity as any, nextItem as any);
+    }
+
+    if (entity === "courses") {
+      setSelectedCourseClass(String(nextItem.className ?? ""));
     }
 
     setVisible(false);
@@ -138,16 +216,58 @@ export default function AdminCrudScreen({ route }: Props) {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerText}>
             <Text style={styles.title}>{config.title}</Text>
             <Text style={styles.subtitle}>{statsLabel}</Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={openCreate} activeOpacity={0.85}>
-            <Ionicons name="add" size={24} color="#FFFFFF" />
+            <Ionicons name="add" size={20} color="#FFFFFF" />
+            <Text style={styles.addButtonText}>Ajouter</Text>
           </TouchableOpacity>
         </View>
 
-        {items.map((item: any) => (
+        {entity === "courses" && (
+          <View style={styles.classCardsBlock}>
+            <Text style={styles.blockLabel}>Choisir une classe</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.classCardsList}
+            >
+              {classesData.map((schoolClass) => {
+                const selected = normalize(schoolClass.name) === normalize(selectedCourseClass);
+                const courseCount = items.filter(
+                  (item: any) => normalize(item.className) === normalize(schoolClass.name)
+                ).length;
+
+                return (
+                  <TouchableOpacity
+                    key={schoolClass.id}
+                    activeOpacity={0.85}
+                    style={[styles.classCard, selected && styles.classCardSelected]}
+                    onPress={() => setSelectedCourseClass(schoolClass.name)}
+                  >
+                    <Text style={[styles.classCardTitle, selected && styles.classCardTitleSelected]}>
+                      {schoolClass.name}
+                    </Text>
+                    <Text style={[styles.classCardMeta, selected && styles.classCardMetaSelected]}>
+                      {courseCount} cours
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.courseHeader}>
+              <Text style={styles.courseHeaderTitle}>
+                Cours de {selectedCourseClass || "la classe"}
+              </Text>
+              <Text style={styles.courseHeaderMeta}>{visibleItems.length} cours</Text>
+            </View>
+          </View>
+        )}
+
+        {visibleItems.map((item: any) => (
           <View key={item.id} style={styles.card}>
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>{getPrimaryText(entity, item)}</Text>
@@ -161,6 +281,13 @@ export default function AdminCrudScreen({ route }: Props) {
             </TouchableOpacity>
           </View>
         ))}
+
+        {visibleItems.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="book-outline" size={22} color="#94A3B8" />
+            <Text style={styles.emptyText}>Aucun élément pour cette sélection</Text>
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
@@ -171,13 +298,50 @@ export default function AdminCrudScreen({ route }: Props) {
             {config.fields.map((field) => (
               <View key={field.key} style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>{field.label}</Text>
-                <TextInput
-                  value={form[field.key] ?? ""}
-                  onChangeText={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
-                  placeholder={field.placeholder}
-                  keyboardType={field.keyboardType ?? "default"}
-                  style={styles.input}
-                />
+                {field.type === "select" ? (
+                  <TouchableOpacity
+                    style={styles.selectInput}
+                    activeOpacity={0.85}
+                    onPress={() => setSelectField(field)}
+                  >
+                    <Text
+                      style={[
+                        styles.selectText,
+                        !form[field.key] && styles.selectPlaceholder,
+                      ]}
+                    >
+                      {form[field.key] || field.placeholder}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color="#64748B" />
+                  </TouchableOpacity>
+                ) : field.type === "date" ? (
+                  <TouchableOpacity
+                    style={styles.selectInput}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setCalendarMonth(parseDisplayDate(form[field.key]) ?? new Date());
+                      setDateField(field);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.selectText,
+                        !form[field.key] && styles.selectPlaceholder,
+                      ]}
+                    >
+                      {form[field.key] || field.placeholder}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={18} color="#64748B" />
+                  </TouchableOpacity>
+                ) : (
+                  <TextInput
+                    value={form[field.key] ?? ""}
+                    onChangeText={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
+                    placeholder={field.placeholder}
+                    keyboardType={field.keyboardType ?? "default"}
+                    style={styles.input}
+                  />
+                )}
               </View>
             ))}
 
@@ -192,24 +356,128 @@ export default function AdminCrudScreen({ route }: Props) {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={Boolean(selectField)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectField(null)}
+      >
+        <View style={styles.selectorBackdrop}>
+          <View style={styles.selectorCard}>
+            <Text style={styles.selectorTitle}>{selectField?.label}</Text>
+            <ScrollView style={styles.selectorList}>
+              {getSelectOptions(
+                selectField?.key,
+                classesData,
+                coursesData,
+                paymentStatusesData,
+                form
+              ).map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={styles.selectorOption}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (selectField) {
+                      setForm((current) => ({
+                        ...current,
+                        [selectField.key]: option,
+                        ...(entity === "assignments" && selectField.key === "className"
+                          ? { course: "" }
+                          : {}),
+                      }));
+                    }
+                    setSelectField(null);
+                  }}
+                >
+                  <Text style={styles.selectorOptionText}>{option}</Text>
+                  {form[selectField?.key ?? ""] === option && (
+                    <Ionicons name="checkmark-circle" size={20} color="#2563EB" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity style={styles.selectorCancel} onPress={() => setSelectField(null)}>
+              <Text style={styles.cancelText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={Boolean(dateField)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDateField(null)}
+      >
+        <View style={styles.selectorBackdrop}>
+          <View style={styles.selectorCard}>
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity
+                style={styles.calendarNav}
+                onPress={() => setCalendarMonth(addMonths(calendarMonth, -1))}
+              >
+                <Ionicons name="chevron-back" size={20} color="#0F172A" />
+              </TouchableOpacity>
+              <Text style={styles.selectorTitle}>{formatMonth(calendarMonth)}</Text>
+              <TouchableOpacity
+                style={styles.calendarNav}
+                onPress={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+              >
+                <Ionicons name="chevron-forward" size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.weekRow}>
+              {["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"].map((day) => (
+                <Text key={day} style={styles.weekDay}>{day}</Text>
+              ))}
+            </View>
+
+            <View style={styles.daysGrid}>
+              {buildCalendarDays(calendarMonth).map((day, index) => (
+                <TouchableOpacity
+                  key={`${day?.toISOString() ?? "empty"}-${index}`}
+                  disabled={!day}
+                  style={[styles.dayCell, !day && styles.dayCellEmpty]}
+                  onPress={() => {
+                    if (day && dateField) {
+                      setForm((current) => ({ ...current, [dateField.key]: formatDate(day) }));
+                    }
+                    setDateField(null);
+                  }}
+                >
+                  <Text style={styles.dayText}>{day ? day.getDate() : ""}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.selectorCancel} onPress={() => setDateField(null)}>
+              <Text style={styles.cancelText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 function itemToForm(entity: AdminEntity, item: any) {
-  if (entity === "teachers") {
-    return {
-      name: item.name,
-      phone: item.phone,
-      assignments: (item.assignments ?? [])
-        .map((assignment: any) => `${assignment.className}:${assignment.course}`)
-        .join(", "),
-    };
-  }
-
   return Object.fromEntries(
     Object.entries(item).map(([key, value]) => [key, String(value)])
   );
+}
+
+function getInitialForm(entity: AdminEntity): Record<string, string> {
+  if (entity === "teachers") {
+    return {
+      id: `T${Date.now().toString().slice(-4)}`,
+    };
+  }
+
+  return {};
 }
 
 function formToItem(entity: AdminEntity, form: Record<string, string>, id?: string) {
@@ -228,12 +496,12 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
   }
 
   if (entity === "teachers") {
-    if (!form.name || !form.phone) return null;
+    if (!form.id || !form.name || !form.phone) return null;
     return {
-      id: nextId,
+      id: form.id.trim(),
       name: form.name,
       phone: form.phone,
-      assignments: parseAssignments(form.assignments ?? ""),
+      assignments: [],
     };
   }
 
@@ -242,14 +510,43 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     return { id: nextId, name: form.name, teacherId: form.teacherId ?? "" };
   }
 
+  if (entity === "courses") {
+    if (!form.className || !form.name) return null;
+    return {
+      id: nextId,
+      className: form.className,
+      name: form.name,
+      coefficient: Number(form.coefficient) || 1,
+    };
+  }
+
+  if (entity === "assignments") {
+    if (!form.teacherId || !form.className || !form.course) return null;
+    return {
+      id: nextId,
+      teacherId: form.teacherId,
+      className: form.className,
+      course: form.course,
+    };
+  }
+
   if (entity === "payments") {
     if (!form.studentId || !form.amount) return null;
     return {
       id: nextId,
       studentId: form.studentId,
       amount: Number(form.amount) || 0,
-      date: form.date || new Date().toISOString().slice(0, 10),
-      status: form.status === "EN_ATTENTE" ? "EN_ATTENTE" : "PAYE",
+      date: form.date || formatDate(new Date()),
+      status: form.status || "PAYE",
+    };
+  }
+
+  if (entity === "paymentStatuses") {
+    if (!form.label || !form.value) return null;
+    return {
+      id: nextId,
+      label: form.label,
+      value: form.value.trim().toUpperCase().replace(/\s+/g, "_"),
     };
   }
 
@@ -258,38 +555,167 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     id: nextId,
     title: form.title,
     message: form.message,
-    date: form.date || new Date().toISOString().slice(0, 10),
+    date: form.date || formatDate(new Date()),
   };
-}
-
-function parseAssignments(value: string) {
-  return value
-    .split(",")
-    .map((row) => row.trim())
-    .filter(Boolean)
-    .map((row) => {
-      const [className, course] = row.split(":").map((part) => part.trim());
-      return { className: className ?? "", course: course ?? "" };
-    })
-    .filter((assignment) => assignment.className && assignment.course);
 }
 
 function getPrimaryText(entity: AdminEntity, item: any) {
   if (entity === "payments") return `${item.amount?.toLocaleString?.() ?? item.amount} FC`;
+  if (entity === "paymentStatuses") return item.label;
   if (entity === "announcements") return item.title;
+  if (entity === "assignments") return `${item.className} - ${item.course}`;
   return item.name;
 }
 
 function getSecondaryText(entity: AdminEntity, item: any) {
   if (entity === "students") return `${item.matricule} • ${item.className}`;
   if (entity === "teachers") {
-    return (item.assignments ?? [])
-      .map((assignment: any) => `${assignment.className} - ${assignment.course}`)
-      .join(" • ");
+    return `ID : ${item.id} • ${item.phone}`;
   }
   if (entity === "classes") return `Responsable : ${item.teacherId || "Non assigné"}`;
+  if (entity === "courses") return `${item.className} • Coefficient : ${item.coefficient}`;
+  if (entity === "assignments") return `Enseignant : ${item.teacherId}`;
+  if (entity === "paymentStatuses") return `Code : ${item.value}`;
   if (entity === "payments") return `Élève ${item.studentId} • ${item.date} • ${item.status}`;
   return `${item.date} • ${item.message}`;
+}
+
+type BusinessValidationInput = {
+  entity: AdminEntity;
+  item: any;
+  editingId?: string;
+  teachersData: any[];
+  classesData: any[];
+  coursesData: any[];
+  assignmentsData: any[];
+};
+
+function validateBusinessRules({
+  entity,
+  item,
+  editingId,
+  teachersData,
+  classesData,
+  coursesData,
+  assignmentsData,
+}: BusinessValidationInput) {
+  if (entity !== "assignments") {
+    return null;
+  }
+
+  const teacherId = normalize(item.teacherId);
+  const className = normalize(item.className);
+  const course = normalize(item.course);
+  const teacherExists = teachersData.some((teacher) => normalize(teacher.id) === teacherId);
+  const classExists = classesData.some((schoolClass) => normalize(schoolClass.name) === className);
+  const courseExists = coursesData.some(
+    (courseItem) =>
+      normalize(courseItem.name) === course &&
+      normalize(courseItem.className) === className
+  );
+
+  if (!teacherExists) {
+    return "Affectation impossible : cet ID enseignant n'est pas enregistré dans le système.";
+  }
+
+  if (!courseExists) {
+    return "Affectation impossible : ce cours n'existe pas dans le système.";
+  }
+
+  if (!classExists) {
+    return "Affectation impossible : cette classe n'existe pas dans le système.";
+  }
+
+  const duplicate = assignmentsData.find(
+    (assignment) =>
+      assignment.id !== editingId &&
+      normalize(assignment.className) === className &&
+      normalize(assignment.course) === course
+  );
+
+  if (duplicate) {
+    if (normalize(duplicate.teacherId) === teacherId) {
+      return `Affectation impossible : cet enseignant est déjà affecté au cours ${item.course} pour la classe ${item.className}.`;
+    }
+
+    return `Affectation impossible : le cours ${item.course} est déjà affecté à un autre professeur pour la classe ${item.className}.`;
+  }
+
+  return null;
+}
+
+function normalize(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function getSelectOptions(
+  key: string | undefined,
+  classesData: any[],
+  coursesData: any[],
+  paymentStatusesData: any[],
+  form: Record<string, string>
+) {
+  if (key === "className") {
+    return classesData.map((schoolClass) => schoolClass.name).filter(Boolean);
+  }
+
+  if (key === "course") {
+    const selectedClass = normalize(form.className);
+    return coursesData
+      .filter((course) => !selectedClass || normalize(course.className) === selectedClass)
+      .map((course) => course.name)
+      .filter(Boolean);
+  }
+
+  if (key === "status") {
+    return paymentStatusesData.map((status) => status.value).filter(Boolean);
+  }
+
+  return [];
+}
+
+function formatDate(date: Date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}-${month}-${date.getFullYear()}`;
+}
+
+function parseDisplayDate(value?: string) {
+  if (!value) return null;
+  const [day, month, year] = value.split("-").map(Number);
+
+  if (!day || !month || !year) return null;
+  return new Date(year, month - 1, day);
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function formatMonth(date: Date) {
+  return date.toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function buildCalendarDays(date: Date) {
+  const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const days: Array<Date | null> = Array(startOffset).fill(null);
+
+  for (let day = 1; day <= lastDay.getDate(); day += 1) {
+    days.push(new Date(date.getFullYear(), date.getMonth(), day));
+  }
+
+  while (days.length % 7 !== 0) {
+    days.push(null);
+  }
+
+  return days;
 }
 
 const styles = StyleSheet.create({
@@ -300,16 +726,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    gap: 12,
   },
-  title: { fontSize: 28, fontWeight: "900", color: "#0F172A" },
+  headerText: { flex: 1, minWidth: 0 },
+  title: { fontSize: 24, fontWeight: "900", color: "#0F172A" },
   subtitle: { marginTop: 4, color: "#64748B", fontWeight: "700" },
   addButton: {
-    width: 46,
-    height: 46,
+    minWidth: 104,
+    height: 44,
     borderRadius: 16,
     backgroundColor: "#2563EB",
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    paddingHorizontal: 12,
+  },
+  addButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "900",
+    marginLeft: 5,
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -318,6 +754,81 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
+  },
+  classCardsBlock: {
+    marginBottom: 14,
+  },
+  blockLabel: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  classCardsList: {
+    gap: 10,
+    paddingRight: 4,
+  },
+  classCard: {
+    minWidth: 132,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  classCardSelected: {
+    backgroundColor: "#0F172A",
+    borderColor: "#0F172A",
+  },
+  classCardTitle: {
+    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  classCardTitleSelected: {
+    color: "#FFFFFF",
+  },
+  classCardMeta: {
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  classCardMetaSelected: {
+    color: "#CBD5E1",
+  },
+  courseHeader: {
+    marginTop: 14,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  courseHeaderTitle: {
+    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  courseHeaderMeta: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  emptyState: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 18,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 8,
+    textAlign: "center",
   },
   cardContent: { flex: 1, minWidth: 0 },
   cardTitle: { color: "#0F172A", fontSize: 15, fontWeight: "900" },
@@ -363,6 +874,23 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontWeight: "700",
   },
+  selectInput: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectText: {
+    color: "#0F172A",
+    fontWeight: "800",
+  },
+  selectPlaceholder: {
+    color: "#94A3B8",
+  },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 8 },
   cancelButton: {
     flex: 1,
@@ -380,4 +908,94 @@ const styles = StyleSheet.create({
   },
   cancelText: { color: "#334155", fontWeight: "900" },
   saveText: { color: "#FFFFFF", fontWeight: "900" },
+  selectorBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  selectorCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 16,
+    maxHeight: "72%",
+  },
+  selectorTitle: {
+    color: "#0F172A",
+    fontSize: 20,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  calendarNav: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  weekRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  weekDay: {
+    width: `${100 / 7}%`,
+    textAlign: "center",
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  daysGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
+  dayCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayCellEmpty: {
+    opacity: 0,
+  },
+  dayText: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#EFF6FF",
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+    lineHeight: 34,
+  },
+  selectorList: {
+    marginBottom: 12,
+  },
+  selectorOption: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectorOptionText: {
+    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  selectorCancel: {
+    backgroundColor: "#F1F5F9",
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+  },
 });

@@ -7,20 +7,22 @@ import {
   TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { classes, getPresenceRate, getTeacherById, students } from "../data/catalog";
+import { getPresenceRate } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
+import { useAdminData } from "../context/AdminDataContext";
 
 export default function ClassesScreen({ navigation }: any) {
   const { session } = useAuth();
+  const { classesData, studentsData, teachersData } = useAdminData();
   const assignedClasses = session?.role === "teacher" ? session.user.assignedClasses ?? [] : [];
   const visibleClasses =
     session?.role === "teacher"
-      ? classes.filter((item) => assignedClasses.includes(item.name))
-      : classes;
+      ? classesData.filter((item) => assignedClasses.includes(item.name))
+      : classesData;
   const visibleStudents =
     session?.role === "teacher"
-      ? students.filter((student) => assignedClasses.includes(student.className))
-      : students;
+      ? studentsData.filter((student) => assignedClasses.includes(student.className))
+      : studentsData;
   const totalStudents = visibleStudents.length;
 
   return (
@@ -66,8 +68,8 @@ export default function ClassesScreen({ navigation }: any) {
         <Text style={styles.sectionTitle}>Liste des classes</Text>
 
         {visibleClasses.map((item) => {
-          const classStudents = students.filter((student) => student.className === item.name);
-          const teacher = getTeacherById(item.teacherId);
+          const classStudents = studentsData.filter((student) => student.className === item.name);
+          const teacher = teachersData.find((teacherItem) => teacherItem.id === item.teacherId);
           const presenceRate = getPresenceRate(classStudents.map((student) => student.id));
 
           return (

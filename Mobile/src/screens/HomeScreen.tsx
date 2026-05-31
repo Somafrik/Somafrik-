@@ -7,31 +7,32 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  announcements,
   getStudentById,
-  getPaymentRate,
   getPresenceRate,
   notes,
   payments,
   presences,
   school,
-  students,
-  teachers,
 } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
+import { useAdminData } from "../context/AdminDataContext";
 
 export default function HomeScreen({ navigation }: any) {
   const { session, selectedStudentId } = useAuth();
-  const studentIds = students.map((student) => student.id);
+  const { studentsData, teachersData, paymentsData, announcementsData } = useAdminData();
+  const studentIds = studentsData.map((student) => student.id);
   const presenceRate = getPresenceRate(studentIds);
-  const paymentRate = getPaymentRate(studentIds);
+  const paymentRows = paymentsData.filter((payment) => studentIds.includes(payment.studentId));
+  const paymentRate = paymentRows.length
+    ? Math.round((paymentRows.filter((payment) => payment.status === "PAYE").length / paymentRows.length) * 100)
+    : 0;
   const userName = session?.user.name ?? "Administrateur";
 
   if (session?.role === "teacher") {
     const assignedClasses = session.user.assignedClasses ?? [];
     const courses = session.user.courses ?? [];
-    const teacherStudents = students.filter((student) => assignedClasses.includes(student.className));
+    const teacherStudents = studentsData.filter((student) => assignedClasses.includes(student.className));
     const teacherStudentIds = teacherStudents.map((student) => student.id);
     const teacherPresenceRate = getPresenceRate(teacherStudentIds);
     const teacherNotes = notes.filter(
@@ -137,7 +138,7 @@ export default function HomeScreen({ navigation }: any) {
   }
 
   if (session?.role === "parent_student" && selectedStudentId) {
-    const student = getStudentById(selectedStudentId);
+    const student = studentsData.find((item) => item.id === selectedStudentId) ?? getStudentById(selectedStudentId);
     const studentNotes = notes.filter((note) => note.studentId === selectedStudentId);
     const studentPresences = presences.filter((presence) => presence.studentId === selectedStudentId);
     const studentPayments = payments.filter((payment) => payment.studentId === selectedStudentId);
@@ -147,7 +148,7 @@ export default function HomeScreen({ navigation }: any) {
         : studentNotes.reduce((sum, note) => sum + note.value, 0) / studentNotes.length;
     const presentCount = studentPresences.filter((presence) => presence.present).length;
     const paidCount = studentPayments.filter((payment) => payment.status === "PAYE").length;
-    const latestAnnouncement = announcements[0];
+    const latestAnnouncement = announcementsData[0];
 
     return (
       <View style={styles.screen}>
@@ -316,7 +317,7 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.statsGrid}>
           <StatCard
             icon="people-outline"
-            value={String(students.length)}
+            value={String(studentsData.length)}
             label="Élèves"
             color="#2563EB"
             bg="#EFF6FF"
@@ -324,7 +325,7 @@ export default function HomeScreen({ navigation }: any) {
 
           <StatCard
             icon="person-outline"
-            value={String(teachers.length)}
+            value={String(teachersData.length)}
             label="Enseignants"
             color="#7C3AED"
             bg="#F5F3FF"
@@ -357,21 +358,21 @@ export default function HomeScreen({ navigation }: any) {
           <ActivityItem
             icon="cash-outline"
             title="Paiement reçu"
-            description={`${payments.filter((payment) => payment.status === "PAYE").length} paiement(s) validé(s)`}
+            description={`${paymentsData.filter((payment) => payment.status === "PAYE").length} paiement(s) validé(s)`}
             color="#16A34A"
           />
 
           <ActivityItem
             icon="person-add-outline"
             title="Élèves inscrits"
-            description={`${students.length} dossier(s) actif(s)`}
+            description={`${studentsData.length} dossier(s) actif(s)`}
             color="#2563EB"
           />
 
           <ActivityItem
             icon="megaphone-outline"
             title="Annonce publiée"
-            description={`${announcements.length} communication(s) envoyée(s)`}
+            description={`${announcementsData.length} communication(s) envoyée(s)`}
             color="#7C3AED"
           />
         </View>
@@ -398,6 +399,11 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
           />
           <QuickAction
+            icon="settings-outline"
+            label="Statuts"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "paymentStatuses" })}
+          />
+          <QuickAction
             icon="megaphone-outline"
             label="Annonces"
             onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
@@ -406,6 +412,16 @@ export default function HomeScreen({ navigation }: any) {
             icon="grid-outline"
             label="Classes"
             onPress={() => navigation.navigate("AdminCrud", { entity: "classes" })}
+          />
+          <QuickAction
+            icon="book-outline"
+            label="Cours"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "courses" })}
+          />
+          <QuickAction
+            icon="swap-horizontal-outline"
+            label="Affectations"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "assignments" })}
           />
         </View>
       </ScrollView>

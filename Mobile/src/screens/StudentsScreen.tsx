@@ -8,18 +8,20 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { getPaymentRate, getPresenceRate, presences, students } from "../data/catalog";
+import { getPresenceRate, presences } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
+import { useAdminData } from "../context/AdminDataContext";
 
 export default function StudentsScreen({ route, navigation }: any) {
   const { session } = useAuth();
+  const { studentsData, paymentsData } = useAdminData();
   const className = route?.params?.className ?? "Toutes les classes";
   const [query, setQuery] = useState("");
   const assignedClasses = session?.role === "teacher" ? session.user.assignedClasses ?? [] : [];
   const availableStudents =
     session?.role === "teacher"
-      ? students.filter((student) => assignedClasses.includes(student.className))
-      : students;
+      ? studentsData.filter((student) => assignedClasses.includes(student.className))
+      : studentsData;
 
   const classStudents =
     className === "Toutes les classes"
@@ -40,7 +42,11 @@ export default function StudentsScreen({ route, navigation }: any) {
   });
 
   const presenceRate = getPresenceRate(classStudents.map((student) => student.id));
-  const paymentRate = getPaymentRate(classStudents.map((student) => student.id));
+  const classStudentIds = classStudents.map((student) => student.id);
+  const paymentRows = paymentsData.filter((payment) => classStudentIds.includes(payment.studentId));
+  const paymentRate = paymentRows.length
+    ? Math.round((paymentRows.filter((payment) => payment.status === "PAYE").length / paymentRows.length) * 100)
+    : 0;
   const classGroups = filteredStudents.reduce<Record<string, typeof filteredStudents>>(
     (groups, student) => {
       const key = student.className;

@@ -31,8 +31,23 @@ export default function SchoolManagementScreen({
       />
 
       <MenuCard
+        title="📖 Cours"
+        onPress={() => navigation.navigate("AdminCrud", { entity: "courses" })}
+      />
+
+      <MenuCard
+        title="🔁 Affectations"
+        onPress={() => navigation.navigate("AdminCrud", { entity: "assignments" })}
+      />
+
+      <MenuCard
         title="💰 Paiements"
         onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+      />
+
+      <MenuCard
+        title="⚙️ Statuts paiement"
+        onPress={() => navigation.navigate("AdminCrud", { entity: "paymentStatuses" })}
       />
 
       <MenuCard
