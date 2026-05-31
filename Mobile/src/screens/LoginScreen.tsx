@@ -34,6 +34,8 @@ export default function LoginScreen({ navigation, route }: Props) {
     role === "school_admin"
       ? "Identifiant administrateur"
       : "Téléphone parent ou matricule";
+  const secretPlaceholder =
+    role === "school_admin" ? "Mot de passe" : "Code PIN";
 
   const handleLogin = async () => {
     if (!schoolCode.trim() || !identifier.trim() || !pin.trim()) {
@@ -90,12 +92,12 @@ export default function LoginScreen({ navigation, route }: Props) {
       />
 
       <TextInput
-        placeholder="Code PIN"
+        placeholder={secretPlaceholder}
         value={pin}
         onChangeText={setPin}
-        keyboardType="number-pad"
+        keyboardType={role === "school_admin" ? "default" : "number-pad"}
         secureTextEntry
-        maxLength={6}
+        maxLength={role === "school_admin" ? undefined : 6}
         style={styles.input}
       />
 
