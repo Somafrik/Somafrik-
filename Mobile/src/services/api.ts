@@ -1,4 +1,5 @@
 import { UserRole } from "../navigation/AppNavigator";
+import { AuthResolver } from "../domain/auth/AuthResolver";
 
 export const API_BASE_URL = "http://192.168.1.141:5001/api";
 
@@ -151,99 +152,11 @@ async function identifyAccountFromExistingEndpoints({
   schoolCode: string;
   identifier: string;
 }): Promise<IdentifyResponse> {
-  const normalizedIdentifier = identifier.trim();
-  const normalizedSchoolCode = schoolCode.trim().toUpperCase();
-  const possibleIdentifiers = getPossibleAccountIdentifiers(schoolCode, normalizedIdentifier);
-
-  if (normalizedIdentifier.toLowerCase() === "admin") {
-    return { role: "school_admin", roleLabel: "Administrateur" };
-  }
-
   const [teachers, students] = await Promise.all([
     request<TeacherSummary[]>("/teachers"),
     request<StudentSummary[]>("/students"),
   ]);
+  const authResolver = new AuthResolver({ teachers, students });
 
-  const teacher = teachers.find(
-    (item) =>
-      matchesAccountIdentifier(item.id, possibleIdentifiers) ||
-      matchesAccountIdentifier(item.publicId, possibleIdentifiers) ||
-      matchesAccountIdentifier(item.phone, possibleIdentifiers)
-  );
-
-  if (teacher) {
-    return { role: "teacher", roleLabel: "Enseignant" };
-  }
-
-  const student = students.find(
-    (item) =>
-      item.schoolCode === normalizedSchoolCode &&
-      (matchesAccountIdentifier(item.matricule, possibleIdentifiers) ||
-        matchesAccountIdentifier(item.publicId, possibleIdentifiers))
-  );
-
-  if (student) {
-    return { role: "student", roleLabel: "Élève" };
-  }
-
-  const parent = students.find(
-    (item) => item.schoolCode === normalizedSchoolCode && matchesAccountIdentifier(item.parentPhone, possibleIdentifiers)
-  );
-
-  if (parent) {
-    return { role: "parent_student", roleLabel: "Parent" };
-  }
-
-  throw new Error("Aucun compte trouvé pour cet identifiant");
-}
-
-function getPossibleAccountIdentifiers(schoolCode: string, identifier: string) {
-  const normalizedSchoolCode = schoolCode.trim().toUpperCase();
-  const normalizedIdentifier = identifier.trim();
-  const upperIdentifier = normalizedIdentifier.toUpperCase();
-  const values = new Set([normalizedIdentifier, upperIdentifier]);
-  const localMatch = upperIdentifier.match(/^(ELE|ETU|ENS)-(\d+)$/);
-
-  if (localMatch) {
-    const [, profile, sequence] = localMatch;
-    const normalizedSequence = String(Number(sequence)).padStart(4, "0");
-    const extendedSequence = String(Number(sequence)).padStart(6, "0");
-    const localIdentifier = `${profile}-${normalizedSequence}`;
-    const extendedLocalIdentifier = `${profile}-${extendedSequence}`;
-
-    values.add(localIdentifier);
-    values.add(extendedLocalIdentifier);
-    values.add(`${normalizedSchoolCode}-${upperIdentifier}`);
-    values.add(`${normalizedSchoolCode}-${localIdentifier}`);
-    values.add(`${normalizedSchoolCode}-${extendedLocalIdentifier}`);
-  }
-
-  return [...values];
-}
-
-function matchesAccountIdentifier(value: string | undefined, possibleIdentifiers: string[]) {
-  const normalizedValue = String(value ?? "").trim().toUpperCase();
-
-  if (!normalizedValue) {
-    return false;
-  }
-
-  if (possibleIdentifiers.includes(normalizedValue) || possibleIdentifiers.includes(String(value).trim())) {
-    return true;
-  }
-
-  const localMatch = normalizedValue.match(/(?:^|-)(ELE|ETU|ENS)-(\d+)$/);
-  if (!localMatch) {
-    return false;
-  }
-
-  const [, profile, sequence] = localMatch;
-  const normalizedSequence = String(Number(sequence)).padStart(4, "0");
-  const extendedSequence = String(Number(sequence)).padStart(6, "0");
-
-  return (
-    possibleIdentifiers.includes(`${profile}-${sequence}`) ||
-    possibleIdentifiers.includes(`${profile}-${normalizedSequence}`) ||
-    possibleIdentifiers.includes(`${profile}-${extendedSequence}`)
-  );
+  return authResolver.identify(schoolCode, identifier);
 }

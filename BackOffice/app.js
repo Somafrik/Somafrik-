@@ -4,6 +4,9 @@ const state = {
   session: null,
   schools: [],
   users: [],
+  countries: [],
+  subscriptions: [],
+  notifications: [],
 };
 
 const loginPanel = document.querySelector("#loginPanel");
@@ -23,6 +26,12 @@ const controlGrid = document.querySelector("#controlGrid");
 const controlHint = document.querySelector("#controlHint");
 const schoolsTable = document.querySelector("#schoolsTable");
 const usersTable = document.querySelector("#usersTable");
+const countriesTable = document.querySelector("#countriesTable");
+const subscriptionsTable = document.querySelector("#subscriptionsTable");
+const notificationsList = document.querySelector("#notificationsList");
+const countryCount = document.querySelector("#countryCount");
+const subscriptionCount = document.querySelector("#subscriptionCount");
+const notificationCount = document.querySelector("#notificationCount");
 const permissionsList = document.querySelector("#permissionsList");
 const permissionCount = document.querySelector("#permissionCount");
 const schoolSearch = document.querySelector("#schoolSearch");
@@ -60,6 +69,9 @@ loginForm.addEventListener("submit", async (event) => {
     state.session = response;
     state.schools = response.schools;
     state.users = response.users;
+    state.countries = response.countries ?? [];
+    state.subscriptions = response.subscriptions ?? [];
+    state.notifications = response.notifications ?? [];
     localStorage.setItem("schoollink-backoffice-session", JSON.stringify(response));
     renderApp();
   } catch (error) {
@@ -72,6 +84,9 @@ logoutButton.addEventListener("click", () => {
   state.session = null;
   state.schools = [];
   state.users = [];
+  state.countries = [];
+  state.subscriptions = [];
+  state.notifications = [];
   loginPanel.classList.remove("hidden");
   appPanel.classList.add("hidden");
 });
@@ -93,6 +108,9 @@ function boot() {
     state.session = session;
     state.schools = session.schools ?? [];
     state.users = session.users ?? [];
+    state.countries = session.countries ?? [];
+    state.subscriptions = session.subscriptions ?? [];
+    state.notifications = session.notifications ?? [];
     renderApp();
   } catch {
     localStorage.removeItem("schoollink-backoffice-session");
@@ -127,29 +145,57 @@ function renderApp() {
   controlHint.textContent = scope.hint;
 
   renderKpis();
+  renderMenus();
   renderControls();
+  renderCountries();
   renderSchools();
+  renderSubscriptions();
+  renderNotifications();
   renderUsers();
   renderPermissions();
   showView("overview");
 }
 
 function renderKpis() {
-  const activeSchools = state.schools.filter((school) => school.status === "Actif").length;
-  const backOfficeUsers = state.users.filter((user) => user.accessChannel === "BackOffice").length;
-  const appUsers = state.users.filter((user) => user.accessChannel === "Application").length;
-  const countries = new Set(state.schools.map((school) => school.country).filter(Boolean)).size;
-
-  const cards = [
-    ["Pays", countries],
-    ["Établissements actifs", activeSchools],
-    ["Utilisateurs BackOffice", backOfficeUsers],
-    ["Utilisateurs application", appUsers],
-  ];
+  const cards = state.session.dashboard?.kpis ?? [];
 
   kpiGrid.innerHTML = cards
-    .map(([label, value]) => `<article class="kpi-card"><span>${label}</span><strong>${value}</strong></article>`)
+    .map(
+      (card) => `
+        <article class="kpi-card">
+          <span>${card.label}</span>
+          <strong>${formatMetric(card.value, card.suffix)}</strong>
+        </article>
+      `
+    )
     .join("");
+}
+
+function renderMenus() {
+  const allowedMenus = state.session.menus ?? [];
+  const menuToView = {
+    Dashboard: "overview",
+    Pays: "countries",
+    "Administrateurs Pays": "users",
+    Établissements: "schools",
+    Validations: "schools",
+    Abonnements: "subscriptions",
+    Paiements: "subscriptions",
+    Support: "notifications",
+    Rapports: "overview",
+    Paramètres: "permissions",
+  };
+  const allowedViews = new Set(["overview", "permissions"]);
+
+  allowedMenus.forEach((menu) => {
+    if (menuToView[menu]) {
+      allowedViews.add(menuToView[menu]);
+    }
+  });
+
+  document.querySelectorAll(".nav-item").forEach((button) => {
+    button.classList.toggle("hidden", !allowedViews.has(button.dataset.view));
+  });
 }
 
 function renderControls() {
@@ -189,6 +235,60 @@ function renderSchools() {
     .join("");
 }
 
+function renderCountries() {
+  countryCount.textContent = `${state.countries.length} pays`;
+  countriesTable.innerHTML = state.countries
+    .map(
+      (country) => `
+        <tr>
+          <td><strong>${country.name}</strong><br><small>Admin : ${country.administratorId || "À affecter"}</small></td>
+          <td>${country.code}</td>
+          <td>${country.phonePrefix}</td>
+          <td>${country.currency}</td>
+          <td>${country.timezone}</td>
+          <td><span class="status ${getStatusClass(country.status)}">${country.status}</span></td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderSubscriptions() {
+  subscriptionCount.textContent = `${state.subscriptions.length} abonnement(s)`;
+  subscriptionsTable.innerHTML = state.subscriptions
+    .map(
+      (subscription) => `
+        <tr>
+          <td><strong>${subscription.schoolCode}</strong><br><small>${subscription.status}</small></td>
+          <td>${subscription.country}</td>
+          <td>${subscription.plan}</td>
+          <td>${subscription.monthlyPrice} ${subscription.currency}</td>
+          <td>${subscription.endDate}</td>
+          <td><span class="status ${getPaymentClass(subscription.paymentStatus)}">${subscription.paymentStatus}</span></td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderNotifications() {
+  const unread = state.notifications.filter((notification) => notification.status === "Non lu").length;
+  notificationCount.textContent = `${unread} non lue(s)`;
+  notificationsList.innerHTML = state.notifications
+    .map(
+      (notification) => `
+        <article class="notification-item">
+          <div>
+            <strong>${notification.title}</strong>
+            <p>${notification.message}</p>
+          </div>
+          <span class="status ${notification.status === "Non lu" ? "status-warning" : ""}">${notification.status}</span>
+        </article>
+      `
+    )
+    .join("");
+}
+
 function renderUsers() {
   const query = normalize(userSearch.value);
   const rows = state.users.filter((user) =>
@@ -223,7 +323,10 @@ function renderPermissions() {
 function showView(viewName) {
   const titles = {
     overview: "Vue globale",
+    countries: "Pays",
     schools: "Établissements",
+    subscriptions: "Abonnements",
+    notifications: "Notifications",
     users: "Utilisateurs",
     permissions: "Permissions",
   };
@@ -238,10 +341,24 @@ function normalize(value) {
 }
 
 function getControlDescription(permission) {
+  if (permission === "ALL_PRIVILEGES") return "Accès total à la plateforme SchoolLink.";
+  if (permission === "COUNTRY_PRIVILEGES") return "Accès limité aux données du pays affecté.";
   if (permission.includes("pays")) return "Contrôle limité au périmètre pays autorisé.";
   if (permission.includes("établissement")) return "Contrôle des écoles, statuts et abonnements.";
   if (permission.includes("utilisateur") || permission.includes("admins")) return "Création, suspension et audit des comptes.";
   if (permission.includes("rapport")) return "Suivi des indicateurs consolidés.";
   if (permission.includes("abonnement")) return "Gestion des plans, échéances et limites.";
   return "Action autorisée selon votre niveau métier.";
+}
+
+function formatMetric(value, suffix) {
+  return `${value}${suffix ? ` ${suffix}` : ""}`;
+}
+
+function getStatusClass(status) {
+  return status === "Suspendu" ? "status-danger" : "";
+}
+
+function getPaymentClass(status) {
+  return status === "En retard" ? "status-warning" : "";
 }

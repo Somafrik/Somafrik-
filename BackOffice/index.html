@@ -48,7 +48,10 @@
           </div>
           <nav>
             <button class="nav-item active" data-view="overview">Vue globale</button>
+            <button class="nav-item" data-view="countries">Pays</button>
             <button class="nav-item" data-view="schools">Établissements</button>
+            <button class="nav-item" data-view="subscriptions">Abonnements</button>
+            <button class="nav-item" data-view="notifications">Notifications</button>
             <button class="nav-item" data-view="users">Utilisateurs</button>
             <button class="nav-item" data-view="permissions">Permissions</button>
           </nav>
@@ -100,6 +103,58 @@
                 <tbody id="schoolsTable"></tbody>
               </table>
             </div>
+          </section>
+
+          <section class="view hidden" id="countriesView">
+            <div class="section-head">
+              <h3>Pays</h3>
+              <span id="countryCount"></span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pays</th>
+                    <th>Code</th>
+                    <th>Indicatif</th>
+                    <th>Devise</th>
+                    <th>Fuseau horaire</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="countriesTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="subscriptionsView">
+            <div class="section-head">
+              <h3>Abonnements</h3>
+              <span id="subscriptionCount"></span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Établissement</th>
+                    <th>Pays</th>
+                    <th>Offre</th>
+                    <th>Tarif mensuel</th>
+                    <th>Échéance</th>
+                    <th>Statut paiement</th>
+                  </tr>
+                </thead>
+                <tbody id="subscriptionsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="notificationsView">
+            <div class="section-head">
+              <h3>Notifications</h3>
+              <span id="notificationCount"></span>
+            </div>
+            <div class="notifications-list" id="notificationsList"></div>
           </section>
 
           <section class="view hidden" id="usersView">

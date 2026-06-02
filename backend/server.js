@@ -11,9 +11,22 @@ const {
   payments,
   announcements,
   userAccounts,
+  countries,
+  subscriptions,
+  platformNotifications,
 } = require("./data");
+const { AuthService, BusinessError } = require("./services/authService");
+const { BackOfficeAccessService } = require("./services/backOfficeAccessService");
 
 const app = express();
+const authService = new AuthService({ school, teachers, students, userAccounts });
+const backOfficeAccessService = new BackOfficeAccessService({
+  school,
+  userAccounts,
+  countries,
+  subscriptions,
+  notifications: platformNotifications,
+});
 
 app.use(cors());
 app.use(express.json());
@@ -41,6 +54,9 @@ app.get("/", (req, res) => {
       "/api/users",
       "/api/payments",
       "/api/announcements",
+      "/api/backoffice/countries",
+      "/api/backoffice/subscriptions",
+      "/api/backoffice/notifications",
     ],
   });
 });
@@ -62,210 +78,15 @@ app.get("/api/schools/:code", (req, res) => {
 });
 
 app.post("/api/backoffice/login", (req, res) => {
-  const { identifier, password } = req.body;
-
-  if (!identifier || !password) {
-    return res.status(400).json({ message: "Identifiant et mot de passe obligatoires" });
-  }
-
-  const user = userAccounts.find(
-    (account) => account.identifier === identifier || account.phone === identifier
-  );
-
-  if (!user || user.password !== password) {
-    return res.status(401).json({ message: "Identifiants BackOffice incorrects" });
-  }
-
-  if (user.status !== "Actif") {
-    return res.status(403).json({ message: "Compte suspendu ou desactive" });
-  }
-
-  if (user.accessChannel !== "BackOffice") {
-    return res.status(403).json({ message: "Ce compte n'a pas accès au BackOffice" });
-  }
-
-  const scopedSchools = getScopedSchools(user);
-  const scopedUsers = getScopedUsers(user);
-  const { password: _password, temporaryPassword: _temporaryPassword, ...safeUser } = user;
-
-  res.json({
-    user: safeUser,
-    scope: getBackOfficeScope(user),
-    schools: scopedSchools,
-    users: scopedUsers.map(({ password: _pwd, temporaryPassword: _tmp, ...account }) => account),
-  });
+  handleBusinessResponse(res, () => backOfficeAccessService.login(req.body));
 });
 
 app.post("/api/identify", (req, res) => {
-  const { schoolCode, identifier } = req.body;
-
-  if (!schoolCode || !identifier) {
-    return res.status(400).json({ message: "Champs manquants" });
-  }
-
-  if (String(schoolCode).toUpperCase() !== school.code) {
-    return res.status(401).json({ message: "Code etablissement invalide" });
-  }
-
-  if (school.status === "Suspendu") {
-    return res.status(403).json({ message: "Etablissement suspendu. Connexion indisponible." });
-  }
-
-  const possibleIdentifiers = getPossibleAccountIdentifiers(schoolCode, identifier);
-  const managedUser = findManagedUser(identifier, schoolCode);
-
-  if (managedUser && managedUser.status !== "Actif") {
-    return res.status(403).json({ message: "Compte suspendu ou desactive. Connexion indisponible." });
-  }
-
-  if (managedUser?.accessChannel === "BackOffice") {
-    return res.status(403).json({
-      message: "Ce compte est reserve au BackOffice SchoolLink. Utilisez le portail PC/tablette/web.",
-    });
-  }
-
-  if (possibleIdentifiers.includes("admin")) {
-    return res.json({ role: "school_admin", roleLabel: "Administrateur" });
-  }
-
-  const teacher = teachers.find(
-    (item) =>
-      matchesAccountIdentifier(item.id, possibleIdentifiers) ||
-      matchesAccountIdentifier(item.publicId, possibleIdentifiers) ||
-      matchesAccountIdentifier(item.phone, possibleIdentifiers)
-  );
-
-  if (teacher) {
-    return res.json({ role: "teacher", roleLabel: "Enseignant" });
-  }
-
-  const studentByMatricule = students.find(
-    (item) =>
-      item.schoolCode === String(schoolCode).toUpperCase() &&
-      (matchesAccountIdentifier(item.matricule, possibleIdentifiers) ||
-        matchesAccountIdentifier(item.publicId, possibleIdentifiers))
-  );
-
-  if (studentByMatricule) {
-    return res.json({ role: "student", roleLabel: "Élève" });
-  }
-
-  const parentStudent = students.find(
-    (item) =>
-      item.schoolCode === String(schoolCode).toUpperCase() &&
-      matchesAccountIdentifier(item.parentPhone, possibleIdentifiers)
-  );
-
-  if (parentStudent) {
-    return res.json({ role: "parent_student", roleLabel: "Parent" });
-  }
-
-  return res.status(404).json({ message: "Aucun compte trouve pour cet identifiant" });
+  handleBusinessResponse(res, () => authService.identify(req.body));
 });
 
 app.post("/api/login", (req, res) => {
-  const { role, schoolCode, identifier, pin } = req.body;
-
-  if (!role || !schoolCode || !identifier || !pin) {
-    return res.status(400).json({ message: "Champs manquants" });
-  }
-
-  if (String(schoolCode).toUpperCase() !== school.code) {
-    return res.status(401).json({ message: "Code etablissement invalide" });
-  }
-
-  if (school.status === "Suspendu") {
-    return res.status(403).json({ message: "Etablissement suspendu. Connexion indisponible." });
-  }
-
-  const possibleIdentifiers = getPossibleAccountIdentifiers(schoolCode, identifier);
-  const managedUser = findManagedUser(identifier, schoolCode);
-
-  if (managedUser && managedUser.status !== "Actif") {
-    return res.status(403).json({ message: "Compte suspendu ou desactive. Connexion indisponible." });
-  }
-
-  if (managedUser?.accessChannel === "BackOffice") {
-    return res.status(403).json({
-      message: "Ce compte est reserve au BackOffice SchoolLink. Utilisez le portail PC/tablette/web.",
-    });
-  }
-
-  if (role === "school_admin" && possibleIdentifiers.includes("admin") && pin === "1234") {
-    return res.json({ role, user: { id: "ADMIN1", name: "Administrateur" }, school });
-  }
-
-  if (role === "teacher") {
-    const teacher = teachers.find(
-      (item) =>
-        (matchesAccountIdentifier(item.id, possibleIdentifiers) ||
-          matchesAccountIdentifier(item.publicId, possibleIdentifiers) ||
-          matchesAccountIdentifier(item.phone, possibleIdentifiers)) &&
-        item.password === pin
-    );
-
-    if (teacher) {
-      const assignedClasses = [...new Set(teacher.assignments.map((item) => item.className))];
-      const courses = [...new Set(teacher.assignments.map((item) => item.course))];
-      const { password: _password, ...safeTeacher } = teacher;
-
-      return res.json({
-        role,
-        user: {
-          ...safeTeacher,
-          assignedClasses,
-          courses,
-        },
-        school,
-      });
-    }
-  }
-
-  if (role === "student") {
-    const student = students.find(
-      (item) =>
-        item.schoolCode === String(schoolCode).toUpperCase() &&
-        (matchesAccountIdentifier(item.matricule, possibleIdentifiers) ||
-          matchesAccountIdentifier(item.publicId, possibleIdentifiers)) &&
-        item.pin === pin
-    );
-
-    if (student) {
-      const { pin: _pin, ...safeStudent } = student;
-      return res.json({
-        role,
-        user: safeStudent,
-        school,
-      });
-    }
-  }
-
-  if (role === "parent_student") {
-    const matchedStudents = students.filter(
-      (item) =>
-        item.schoolCode === String(schoolCode).toUpperCase() &&
-        matchesAccountIdentifier(item.parentPhone, possibleIdentifiers) &&
-        item.pin === pin
-    );
-
-    if (matchedStudents.length > 0) {
-      const children = matchedStudents.map(({ pin: _pin, ...safeStudent }) => safeStudent);
-      const firstStudent = children[0];
-
-      return res.json({
-        role,
-        user: {
-          id: `PARENT-${firstStudent.parentPhone}`,
-          name: "Parent SchoolLink",
-          parentPhone: firstStudent.parentPhone,
-          children,
-        },
-        school,
-      });
-    }
-  }
-
-  return res.status(401).json({ message: "Identifiants incorrects" });
+  handleBusinessResponse(res, () => authService.login(req.body));
 });
 
 app.get("/api/school", (req, res) => {
@@ -363,110 +184,29 @@ app.get("/api/announcements", (req, res) => {
   res.json(announcements);
 });
 
-function findManagedUser(identifier, schoolCode) {
-  return userAccounts.find(
-    (user) =>
-      (user.schoolCode === "*" || user.schoolCode === String(schoolCode).toUpperCase()) &&
-      (user.identifier === identifier || user.phone === identifier)
-  );
-}
+app.get("/api/backoffice/countries", (req, res) => {
+  res.json(countries);
+});
 
-function getPossibleAccountIdentifiers(schoolCode, identifier) {
-  const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
-  const rawIdentifier = String(identifier).trim();
-  const upperIdentifier = rawIdentifier.toUpperCase();
-  const values = new Set([rawIdentifier, upperIdentifier]);
-  const localMatch = upperIdentifier.match(/^(ELE|ETU|ENS)-(\d+)$/);
+app.get("/api/backoffice/subscriptions", (req, res) => {
+  res.json(subscriptions);
+});
 
-  if (localMatch) {
-    const [, profile, sequence] = localMatch;
-    const normalizedSequence = String(Number(sequence)).padStart(4, "0");
-    const extendedSequence = String(Number(sequence)).padStart(6, "0");
-    const localIdentifier = `${profile}-${normalizedSequence}`;
-    const extendedLocalIdentifier = `${profile}-${extendedSequence}`;
+app.get("/api/backoffice/notifications", (req, res) => {
+  res.json(platformNotifications);
+});
 
-    values.add(localIdentifier);
-    values.add(extendedLocalIdentifier);
-    values.add(`${normalizedSchoolCode}-${upperIdentifier}`);
-    values.add(`${normalizedSchoolCode}-${localIdentifier}`);
-    values.add(`${normalizedSchoolCode}-${extendedLocalIdentifier}`);
+function handleBusinessResponse(res, action) {
+  try {
+    return res.json(action());
+  } catch (error) {
+    if (error instanceof BusinessError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
+    console.error(error);
+    return res.status(500).json({ message: "Erreur interne SchoolLink" });
   }
-
-  return [...values];
-}
-
-function matchesAccountIdentifier(value, possibleIdentifiers) {
-  const normalizedValue = String(value ?? "").trim().toUpperCase();
-
-  if (!normalizedValue) {
-    return false;
-  }
-
-  if (possibleIdentifiers.includes(normalizedValue) || possibleIdentifiers.includes(String(value).trim())) {
-    return true;
-  }
-
-  const localMatch = normalizedValue.match(/(?:^|-)(ELE|ETU|ENS)-(\d+)$/);
-  if (!localMatch) {
-    return false;
-  }
-
-  const [, profile, sequence] = localMatch;
-  const normalizedSequence = String(Number(sequence)).padStart(4, "0");
-  const extendedSequence = String(Number(sequence)).padStart(6, "0");
-
-  return (
-    possibleIdentifiers.includes(`${profile}-${sequence}`) ||
-    possibleIdentifiers.includes(`${profile}-${normalizedSequence}`) ||
-    possibleIdentifiers.includes(`${profile}-${extendedSequence}`)
-  );
-}
-
-function getScopedSchools(user) {
-  if (user.role === "Super Administrateur SchoolLink") {
-    return [school];
-  }
-
-  if (user.role === "Admin Pays") {
-    return [school].filter((item) => item.country === user.countryScope);
-  }
-
-  return [school].filter((item) => item.code === user.schoolCode);
-}
-
-function getScopedUsers(user) {
-  if (user.role === "Super Administrateur SchoolLink") {
-    return userAccounts;
-  }
-
-  if (user.role === "Admin Pays") {
-    return userAccounts.filter(
-      (account) => account.countryScope === user.countryScope || account.schoolCode === "*"
-    );
-  }
-
-  return userAccounts.filter((account) => account.schoolCode === user.schoolCode);
-}
-
-function getBackOfficeScope(user) {
-  if (user.role === "Super Administrateur SchoolLink") {
-    return {
-      label: "Périmètre global",
-      hint: "Vous contrôlez tous les pays, établissements et comptes.",
-    };
-  }
-
-  if (user.role === "Admin Pays") {
-    return {
-      label: `Périmètre pays : ${user.countryScope}`,
-      hint: "Vous contrôlez uniquement les écoles et utilisateurs de ce pays.",
-    };
-  }
-
-  return {
-    label: `Périmètre établissement : ${user.schoolCode}`,
-    hint: "Vous contrôlez uniquement votre établissement.",
-  };
 }
 
 const PORT = process.env.PORT || 5001;
