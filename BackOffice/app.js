@@ -280,6 +280,7 @@ function renderNotifications() {
         <article class="notification-item">
           <div>
             <strong>${notification.title}</strong>
+            <p>${notification.type} • ${notification.priority} • ${(notification.channels ?? []).join(", ")}</p>
             <p>${notification.message}</p>
           </div>
           <span class="status ${notification.status === "Non lu" ? "status-warning" : ""}">${notification.status}</span>

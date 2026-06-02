@@ -1,11 +1,13 @@
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
-import { notes, students } from "../data/catalog";
+import { courses, notes, students } from "../data/catalog";
+import { GradeBookService } from "../domain/academics/GradeBookService";
 
 export default function TeacherGradesScreen({ navigation }: any) {
   const { session } = useAuth();
   const assignments = session?.user.assignments ?? [];
+  const gradeBook = new GradeBookService(students, notes, courses);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -14,6 +16,7 @@ export default function TeacherGradesScreen({ navigation }: any) {
 
       {assignments.map((assignment) => {
         const classStudents = students.filter((student) => student.className === assignment.className);
+        const classStats = gradeBook.getClassStatistics(assignment.className);
 
         return (
           <View key={`${assignment.className}-${assignment.course}`} style={styles.assignmentCard}>
@@ -29,14 +32,24 @@ export default function TeacherGradesScreen({ navigation }: any) {
               <Ionicons name="reader-outline" size={24} color="#7C3AED" />
             </TouchableOpacity>
 
+            <View style={styles.statsRow}>
+              <View style={styles.statPill}>
+                <Text style={styles.statValue}>{classStats.classAverage.toFixed(1)}</Text>
+                <Text style={styles.statLabel}>Moy. classe</Text>
+              </View>
+              <View style={styles.statPill}>
+                <Text style={styles.statValue}>{classStats.bestAverage.toFixed(1)}</Text>
+                <Text style={styles.statLabel}>Meilleure</Text>
+              </View>
+              <View style={styles.statPill}>
+                <Text style={styles.statValue}>{classStats.successRate}%</Text>
+                <Text style={styles.statLabel}>Réussite</Text>
+              </View>
+            </View>
+
             {classStudents.map((student) => {
-              const studentNotes = notes.filter(
-                (note) => note.studentId === student.id && note.subject === assignment.course
-              );
-              const average =
-                studentNotes.length === 0
-                  ? 0
-                  : studentNotes.reduce((sum, note) => sum + note.value, 0) / studentNotes.length;
+              const subjectAverage = gradeBook.getSubjectAverage(student.id, assignment.course);
+              const report = gradeBook.generateReport(student.id);
 
               return (
                 <TouchableOpacity
@@ -53,8 +66,8 @@ export default function TeacherGradesScreen({ navigation }: any) {
                     <Text style={styles.meta}>{student.matricule}</Text>
                   </View>
                   <View style={styles.gradeBox}>
-                    <Text style={styles.grade}>{studentNotes.length ? average.toFixed(1) : "-"}</Text>
-                    <Text style={styles.gradeLabel}>/20</Text>
+                    <Text style={styles.grade}>{subjectAverage.average ? subjectAverage.average.toFixed(1) : "-"}</Text>
+                    <Text style={styles.gradeLabel}>{report.rankLabel}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -84,6 +97,19 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   assignmentTitle: { fontSize: 20, fontWeight: "900", color: "#0F172A" },
+  statsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginVertical: 12,
+  },
+  statPill: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 14,
+    padding: 10,
+  },
+  statValue: { color: "#7C3AED", fontSize: 18, fontWeight: "900" },
+  statLabel: { color: "#64748B", fontSize: 11, fontWeight: "800", marginTop: 2 },
   card: {
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",

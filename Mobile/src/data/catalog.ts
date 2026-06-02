@@ -59,6 +59,17 @@ export type NoteItem = {
   value: number;
   coefficient: number;
   date: string;
+  evaluationId?: string;
+  scale?: number;
+  evaluationCoefficient?: number;
+  authorId?: string;
+  enteredAt?: string;
+  audit?: {
+    authorId: string;
+    oldValue?: number;
+    newValue: number;
+    date: string;
+  }[];
 };
 
 export type PresenceItem = {
@@ -106,8 +117,18 @@ export type SchoolMessage = {
     | "Parent vers enseignant"
     | string;
   message: string;
-  status: "Nouveau" | "En cours" | "Traité" | string;
+  status: "Envoyé" | "Distribué" | "Lu" | "Archivé" | "Nouveau" | "En cours" | "Traité" | string;
   date: string;
+  attachmentUrl?: string;
+  priority?: "Faible" | "Moyenne" | "Haute" | "Critique" | string;
+  sentAt?: string;
+  readAt?: string;
+  archivedAt?: string;
+  audit?: {
+    action: string;
+    actorId: string;
+    date: string;
+  }[];
 };
 
 export type UserAccount = {
@@ -455,10 +476,10 @@ export const students: Student[] = [
 ];
 
 export const notes: NoteItem[] = [
-  { id: "N1", studentId: "1", subject: "Mathématiques", value: 15, coefficient: 2, date: "2026-05-20" },
-  { id: "N2", studentId: "1", subject: "Français", value: 13, coefficient: 1, date: "2026-05-22" },
-  { id: "N3", studentId: "2", subject: "Mathématiques", value: 16, coefficient: 2, date: "2026-05-21" },
-  { id: "N4", studentId: "3", subject: "Sciences", value: 12, coefficient: 2, date: "2026-05-23" },
+  { id: "N1", studentId: "1", subject: "Mathématiques", value: 15, coefficient: 2, date: "2026-05-20", evaluationId: "EVAL1", scale: 20, evaluationCoefficient: 1, authorId: "T1", enteredAt: "20-05-2026 09:00", audit: [{ authorId: "T1", newValue: 15, date: "20-05-2026 09:00" }] },
+  { id: "N2", studentId: "1", subject: "Français", value: 13, coefficient: 1, date: "2026-05-22", evaluationId: "EVAL2", scale: 20, evaluationCoefficient: 1, authorId: "T2", enteredAt: "22-05-2026 10:00", audit: [{ authorId: "T2", newValue: 13, date: "22-05-2026 10:00" }] },
+  { id: "N3", studentId: "2", subject: "Mathématiques", value: 16, coefficient: 2, date: "2026-05-21", evaluationId: "EVAL1", scale: 20, evaluationCoefficient: 1, authorId: "T1", enteredAt: "21-05-2026 09:00", audit: [{ authorId: "T1", newValue: 16, date: "21-05-2026 09:00" }] },
+  { id: "N4", studentId: "3", subject: "Sciences", value: 12, coefficient: 2, date: "2026-05-23", evaluationId: "EVAL3", scale: 20, evaluationCoefficient: 1, authorId: "T3", enteredAt: "23-05-2026 11:00", audit: [{ authorId: "T3", newValue: 12, date: "23-05-2026 11:00" }] },
 ];
 
 export const presences: PresenceItem[] = [
@@ -504,7 +525,10 @@ export const schoolMessages: SchoolMessage[] = [
     direction: "Parent vers école",
     message: "Demande de dérogation pour régler la deuxième tranche le 10 du mois prochain.",
     status: "Nouveau",
+    priority: "Haute",
     date: "31-05-2026",
+    sentAt: "31-05-2026 08:15",
+    audit: [{ action: "Création", actorId: "PARENT-+243 820 000 001", date: "31-05-2026 08:15" }],
   },
   {
     id: "MSG2",
@@ -513,8 +537,11 @@ export const schoolMessages: SchoolMessage[] = [
     theme: "Résultats scolaires",
     direction: "École vers parent",
     message: "Merci de passer à l'école cette semaine pour échanger avec le titulaire.",
-    status: "En cours",
+    status: "Distribué",
+    priority: "Moyenne",
     date: "31-05-2026",
+    sentAt: "31-05-2026 10:20",
+    audit: [{ action: "Création", actorId: "ADMIN1", date: "31-05-2026 10:20" }],
   },
   {
     id: "MSG3",
@@ -525,7 +552,10 @@ export const schoolMessages: SchoolMessage[] = [
     direction: "Enseignant vers parent",
     message: "Jean doit renforcer les exercices de mathématiques cette semaine.",
     status: "Nouveau",
+    priority: "Moyenne",
     date: "31-05-2026",
+    sentAt: "31-05-2026 11:05",
+    audit: [{ action: "Création", actorId: "T1", date: "31-05-2026 11:05" }],
   },
   {
     id: "MSG4",
@@ -536,7 +566,11 @@ export const schoolMessages: SchoolMessage[] = [
     direction: "Parent vers enseignant",
     message: "Marie sera absente demain matin pour un rendez-vous médical.",
     status: "Nouveau",
+    priority: "Haute",
     date: "31-05-2026",
+    attachmentUrl: "",
+    sentAt: "31-05-2026 12:30",
+    audit: [{ action: "Création", actorId: "PARENT-+243 820 000 001", date: "31-05-2026 12:30" }],
   },
 ];
 

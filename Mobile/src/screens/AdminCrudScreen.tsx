@@ -171,7 +171,9 @@ const configs: Record<
       { key: "parentPhone", label: "Parent", placeholder: "Choisir un parent", type: "select" },
       { key: "studentId", label: "Élève", placeholder: "Choisir un élève", type: "select" },
       { key: "theme", label: "Thème", placeholder: "Choisir un thème", type: "select" },
+      { key: "priority", label: "Priorité", placeholder: "Choisir une priorité", type: "select" },
       { key: "message", label: "Message", placeholder: "Message au parent" },
+      { key: "attachmentUrl", label: "Pièce jointe", placeholder: "Lien PDF, image, audio ou vidéo" },
       { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
       { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
     ],
@@ -950,8 +952,18 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       theme: form.theme,
       direction: "École vers parent",
       message: form.message,
-      status: form.status || "Nouveau",
+      attachmentUrl: form.attachmentUrl ?? "",
+      priority: form.priority || "Moyenne",
+      status: form.status || "Envoyé",
       date: form.date || formatDate(new Date()),
+      sentAt: `${form.date || formatDate(new Date())} 00:00`,
+      audit: [
+        {
+          action: id ? "Modification" : "Création",
+          actorId: "ADMIN1",
+          date: `${formatDate(new Date())} 00:00`,
+        },
+      ],
     };
   }
 
@@ -1299,6 +1311,10 @@ function getSelectOptions(
     return messageThemes;
   }
 
+  if (key === "priority") {
+    return ["Faible", "Moyenne", "Haute", "Critique"];
+  }
+
   if (key === "method") {
     return ["Mobile Money", "Carte bancaire", "Espèces", "Virement bancaire"];
   }
@@ -1365,7 +1381,7 @@ function getSelectOptions(
     }
 
     if (entity === "messages") {
-      return ["Nouveau", "En cours", "Traité"];
+      return ["Envoyé", "Distribué", "Lu", "Archivé", "Nouveau", "En cours", "Traité"];
     }
 
     return paymentStatusesData.map((status) => status.value).filter(Boolean);

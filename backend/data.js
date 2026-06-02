@@ -149,8 +149,11 @@ const platformNotifications = [
     title: "Nouveau pays créé",
     message: "La République du Congo a été ajoutée au périmètre SchoolLink.",
     type: "Pays",
+    priority: "Moyenne",
+    channels: ["Web", "Tablette", "Mobile"],
     status: "Non lu",
     date: "01-06-2026",
+    createdBy: "Système",
   },
   {
     id: "NOTIF-002",
@@ -159,8 +162,11 @@ const platformNotifications = [
     title: "Abonnement expiré",
     message: "Un abonnement pays est arrivé à échéance.",
     type: "Abonnement",
+    priority: "Haute",
+    channels: ["Web", "Tablette", "Mobile"],
     status: "Non lu",
     date: "01-06-2026",
+    createdBy: "Système",
   },
   {
     id: "NOTIF-003",
@@ -169,8 +175,11 @@ const platformNotifications = [
     title: "Paiement reçu",
     message: "Université de Kinshasa a réglé son abonnement Premium.",
     type: "Paiement",
+    priority: "Moyenne",
+    channels: ["Web", "Tablette", "Mobile"],
     status: "Lu",
     date: "01-06-2026",
+    createdBy: "Système",
   },
   {
     id: "NOTIF-004",
@@ -179,8 +188,11 @@ const platformNotifications = [
     title: "Nouvelle demande d'inscription",
     message: "Une nouvelle école attend validation dans votre pays.",
     type: "Inscription",
+    priority: "Haute",
+    channels: ["Web", "Tablette", "Mobile"],
     status: "Non lu",
     date: "02-06-2026",
+    createdBy: "Système",
   },
 ];
 
@@ -399,10 +411,10 @@ const students = [
 ];
 
 const notes = [
-  { id: "N1", studentId: "1", subject: "Mathématiques", value: 15, coefficient: 2, date: "2026-05-20" },
-  { id: "N2", studentId: "1", subject: "Français", value: 13, coefficient: 1, date: "2026-05-22" },
-  { id: "N3", studentId: "2", subject: "Mathématiques", value: 16, coefficient: 2, date: "2026-05-21" },
-  { id: "N4", studentId: "3", subject: "Sciences", value: 12, coefficient: 2, date: "2026-05-23" },
+  { id: "N1", studentId: "1", subject: "Mathématiques", value: 15, coefficient: 2, date: "2026-05-20", evaluationId: "EVAL1", scale: 20, evaluationCoefficient: 1, authorId: "T1", enteredAt: "20-05-2026 09:00", audit: [{ authorId: "T1", newValue: 15, date: "20-05-2026 09:00" }] },
+  { id: "N2", studentId: "1", subject: "Français", value: 13, coefficient: 1, date: "2026-05-22", evaluationId: "EVAL2", scale: 20, evaluationCoefficient: 1, authorId: "T2", enteredAt: "22-05-2026 10:00", audit: [{ authorId: "T2", newValue: 13, date: "22-05-2026 10:00" }] },
+  { id: "N3", studentId: "2", subject: "Mathématiques", value: 16, coefficient: 2, date: "2026-05-21", evaluationId: "EVAL1", scale: 20, evaluationCoefficient: 1, authorId: "T1", enteredAt: "21-05-2026 09:00", audit: [{ authorId: "T1", newValue: 16, date: "21-05-2026 09:00" }] },
+  { id: "N4", studentId: "3", subject: "Sciences", value: 12, coefficient: 2, date: "2026-05-23", evaluationId: "EVAL3", scale: 20, evaluationCoefficient: 1, authorId: "T3", enteredAt: "23-05-2026 11:00", audit: [{ authorId: "T3", newValue: 12, date: "23-05-2026 11:00" }] },
 ];
 
 const presences = [

@@ -14,12 +14,15 @@ const {
   countries,
   subscriptions,
   platformNotifications,
+  courses,
 } = require("./data");
 const { AuthService, BusinessError } = require("./services/authService");
 const { BackOfficeAccessService } = require("./services/backOfficeAccessService");
+const { GradeBookService } = require("./services/gradeBookService");
 
 const app = express();
 const authService = new AuthService({ school, teachers, students, userAccounts });
+const gradeBookService = new GradeBookService({ students, notes, courses });
 const backOfficeAccessService = new BackOfficeAccessService({
   school,
   userAccounts,
@@ -48,6 +51,7 @@ app.get("/", (req, res) => {
       "/api/students",
       "/api/students/:id",
       "/api/students/:id/notes",
+      "/api/students/:id/report",
       "/api/students/:id/presences",
       "/api/students/:id/payments",
       "/api/teachers",
@@ -138,6 +142,16 @@ app.get("/api/students/:id", (req, res) => {
 
 app.get("/api/students/:id/notes", (req, res) => {
   res.json(notes.filter((note) => note.studentId === req.params.id));
+});
+
+app.get("/api/students/:id/report", (req, res) => {
+  const student = students.find((item) => item.id === req.params.id);
+
+  if (!student) {
+    return res.status(404).json({ message: "Eleve introuvable" });
+  }
+
+  res.json(gradeBookService.generateReport(req.params.id));
 });
 
 app.get("/api/students/:id/presences", (req, res) => {

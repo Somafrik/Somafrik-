@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { getStudentById, notes } from "../data/catalog";
+import { courses, getStudentById, notes, students } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
+import { GradeBookService } from "../domain/academics/GradeBookService";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentNotes">;
 
@@ -11,11 +12,9 @@ export default function StudentNotesScreen({ route, navigation }: Partial<Props>
   const { selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
   const student = studentId ? getStudentById(studentId) : undefined;
+  const gradeBook = new GradeBookService(students, notes, courses);
   const studentNotes = notes.filter((note) => note.studentId === studentId);
-  const average =
-    studentNotes.length === 0
-      ? 0
-      : studentNotes.reduce((sum, note) => sum + note.value, 0) / studentNotes.length;
+  const report = studentId ? gradeBook.generateReport(studentId, "Trimestre 1", "Publié") : undefined;
 
   return (
     <View style={styles.container}>
@@ -29,8 +28,26 @@ export default function StudentNotesScreen({ route, navigation }: Partial<Props>
         onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
       >
         <Text style={styles.summaryLabel}>Moyenne générale</Text>
-        <Text style={styles.summaryValue}>{average.toFixed(1)}/20</Text>
+        <Text style={styles.summaryValue}>{(report?.average ?? 0).toFixed(1)}/20</Text>
+        <Text style={styles.summaryMeta}>
+          {report?.rankLabel ?? "-"} • {report?.appreciation ?? "Aucune appréciation"}
+        </Text>
       </TouchableOpacity>
+
+      <View style={styles.reportRow}>
+        <View style={styles.reportPill}>
+          <Text style={styles.reportValue}>{(report?.totalPoints ?? 0).toFixed(1)}</Text>
+          <Text style={styles.reportLabel}>Points</Text>
+        </View>
+        <View style={styles.reportPill}>
+          <Text style={styles.reportValue}>{report?.totalCoefficients ?? 0}</Text>
+          <Text style={styles.reportLabel}>Coefficients</Text>
+        </View>
+        <View style={styles.reportPill}>
+          <Text style={styles.reportValue}>{report?.status ?? "Brouillon"}</Text>
+          <Text style={styles.reportLabel}>Bulletin</Text>
+        </View>
+      </View>
 
       <FlatList
         data={studentNotes}
@@ -46,8 +63,9 @@ export default function StudentNotesScreen({ route, navigation }: Partial<Props>
             <View>
               <Text style={styles.subject}>{item.subject}</Text>
               <Text style={styles.meta}>
-                Coef. {item.coefficient} • {item.date}
+                Coef. {item.coefficient} • Barème {item.scale ?? 20} • {item.date}
               </Text>
+              <Text style={styles.audit}>Saisi par {item.authorId ?? "N/A"} • {item.enteredAt ?? item.date}</Text>
             </View>
             <Text style={styles.grade}>{item.value}/20</Text>
           </TouchableOpacity>
@@ -90,6 +108,33 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 6,
   },
+  summaryMeta: {
+    color: "#DBEAFE",
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  reportRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  reportPill: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 12,
+  },
+  reportValue: {
+    color: "#0F172A",
+    fontWeight: "900",
+    fontSize: 16,
+  },
+  reportLabel: {
+    color: "#64748B",
+    fontWeight: "800",
+    fontSize: 11,
+    marginTop: 4,
+  },
   listContent: {
     paddingBottom: 40,
   },
@@ -111,6 +156,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: "#64748B",
     fontWeight: "600",
+  },
+  audit: {
+    marginTop: 3,
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "700",
   },
   grade: {
     fontSize: 22,

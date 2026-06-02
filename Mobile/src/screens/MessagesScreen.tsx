@@ -13,12 +13,19 @@ import { messageThemes } from "../data/catalog";
 import { useAdminData } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
+import { MessagePriority, MessageService } from "../domain/communication/MessageService";
+
+const messageService = new MessageService();
+const priorities: MessagePriority[] = ["Faible", "Moyenne", "Haute", "Critique"];
 
 export default function MessagesScreen({ navigation }: any) {
   const { session, selectedStudentId } = useAuth();
-  const { createItem, messagesData, studentsData, teachersData } = useAdminData();
+  const { createItem, updateItem, messagesData, studentsData, teachersData } = useAdminData();
   const [theme, setTheme] = useState(messageThemes[0]);
   const [message, setMessage] = useState("");
+  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [priority, setPriority] = useState<MessagePriority>("Moyenne");
+  const [query, setQuery] = useState("");
   const [recipient, setRecipient] = useState<"school" | "teacher">("school");
   const [selectedTeacherId, setSelectedTeacherId] = useState(session?.user.id ?? "");
   const [teacherStudentId, setTeacherStudentId] = useState("");
@@ -43,7 +50,7 @@ export default function MessagesScreen({ navigation }: any) {
     );
   }, [parentChildren, role, teachersData]);
 
-  const visibleMessages = useMemo(() => {
+  const roleMessages = useMemo(() => {
     if (role === "teacher") {
       return messagesData.filter(
         (item) =>
@@ -60,6 +67,7 @@ export default function MessagesScreen({ navigation }: any) {
     return messagesData.filter((item) => item.parentPhone === parentPhone);
   }, [messagesData, parentPhone, role, session?.user.id, teacherStudents]);
 
+  const visibleMessages = useMemo(() => messageService.search(roleMessages, query), [query, roleMessages]);
   const unreadCount = getUnreadMessagesCount(role, session, visibleMessages);
 
   const sendMessage = () => {
@@ -76,19 +84,20 @@ export default function MessagesScreen({ navigation }: any) {
         return;
       }
 
-      createItem("messages", {
-        id: `messages-${Date.now()}`,
+      createItem("messages", messageService.create({
         parentPhone,
         studentId: selectedStudentId ?? parentChildren[0]?.id ?? "",
         teacherId,
         theme,
         direction: recipient === "teacher" ? "Parent vers enseignant" : "Parent vers école",
         message: message.trim(),
-        status: "Nouveau",
-        date: formatDate(new Date()),
-      });
+        attachmentUrl,
+        priority,
+        actorId: session?.user.id ?? parentPhone,
+      }));
 
       setMessage("");
+      setAttachmentUrl("");
       Alert.alert("Message envoyé", recipient === "teacher" ? "L'enseignant recevra votre message." : "L'école recevra votre demande.");
       return;
     }
@@ -102,22 +111,26 @@ export default function MessagesScreen({ navigation }: any) {
         return;
       }
 
-      createItem("messages", {
-        id: `messages-${Date.now()}`,
+      createItem("messages", messageService.create({
         parentPhone: student.parentPhone,
         studentId: student.id,
         teacherId: session?.user.id ?? "",
         theme,
         direction: "Enseignant vers parent",
         message: message.trim(),
-        status: "Nouveau",
-        date: formatDate(new Date()),
-      });
+        attachmentUrl,
+        priority,
+        actorId: session?.user.id ?? "",
+      }));
 
       setMessage("");
+      setAttachmentUrl("");
       Alert.alert("Message envoyé", "Le parent recevra votre message.");
     }
   };
+
+  const markAsRead = (item: any) => updateItem("messages", messageService.markAsRead(item, session?.user.id ?? parentPhone));
+  const archiveMessage = (item: any) => updateItem("messages", messageService.archive(item, session?.user.id ?? parentPhone));
 
   return (
     <View style={styles.screen}>
@@ -253,6 +266,28 @@ export default function MessagesScreen({ navigation }: any) {
               })}
             </ScrollView>
 
+            <Text style={styles.label}>Priorité</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.themeList}
+            >
+              {priorities.map((item) => {
+                const selected = item === priority;
+
+                return (
+                  <TouchableOpacity
+                    key={item}
+                    activeOpacity={0.85}
+                    style={[styles.themeChip, selected && styles.themeChipActive]}
+                    onPress={() => setPriority(item)}
+                  >
+                    <Text style={[styles.themeText, selected && styles.themeTextActive]}>{item}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
             <Text style={styles.label}>Message</Text>
             <TextInput
               value={message}
@@ -263,6 +298,15 @@ export default function MessagesScreen({ navigation }: any) {
               style={styles.messageInput}
             />
 
+            <Text style={styles.label}>Pièce jointe</Text>
+            <TextInput
+              value={attachmentUrl}
+              onChangeText={setAttachmentUrl}
+              placeholder="Lien PDF, image, audio ou vidéo"
+              placeholderTextColor="#94A3B8"
+              style={styles.attachmentInput}
+            />
+
             <TouchableOpacity activeOpacity={0.85} style={styles.sendButton} onPress={sendMessage}>
               <Ionicons name="send-outline" size={20} color="#FFFFFF" />
               <Text style={styles.sendText}>Envoyer</Text>
@@ -271,6 +315,13 @@ export default function MessagesScreen({ navigation }: any) {
         )}
 
         <Text style={styles.sectionTitle}>Historique</Text>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Rechercher par expéditeur, destinataire, date ou mot-clé"
+          placeholderTextColor="#94A3B8"
+          style={styles.searchInput}
+        />
         {visibleMessages.map((item) => {
           const fromSchool = item.direction === "École vers parent";
           const fromTeacher = item.direction === "Enseignant vers parent";
@@ -293,15 +344,31 @@ export default function MessagesScreen({ navigation }: any) {
                 </View>
                 <View style={styles.messageHeaderText}>
                   <Text style={styles.messageTheme}>{item.theme}</Text>
-                  <Text style={styles.messageMeta}>
+                <Text style={styles.messageMeta}>
                     {item.direction} • {teacher?.name ?? item.parentPhone} • {item.date}
                   </Text>
                 </View>
-                <Text style={[styles.status, item.status === "Nouveau" && styles.unreadStatus]}>
+                <Text style={[styles.status, isUnreadStatus(item.status) && styles.unreadStatus]}>
                   {item.status}
                 </Text>
               </View>
+              <View style={styles.badgeRow}>
+                <Text style={styles.priorityBadge}>{item.priority ?? "Moyenne"}</Text>
+                {item.attachmentUrl ? <Text style={styles.attachmentBadge}>Pièce jointe</Text> : null}
+              </View>
               <Text style={styles.messageBody}>{item.message}</Text>
+              <View style={styles.actionRow}>
+                {isUnreadStatus(item.status) && (
+                  <TouchableOpacity style={styles.smallAction} onPress={() => markAsRead(item)}>
+                    <Text style={styles.smallActionText}>Marquer lu</Text>
+                  </TouchableOpacity>
+                )}
+                {item.status !== "Archivé" && (
+                  <TouchableOpacity style={styles.smallAction} onPress={() => archiveMessage(item)}>
+                    <Text style={styles.smallActionText}>Archiver</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           );
         })}
@@ -338,32 +405,11 @@ function SegmentButton({
 }
 
 function getUnreadMessagesCount(role: string | undefined, session: any, messages: any[]) {
-  if (role === "school_admin") {
-    return messages.filter(
-      (message) => message.status === "Nouveau" && message.direction === "Parent vers école"
-    ).length;
-  }
-
-  if (role === "teacher") {
-    return messages.filter(
-      (message) =>
-        message.status === "Nouveau" &&
-        message.direction === "Parent vers enseignant" &&
-        message.teacherId === session?.user.id
-    ).length;
-  }
-
-  return messages.filter(
-    (message) =>
-      message.status === "Nouveau" &&
-      (message.direction === "École vers parent" || message.direction === "Enseignant vers parent")
-  ).length;
+  return messageService.countUnreadForRole(role, session, messages);
 }
 
-function formatDate(date: Date) {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}-${month}-${date.getFullYear()}`;
+function isUnreadStatus(status?: string) {
+  return ["Nouveau", "Distribué", "Envoyé"].includes(String(status));
 }
 
 const styles = StyleSheet.create({
@@ -435,6 +481,25 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 14,
   },
+  attachmentInput: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    padding: 12,
+    color: "#0F172A",
+    fontWeight: "700",
+    marginBottom: 14,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 12,
+    color: "#0F172A",
+    fontWeight: "700",
+    marginBottom: 14,
+  },
   sendButton: {
     backgroundColor: "#2563EB",
     borderRadius: 16,
@@ -479,7 +544,34 @@ const styles = StyleSheet.create({
     color: "#B45309",
     backgroundColor: "#FEF3C7",
   },
+  badgeRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  priorityBadge: {
+    color: "#7C3AED",
+    backgroundColor: "#F5F3FF",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  attachmentBadge: {
+    color: "#0F766E",
+    backgroundColor: "#ECFDF5",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    fontSize: 11,
+    fontWeight: "900",
+  },
   messageBody: { color: "#334155", fontWeight: "700", lineHeight: 20 },
+  actionRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+  smallAction: {
+    borderRadius: 999,
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  smallActionText: { color: "#334155", fontSize: 12, fontWeight: "900" },
   emptyState: {
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
