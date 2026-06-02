@@ -152,8 +152,10 @@ async function identifyAccountFromExistingEndpoints({
   identifier: string;
 }): Promise<IdentifyResponse> {
   const normalizedIdentifier = identifier.trim();
+  const normalizedSchoolCode = schoolCode.trim().toUpperCase();
+  const possibleIdentifiers = getPossibleAccountIdentifiers(schoolCode, normalizedIdentifier);
 
-  if (normalizedIdentifier === "admin") {
+  if (normalizedIdentifier.toLowerCase() === "admin") {
     return { role: "school_admin", roleLabel: "Administrateur" };
   }
 
@@ -164,9 +166,9 @@ async function identifyAccountFromExistingEndpoints({
 
   const teacher = teachers.find(
     (item) =>
-      item.id === normalizedIdentifier ||
-      item.publicId === normalizedIdentifier ||
-      item.phone === normalizedIdentifier
+      matchesAccountIdentifier(item.id, possibleIdentifiers) ||
+      matchesAccountIdentifier(item.publicId, possibleIdentifiers) ||
+      matchesAccountIdentifier(item.phone, possibleIdentifiers)
   );
 
   if (teacher) {
@@ -174,7 +176,10 @@ async function identifyAccountFromExistingEndpoints({
   }
 
   const student = students.find(
-    (item) => item.schoolCode === schoolCode && item.matricule === normalizedIdentifier
+    (item) =>
+      item.schoolCode === normalizedSchoolCode &&
+      (matchesAccountIdentifier(item.matricule, possibleIdentifiers) ||
+        matchesAccountIdentifier(item.publicId, possibleIdentifiers))
   );
 
   if (student) {
@@ -182,7 +187,7 @@ async function identifyAccountFromExistingEndpoints({
   }
 
   const parent = students.find(
-    (item) => item.schoolCode === schoolCode && item.parentPhone === normalizedIdentifier
+    (item) => item.schoolCode === normalizedSchoolCode && matchesAccountIdentifier(item.parentPhone, possibleIdentifiers)
   );
 
   if (parent) {
@@ -190,4 +195,55 @@ async function identifyAccountFromExistingEndpoints({
   }
 
   throw new Error("Aucun compte trouvé pour cet identifiant");
+}
+
+function getPossibleAccountIdentifiers(schoolCode: string, identifier: string) {
+  const normalizedSchoolCode = schoolCode.trim().toUpperCase();
+  const normalizedIdentifier = identifier.trim();
+  const upperIdentifier = normalizedIdentifier.toUpperCase();
+  const values = new Set([normalizedIdentifier, upperIdentifier]);
+  const localMatch = upperIdentifier.match(/^(ELE|ETU|ENS)-(\d+)$/);
+
+  if (localMatch) {
+    const [, profile, sequence] = localMatch;
+    const normalizedSequence = String(Number(sequence)).padStart(4, "0");
+    const extendedSequence = String(Number(sequence)).padStart(6, "0");
+    const localIdentifier = `${profile}-${normalizedSequence}`;
+    const extendedLocalIdentifier = `${profile}-${extendedSequence}`;
+
+    values.add(localIdentifier);
+    values.add(extendedLocalIdentifier);
+    values.add(`${normalizedSchoolCode}-${upperIdentifier}`);
+    values.add(`${normalizedSchoolCode}-${localIdentifier}`);
+    values.add(`${normalizedSchoolCode}-${extendedLocalIdentifier}`);
+  }
+
+  return [...values];
+}
+
+function matchesAccountIdentifier(value: string | undefined, possibleIdentifiers: string[]) {
+  const normalizedValue = String(value ?? "").trim().toUpperCase();
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  if (possibleIdentifiers.includes(normalizedValue) || possibleIdentifiers.includes(String(value).trim())) {
+    return true;
+  }
+
+  const localMatch = normalizedValue.match(/(?:^|-)(ELE|ETU|ENS)-(\d+)$/);
+  if (!localMatch) {
+    return false;
+  }
+
+  const [, profile, sequence] = localMatch;
+  const normalizedSequence = String(Number(sequence)).padStart(4, "0");
+  const extendedSequence = String(Number(sequence)).padStart(6, "0");
+
+  return (
+    possibleIdentifiers.includes(`${profile}-${sequence}`) ||
+    possibleIdentifiers.includes(`${profile}-${normalizedSequence}`) ||
+    possibleIdentifiers.includes(`${profile}-${extendedSequence}`)
+  );
 }

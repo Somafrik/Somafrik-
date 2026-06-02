@@ -111,6 +111,7 @@ app.post("/api/identify", (req, res) => {
     return res.status(403).json({ message: "Etablissement suspendu. Connexion indisponible." });
   }
 
+  const possibleIdentifiers = getPossibleAccountIdentifiers(schoolCode, identifier);
   const managedUser = findManagedUser(identifier, schoolCode);
 
   if (managedUser && managedUser.status !== "Actif") {
@@ -123,12 +124,15 @@ app.post("/api/identify", (req, res) => {
     });
   }
 
-  if (identifier === "admin") {
+  if (possibleIdentifiers.includes("admin")) {
     return res.json({ role: "school_admin", roleLabel: "Administrateur" });
   }
 
   const teacher = teachers.find(
-    (item) => item.id === identifier || item.publicId === identifier || item.phone === identifier
+    (item) =>
+      matchesAccountIdentifier(item.id, possibleIdentifiers) ||
+      matchesAccountIdentifier(item.publicId, possibleIdentifiers) ||
+      matchesAccountIdentifier(item.phone, possibleIdentifiers)
   );
 
   if (teacher) {
@@ -136,7 +140,10 @@ app.post("/api/identify", (req, res) => {
   }
 
   const studentByMatricule = students.find(
-    (item) => item.schoolCode === schoolCode && item.matricule === identifier
+    (item) =>
+      item.schoolCode === String(schoolCode).toUpperCase() &&
+      (matchesAccountIdentifier(item.matricule, possibleIdentifiers) ||
+        matchesAccountIdentifier(item.publicId, possibleIdentifiers))
   );
 
   if (studentByMatricule) {
@@ -144,7 +151,9 @@ app.post("/api/identify", (req, res) => {
   }
 
   const parentStudent = students.find(
-    (item) => item.schoolCode === schoolCode && item.parentPhone === identifier
+    (item) =>
+      item.schoolCode === String(schoolCode).toUpperCase() &&
+      matchesAccountIdentifier(item.parentPhone, possibleIdentifiers)
   );
 
   if (parentStudent) {
@@ -169,6 +178,7 @@ app.post("/api/login", (req, res) => {
     return res.status(403).json({ message: "Etablissement suspendu. Connexion indisponible." });
   }
 
+  const possibleIdentifiers = getPossibleAccountIdentifiers(schoolCode, identifier);
   const managedUser = findManagedUser(identifier, schoolCode);
 
   if (managedUser && managedUser.status !== "Actif") {
@@ -181,14 +191,16 @@ app.post("/api/login", (req, res) => {
     });
   }
 
-  if (role === "school_admin" && identifier === "admin" && pin === "1234") {
+  if (role === "school_admin" && possibleIdentifiers.includes("admin") && pin === "1234") {
     return res.json({ role, user: { id: "ADMIN1", name: "Administrateur" }, school });
   }
 
   if (role === "teacher") {
     const teacher = teachers.find(
       (item) =>
-        (item.id === identifier || item.publicId === identifier || item.phone === identifier) &&
+        (matchesAccountIdentifier(item.id, possibleIdentifiers) ||
+          matchesAccountIdentifier(item.publicId, possibleIdentifiers) ||
+          matchesAccountIdentifier(item.phone, possibleIdentifiers)) &&
         item.password === pin
     );
 
@@ -212,8 +224,9 @@ app.post("/api/login", (req, res) => {
   if (role === "student") {
     const student = students.find(
       (item) =>
-        item.schoolCode === schoolCode &&
-        item.matricule === identifier &&
+        item.schoolCode === String(schoolCode).toUpperCase() &&
+        (matchesAccountIdentifier(item.matricule, possibleIdentifiers) ||
+          matchesAccountIdentifier(item.publicId, possibleIdentifiers)) &&
         item.pin === pin
     );
 
@@ -230,8 +243,8 @@ app.post("/api/login", (req, res) => {
   if (role === "parent_student") {
     const matchedStudents = students.filter(
       (item) =>
-        item.schoolCode === schoolCode &&
-        item.parentPhone === identifier &&
+        item.schoolCode === String(schoolCode).toUpperCase() &&
+        matchesAccountIdentifier(item.parentPhone, possibleIdentifiers) &&
         item.pin === pin
     );
 
@@ -355,6 +368,57 @@ function findManagedUser(identifier, schoolCode) {
     (user) =>
       (user.schoolCode === "*" || user.schoolCode === String(schoolCode).toUpperCase()) &&
       (user.identifier === identifier || user.phone === identifier)
+  );
+}
+
+function getPossibleAccountIdentifiers(schoolCode, identifier) {
+  const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
+  const rawIdentifier = String(identifier).trim();
+  const upperIdentifier = rawIdentifier.toUpperCase();
+  const values = new Set([rawIdentifier, upperIdentifier]);
+  const localMatch = upperIdentifier.match(/^(ELE|ETU|ENS)-(\d+)$/);
+
+  if (localMatch) {
+    const [, profile, sequence] = localMatch;
+    const normalizedSequence = String(Number(sequence)).padStart(4, "0");
+    const extendedSequence = String(Number(sequence)).padStart(6, "0");
+    const localIdentifier = `${profile}-${normalizedSequence}`;
+    const extendedLocalIdentifier = `${profile}-${extendedSequence}`;
+
+    values.add(localIdentifier);
+    values.add(extendedLocalIdentifier);
+    values.add(`${normalizedSchoolCode}-${upperIdentifier}`);
+    values.add(`${normalizedSchoolCode}-${localIdentifier}`);
+    values.add(`${normalizedSchoolCode}-${extendedLocalIdentifier}`);
+  }
+
+  return [...values];
+}
+
+function matchesAccountIdentifier(value, possibleIdentifiers) {
+  const normalizedValue = String(value ?? "").trim().toUpperCase();
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  if (possibleIdentifiers.includes(normalizedValue) || possibleIdentifiers.includes(String(value).trim())) {
+    return true;
+  }
+
+  const localMatch = normalizedValue.match(/(?:^|-)(ELE|ETU|ENS)-(\d+)$/);
+  if (!localMatch) {
+    return false;
+  }
+
+  const [, profile, sequence] = localMatch;
+  const normalizedSequence = String(Number(sequence)).padStart(4, "0");
+  const extendedSequence = String(Number(sequence)).padStart(6, "0");
+
+  return (
+    possibleIdentifiers.includes(`${profile}-${sequence}`) ||
+    possibleIdentifiers.includes(`${profile}-${normalizedSequence}`) ||
+    possibleIdentifiers.includes(`${profile}-${extendedSequence}`)
   );
 }
 

@@ -272,10 +272,10 @@ const courses = [
 ];
 
 const students = [
-  { id: "1", publicId: "ELE-2026-000001", name: "Jean Dupont", firstName: "Jean", matricule: "ELE-2026-000001", gender: "Masculin", birthDate: "12-04-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Dupont", parentPhone: "+243 820 000 001", parentEmail: "parent.dupont@example.com", archived: false },
-  { id: "2", publicId: "ELE-2026-000002", name: "Marie Martin", firstName: "Marie", matricule: "ELE-2026-000002", gender: "Féminin", birthDate: "18-09-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Martin", parentPhone: "+243 820 000 001", parentEmail: "parent.martin@example.com", archived: false },
-  { id: "3", publicId: "ELE-2026-000003", name: "Paul Bernard", firstName: "Paul", matricule: "ELE-2026-000003", gender: "Masculin", birthDate: "03-02-2011", className: "6ème B", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Bernard", parentPhone: "+243 820 000 003", parentEmail: "parent.bernard@example.com", archived: false },
-  { id: "4", publicId: "ELE-2026-000004", name: "Sarah Mbala", firstName: "Sarah", matricule: "ELE-2026-000004", gender: "Féminin", birthDate: "21-07-2011", className: "5ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Mbala", parentPhone: "+243 820 000 004", parentEmail: "parent.mbala@example.com", archived: false },
+  { id: "1", publicId: "CD-2026-0001-ELE-0001", name: "Jean Dupont", firstName: "Jean", matricule: "CD-2026-0001-ELE-0001", gender: "Masculin", birthDate: "12-04-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Dupont", parentPhone: "+243 820 000 001", parentEmail: "parent.dupont@example.com", archived: false },
+  { id: "2", publicId: "CD-2026-0001-ELE-0002", name: "Marie Martin", firstName: "Marie", matricule: "CD-2026-0001-ELE-0002", gender: "Féminin", birthDate: "18-09-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Martin", parentPhone: "+243 820 000 001", parentEmail: "parent.martin@example.com", archived: false },
+  { id: "3", publicId: "CD-2026-0001-ELE-0003", name: "Paul Bernard", firstName: "Paul", matricule: "CD-2026-0001-ELE-0003", gender: "Masculin", birthDate: "03-02-2011", className: "6ème B", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Bernard", parentPhone: "+243 820 000 003", parentEmail: "parent.bernard@example.com", archived: false },
+  { id: "4", publicId: "CD-2026-0001-ELE-0004", name: "Sarah Mbala", firstName: "Sarah", matricule: "CD-2026-0001-ELE-0004", gender: "Féminin", birthDate: "21-07-2011", className: "5ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Mbala", parentPhone: "+243 820 000 004", parentEmail: "parent.mbala@example.com", archived: false },
 ];
 
 const notes = [

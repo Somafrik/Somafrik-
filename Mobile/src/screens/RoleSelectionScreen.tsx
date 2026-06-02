@@ -16,7 +16,7 @@ import { SchoolInfo, getSchoolByCode } from "../services/api";
 type Props = NativeStackScreenProps<RootStackParamList, "RoleSelection">;
 
 export default function RoleSelectionScreen({ navigation }: Props) {
-  const [schoolCode, setSchoolCode] = useState("SCH001");
+  const [schoolCode, setSchoolCode] = useState("CD-2026-0001");
   const [school, setSchool] = useState<SchoolInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
