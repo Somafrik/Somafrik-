@@ -1,0 +1,106 @@
+CRITERES D'ACCEPTATION POUR L'APPLICATION SchoolLink
+
+1. Écran d'identification de l'établissement
+User Story
+
+En tant qu'utilisateur, je souhaite saisir le code de mon établissement afin d'accéder à l'espace de connexion de mon école.
+
+ID	Critère d'acceptation
+
+AC-001	Un champ "Code établissement" est affiché
+AC-002	L'utilisateur peut saisir le code fourni par son établissement
+AC-003	Un bouton "Continuer" est affiché
+AC-004	Le système vérifie l'existence du code
+AC-005	Si le code est valide, le logo de l'établissement apparaît
+AC-006	Si le code est valide, le nom de l'établissement apparaît
+AC-007	Si le code est invalide, un message d'erreur est affiché
+AC-008	L'utilisateur est redirigé vers l'écran de connexion de son établissement
+
+2. Écran de connexion
+User Story
+
+En tant qu'utilisateur, je souhaite me connecter avec mon identifiant afin d'accéder à mon espace personnel.
+
+ID	Critère d'acceptation
+
+AC-009	Le logo de l'établissement est visible
+AC-010	Le nom de l'établissement est visible
+AC-011	Un champ "Identifiant" est affiché
+AC-012	L'utilisateur peut saisir son identifiant
+AC-013	Après saisie de l'identifiant, le système retrouve le compte
+AC-014	Le rôle associé au compte est affiché automatiquement
+AC-015	Le rôle est affiché en lecture seule
+AC-016	Un champ "Mot de passe" apparaît
+AC-017	Le mot de passe est masqué
+AC-018	Un bouton "Se connecter" est affiché
+AC-019	Si les informations sont correctes, l'utilisateur est authentifié
+AC-020	Si elles sont incorrectes, un message d'erreur est affiché
+
+3. Redirection selon le rôle
+
+ID	Critère d'acceptation
+
+AC-021	L'administrateur est redirigé vers le Dashboard Administration
+AC-022	L'enseignant est redirigé vers le Dashboard Enseignant
+AC-023	Le parent est redirigé vers le Dashboard Parent
+AC-024	L'élève est redirigé vers le Dashboard Élève
+AC-025	Les menus affichés correspondent uniquement au rôle connecté
+AC-026	Un utilisateur ne peut pas accéder aux écrans d'un autre rôle
+Dashboard Administrateur
+
+Accès complet à l'établissement
+Élèves
+Enseignants
+Classes
+Paiements
+Présences
+Bulletins
+Annonces
+Paramètres
+Dashboard Enseignant
+
+Accès limité à ses classes
+Mes classes
+Mes élèves
+Présences
+Notes
+Bulletins
+Annonces
+Dashboard Parent
+
+Accès à ses enfants uniquement
+Mes enfants
+Présences
+Notes
+Bulletins
+Paiements
+Messages
+Dashboard Élève
+
+Accès à ses informations uniquement
+Mon profil
+Mes notes
+Mes présences
+Mon emploi du temps
+Mes paiements (lecture seule)
+Annonces
+
+Flux utilisateur final SchoolLink
+
+Ouverture de l'application
+        ↓
+Code établissement
+        ↓
+Logo + Nom établissement
+        ↓
+Identifiant utilisateur
+        ↓
+Affichage automatique du rôle
+        ↓
+Mot de passe
+        ↓
+Authentification
+        ↓
+Dashboard adapté au rôle
+
+Cette architecture est celle utilisée par les grands ERP scolaires comme PowerSchool, Blackbaud SIS ou OpenSIS, et elle est beaucoup plus sécurisée et professionnelle que le choix manuel du rôle.

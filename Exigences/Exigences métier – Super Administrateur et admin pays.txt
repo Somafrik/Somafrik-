@@ -1,0 +1,244 @@
+Pour SchoolLink, je recommande de distinguer clairement :
+
+Super Administrateur SchoolLink (équipe centrale SchoolLink)
+
+Administrateur Pays (représentant SchoolLink dans un pays)
+
+Utilisation sur Backoffice Web, Tablette et Mobile
+
+1. Exigences métier – Super Administrateur
+
+Le Super Administrateur gère l'ensemble de la plateforme SchoolLink.
+
+Gestion des pays
+Fonctionnalités
+Créer un pays
+Modifier un pays
+Suspendre un pays
+Réactiver un pays
+Supprimer un pays
+Affecter un administrateur pays
+Critères d'acceptation
+
+✅ Le Super Administrateur peut créer un pays.
+
+✅ Chaque pays possède :
+
+Nom
+Code pays
+Indicatif téléphonique
+Devise
+Fuseau horaire
+Statut
+
+✅ Un pays suspendu ne peut plus créer d'établissements.
+
+Gestion des administrateurs pays
+Fonctionnalités
+Créer un administrateur pays
+Modifier les informations
+Réinitialiser le mot de passe
+Désactiver le compte
+Consulter l'activité
+Critères d'acceptation
+
+✅ Un administrateur pays est lié à un seul pays.
+
+✅ Son identifiant est généré automatiquement.
+
+Exemple :
+
+ADM-CD-2026-0001
+Gestion globale des établissements
+Fonctionnalités
+Voir tous les établissements
+Rechercher un établissement
+Suspendre un établissement
+Réactiver un établissement
+Consulter les statistiques
+Critères d'acceptation
+
+✅ Le Super Administrateur peut filtrer par :
+
+Pays
+Ville
+Type d'établissement
+Statut
+Gestion des abonnements
+Fonctionnalités
+Définir les offres
+Modifier les tarifs
+Voir les paiements
+Suspendre un abonnement
+Critères d'acceptation
+
+✅ Les tarifs peuvent être différents selon les pays.
+
+Dashboard Super Administrateur
+Statistiques
+
+Afficher :
+
+Nombre de pays
+Nombre d'établissements
+Nombre d'élèves
+Nombre d'enseignants
+Revenus mensuels
+Revenus annuels
+Établissements suspendus
+Abonnements expirés
+2. Exigences métier – Administrateur Pays
+
+L'Administrateur Pays gère uniquement son pays.
+
+Gestion des établissements
+Fonctionnalités
+Créer un établissement
+Modifier un établissement
+Suspendre un établissement
+Réactiver un établissement
+Critères d'acceptation
+
+✅ Un établissement est obligatoirement rattaché à son pays.
+
+✅ L'identifiant est généré automatiquement.
+
+Exemple :
+
+243-2026-0001
+Validation des établissements
+Fonctionnalités
+Valider une inscription
+Refuser une inscription
+Demander des pièces complémentaires
+Critères d'acceptation
+
+✅ Un établissement ne peut accéder à SchoolLink qu'après validation.
+
+Gestion des abonnements du pays
+Fonctionnalités
+Voir les abonnements
+Voir les paiements
+Relancer les établissements
+Critères d'acceptation
+
+✅ Les établissements en retard sont signalés automatiquement.
+
+Dashboard Administrateur Pays
+
+Afficher :
+
+Nombre d'établissements
+Nombre d'élèves
+Nombre d'enseignants
+Taux de paiement
+Nouveaux établissements
+Établissements suspendus
+3. Exigences d'utilisation Backoffice Web
+Super Administrateur
+Menus
+Dashboard
+Pays
+Administrateurs Pays
+Établissements
+Abonnements
+Paiements
+Support
+Rapports
+Paramètres
+Administrateur Pays
+Menus
+Dashboard
+Établissements
+Paiements
+Rapports
+Support
+Paramètres
+4. Exigences d'utilisation Tablette
+Super Administrateur
+
+Peut :
+
+Consulter les statistiques
+Valider les établissements
+Suspendre un compte
+Consulter les paiements
+
+Ne peut pas :
+
+Effectuer les configurations complexes
+Administrateur Pays
+
+Peut :
+
+Créer un établissement
+Valider une inscription
+Consulter les rapports
+Consulter les paiements
+5. Exigences d'utilisation Mobile
+Super Administrateur
+Fonctionnalités
+Dashboard simplifié
+Notifications
+Validation rapide
+Suspension rapide
+Consultation des revenus
+Administrateur Pays
+Fonctionnalités
+Validation d'établissement
+Consultation des statistiques
+Consultation des paiements
+Notifications
+6. Gestion des notifications
+Super Administrateur
+
+Notifications :
+
+Nouveau pays créé
+Nouvel établissement inscrit
+Abonnement expiré
+Paiement reçu
+Incident système
+Administrateur Pays
+
+Notifications :
+
+Nouvel établissement
+Paiement reçu
+Paiement en retard
+Compte suspendu
+Nouvelle demande d'inscription
+7. Gestion des rôles
+Super Administrateur
+
+Accès total :
+
+ALL_PRIVILEGES
+Administrateur Pays
+
+Accès limité :
+
+COUNTRY_PRIVILEGES
+
+Uniquement sur son pays.
+
+Écrans principaux
+Super Administrateur
+Connexion
+Dashboard global
+Liste des pays
+Liste des administrateurs pays
+Liste des établissements
+Paiements
+Rapports
+Paramètres
+Administrateur Pays
+Connexion
+Dashboard pays
+Liste établissements
+Validation établissements
+Paiements
+Rapports
+Paramètres
+
+Cette structure est adaptée à une plateforme SaaS éducative panafricaine capable de gérer plusieurs millions d'élèves et plusieurs milliers d'établissements.

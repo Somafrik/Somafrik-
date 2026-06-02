@@ -1,0 +1,120 @@
+listes des exigences manquantes selon les règles métiers restent principalement à formaliser pour avoir un MVP dans la logique POO sont :
+
+Gestion des élèves / étudiants
+Création, modification, suppression
+Affectation à une classe
+Historique scolaire
+Transfert entre établissements
+Archivage des anciens élèves
+Dossier complet élève
+Gestion des classes
+Création et paramétrage
+Niveaux scolaires
+Sections et options
+Affectation des enseignants
+Effectifs
+Changement d'année scolaire
+Gestion des matières
+Création des matières
+Coefficients
+Affectation aux classes
+Affectation aux enseignants
+Gestion des emplois du temps
+Création d'emplois du temps
+Affectation des salles
+Gestion des conflits horaires
+Consultation par rôle
+Gestion financière
+Paramétrage des frais scolaires
+Génération des échéances
+Encaissements
+Historique des paiements
+Remises et bourses
+Pénalités de retard
+Rapports financiers
+Gestion des parents/tuteurs
+Liaison parent-enfant
+Consultation des résultats
+Consultation des présences
+Consultation des paiements
+Messagerie avec l'école
+Gestion des documents
+Certificats de scolarité
+Relevés de notes
+Bulletins PDF
+Attestations
+Documents administratifs
+Gestion des annonces et communication
+Publication d'annonces
+Ciblage par classe
+Ciblage par établissement
+Notifications push
+Historique des communications
+Gestion des années académiques
+Création d'année scolaire
+Ouverture/Fermeture
+Passage automatique à l'année suivante
+Archivage
+Gestion des examens
+Création des examens
+Calendrier des examens
+Saisie des résultats
+Publication des résultats
+Gestion des bibliothèques
+Catalogue des ouvrages
+Emprunts
+Retours
+Retards
+Gestion des transports scolaires
+Bus scolaires
+Circuits
+Affectation des élèves
+Suivi des paiements transport
+Gestion des internats (si applicable)
+Attribution des chambres
+Occupation
+Paiements associés
+Rapports et statistiques
+Rapports académiques
+Rapports financiers
+Rapports de présence
+Export Excel/PDF
+Tableaux de bord avancés
+Gestion des rôles mobiles
+Enseignant
+Saisie des notes
+Gestion des présences
+Consultation emploi du temps
+Communication avec parents
+Parent
+Consultation des résultats
+Consultation des absences
+Consultation des paiements
+Réception des notifications
+Élève / Étudiant
+Consultation des notes
+Consultation de l'emploi du temps
+Consultation des annonces
+Mode hors connexion
+Consultation locale
+Synchronisation automatique
+Gestion des conflits de synchronisation
+Audit et traçabilité
+Journal des actions
+Historique des modifications
+Historique des connexions
+Paramètres généraux de l'établissement
+Logo
+Devise
+Langue
+Fuseau horaire
+Paramètres académiques
+Paramètres financiers
+Sécurité
+Authentification
+Réinitialisation mot de passe
+Double authentification
+Gestion des sessions
+Permissions par rôle
+
+Ces modules constituent les principales exigences fonctionnelles encore non détaillées après celles déjà rédigées (établissements, utilisateurs, identifiants automatiques, notes/bulletins, présences/appels, notifications/messages, Super Admin et Admin Pays).

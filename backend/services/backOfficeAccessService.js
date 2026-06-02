@@ -2,8 +2,9 @@ const { BusinessError } = require("./authService");
 const { CommunicationService } = require("./communicationService");
 
 class BackOfficeAccessService {
-  constructor({ school, userAccounts, countries = [], subscriptions = [], notifications = [] }) {
+  constructor({ school, schools = [school], userAccounts, countries = [], subscriptions = [], notifications = [] }) {
     this.school = school;
+    this.schools = schools;
     this.userAccounts = userAccounts;
     this.countries = countries;
     this.subscriptions = subscriptions;
@@ -50,14 +51,14 @@ class BackOfficeAccessService {
 
   getScopedSchools(user) {
     if (user.role === "Super Administrateur SchoolLink") {
-      return [this.school];
+      return this.schools;
     }
 
     if (user.role === "Admin Pays") {
-      return [this.school].filter((item) => item.country === user.countryScope);
+      return this.schools.filter((item) => item.country === user.countryScope || item.code.startsWith(this.getCountryCode(user.countryScope)));
     }
 
-    return [this.school].filter((item) => item.code === user.schoolCode);
+    return this.schools.filter((item) => item.code === user.schoolCode);
   }
 
   getScopedCountries(user) {
@@ -86,7 +87,7 @@ class BackOfficeAccessService {
 
   getScopedNotifications(user) {
     if (user.role === "Super Administrateur SchoolLink") {
-      return this.communicationService.filterByAudience("Super Administrateur SchoolLink", "*");
+      return this.communicationService.enrichNotifications(this.notifications);
     }
 
     if (user.role === "Admin Pays") {

@@ -1,0 +1,138 @@
+Exigences métier – Gestion des appels (présences) dans SchoolLink
+
+Objectif métier
+
+Permettre aux enseignants et aux secrétaires d'enregistrer rapidement et de manière fiable la présence des élèves ou étudiants afin d'assurer le suivi scolaire, d'informer les parents et de produire des statistiques de fréquentation.
+
+Acteurs concernés
+👨‍🏫 Enseignant
+Effectue l'appel de sa classe.
+Justifie certaines absences si autorisé.
+Consulte l'historique des présences.
+👩‍💼 Secrétaire scolaire
+Effectue ou corrige les appels.
+Gère les justificatifs d'absence.
+Produit les rapports de présence.
+👨‍💼 Administrateur
+Consulte les statistiques.
+Contrôle les corrections effectuées.
+👨‍👩‍👧 Parent
+Consulte les absences de son enfant.
+Dépose éventuellement un justificatif.
+Fonctionnalité : Réaliser un appel
+Description
+
+L'enseignant sélectionne une classe et effectue l'appel des élèves présents.
+
+Critères d'acceptation
+L'enseignant doit voir uniquement ses classes.
+La liste des élèves de la classe doit être affichée.
+Chaque élève doit pouvoir être marqué :
+Présent
+Absent
+Retard
+Absence justifiée
+L'appel doit être enregistrable en une seule action.
+La date et l'heure de l'appel doivent être enregistrées automatiquement.
+Fonctionnalité : Modifier un appel
+Description
+
+Correction d'un appel déjà enregistré.
+
+Critères d'acceptation
+Seuls les utilisateurs autorisés peuvent modifier un appel.
+La modification doit être historisée.
+L'ancien statut doit être conservé dans un journal d'audit.
+Le nom du modificateur doit être enregistré.
+Fonctionnalité : Gestion des retards
+Critères d'acceptation
+Un élève peut être marqué en retard.
+L'heure d'arrivée peut être renseignée.
+Le retard doit être visible dans les statistiques.
+Les parents peuvent être notifiés.
+Fonctionnalité : Gestion des absences justifiées
+Critères d'acceptation
+Une absence peut être marquée comme justifiée.
+Un document justificatif peut être attaché.
+Le motif doit être enregistré :
+Maladie
+Rendez-vous médical
+Événement familial
+Autre
+Fonctionnalité : Notification automatique
+Critères d'acceptation
+
+Lorsqu'un élève est absent :
+
+Une notification est envoyée au parent.
+Un SMS peut être envoyé.
+Un email peut être envoyé.
+Une notification mobile peut être envoyée.
+
+Message exemple :
+
+Votre enfant est signalé absent aujourd'hui à 08h00 dans la classe 5ème A.
+
+Fonctionnalité : Historique des présences
+Critères d'acceptation
+
+L'utilisateur autorisé doit pouvoir :
+
+Rechercher un élève.
+Consulter ses présences.
+Consulter ses absences.
+Consulter ses retards.
+Filtrer par période.
+Fonctionnalité : Rapport de présence
+Critères d'acceptation
+
+Le système doit permettre de générer :
+
+Rapport journalier
+Rapport hebdomadaire
+Rapport mensuel
+Rapport annuel
+
+Formats :
+
+PDF
+Excel
+Fonctionnalité : Tableau de bord Présences
+Indicateurs
+
+Le système doit afficher :
+
+Nombre d'élèves présents
+Nombre d'absents
+Nombre de retards
+Taux de présence de la journée
+Taux de présence du mois
+Top 10 des élèves les plus absents
+Fonctionnalité : Appel rapide (fortement recommandé)
+Description
+
+Pour éviter que l'enseignant perde du temps :
+
+Tous les élèves sont marqués "Présents" par défaut.
+L'enseignant sélectionne uniquement les absents ou retardataires.
+L'appel peut être terminé en moins de 30 secondes.
+
+Cette fonctionnalité est particulièrement importante pour les établissements de grande taille en Afrique où certaines classes comptent plus de 60 élèves.
+
+Données à enregistrer
+Champ	Description
+idAppel	Identifiant de l'appel
+date	Date de l'appel
+heure	Heure de l'appel
+classe	Classe concernée
+matière	Matière concernée
+enseignant	Enseignant concerné
+élève	Élève concerné
+statut	Présent / Absent / Retard / Justifié
+motif	Motif éventuel
+justificatif	Pièce jointe
+dateModification	Date de modification
+modifiéPar	Utilisateur ayant modifié
+Valeur métier pour SchoolLink
+
+Ce module est l'un des plus utilisés quotidiennement. S'il est rapide, simple et compatible tablette/téléphone, il deviendra un argument de vente majeur auprès des établissements scolaires et universitaires.

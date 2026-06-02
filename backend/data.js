@@ -436,8 +436,314 @@ const announcements = [
   { id: "A2", title: "Examens", message: "Les evaluations commencent le 10 juin.", date: "2026-05-29" },
 ];
 
+const demoCountryTemplates = [
+  ["Sénégal", "SN", "+221", "XOF", "Africa/Dakar"],
+  ["Côte d'Ivoire", "CI", "+225", "XOF", "Africa/Abidjan"],
+  ["Cameroun", "CM", "+237", "XAF", "Africa/Douala"],
+  ["Gabon", "GA", "+241", "XAF", "Africa/Libreville"],
+  ["Bénin", "BJ", "+229", "XOF", "Africa/Porto-Novo"],
+  ["Togo", "TG", "+228", "XOF", "Africa/Lome"],
+  ["Mali", "ML", "+223", "XOF", "Africa/Bamako"],
+  ["Burkina Faso", "BF", "+226", "XOF", "Africa/Ouagadougou"],
+  ["Guinée", "GN", "+224", "GNF", "Africa/Conakry"],
+  ["Rwanda", "RW", "+250", "RWF", "Africa/Kigali"],
+];
+const demoCities = ["Kinshasa", "Lubumbashi", "Goma", "Mbuji-Mayi", "Kisangani", "Matadi", "Bukavu", "Kolwezi"];
+const demoFirstNames = ["Jean", "Marie", "Patrick", "Sarah", "Grace", "David", "Amina", "Joseph", "Chantal", "Moise"];
+const demoLastNames = ["Kabeya", "Mukendi", "Ilunga", "Mbuyi", "Kabasele", "Tshibangu", "Mabiala", "Ndaye", "Kalala", "Mbala"];
+const demoSubjects = ["Mathématiques", "Français", "Sciences", "Histoire", "Géographie", "Anglais", "Physique", "Chimie", "SVT", "Informatique"];
+const demoLevels = ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème"];
+const demoTracks = ["Générale", "Sciences", "Lettres", "Technique", "Commerciale"];
+const demoRoles = [
+  "Directeur adjoint",
+  "Préfet des études",
+  "Conseiller pédagogique",
+  "Responsable discipline",
+  "Bibliothécaire",
+  "Responsable transport",
+  "Responsable internat",
+  "Caissier",
+  "Agent support",
+  "Auditeur",
+  "Inspecteur académique",
+  "Coordinateur examens",
+  "Responsable documents",
+  "Gestionnaire bourses",
+  "Responsable sécurité",
+];
+
+demoRoles.forEach((role) => {
+  rolePermissions[role] = ["Voir tableau de bord", "Consulter rapports", "Créer demande", "Voir historique"];
+});
+
+while (Object.keys(rolePermissions).length < 50) {
+  const index = Object.keys(rolePermissions).length + 1;
+  rolePermissions[`Rôle métier démo ${String(index).padStart(2, "0")}`] = [
+    "Voir tableau de bord",
+    "Consulter données",
+    "Créer demande",
+    "Modifier selon périmètre",
+    "Voir historique",
+  ];
+}
+
+while (countries.length < 50) {
+  const index = countries.length + 1;
+  const template = demoCountryTemplates[index % demoCountryTemplates.length];
+  const code = `${template[1]}${String(index).padStart(2, "0")}`;
+  countries.push({
+    id: `COUNTRY-${code}`,
+    name: `${template[0]} Demo ${index}`,
+    code,
+    phonePrefix: template[2],
+    currency: template[3],
+    timezone: template[4],
+    status: index % 9 === 0 ? "Suspendu" : "Actif",
+    administratorId: `USER-COUNTRY-${code}`,
+    createdAt: `${String((index % 27) + 1).padStart(2, "0")}-01-2026`,
+  });
+}
+
+const platformSchools = [school];
+
+while (platformSchools.length < 50) {
+  const index = platformSchools.length + 1;
+  const country = countries[index % countries.length];
+  const code = `${country.code}-2026-${String(index).padStart(4, "0")}`;
+  platformSchools.push({
+    ...school,
+    id: `SCHOOL-${String(index).padStart(4, "0")}`,
+    publicId: code,
+    code,
+    name: `Établissement SchoolLink ${index}`,
+    type: ["École primaire", "Collège", "Lycée", "Université", "Institut"][index % 5],
+    city: demoCities[index % demoCities.length],
+    country: country.name.includes("République Démocratique") ? "RDC" : country.name,
+    phone: `${country.phonePrefix} 810 ${String(index).padStart(3, "0")} ${String(index + 100).padStart(3, "0")}`,
+    email: `contact-${index}@schoollink.demo`,
+    currency: country.currency,
+    timezone: country.timezone,
+    status: index % 11 === 0 ? "Suspendu" : "Actif",
+    validationStatus: index % 7 === 0 ? "En attente" : "Validé",
+    subscriptionPlan: ["Essentiel", "Standard", "Premium"][index % 3],
+    subscriptionStatus: index % 8 === 0 ? "En retard" : "À jour",
+  });
+}
+
+while (subscriptions.length < 50) {
+  const index = subscriptions.length + 1;
+  const schoolItem = platformSchools[index % platformSchools.length];
+  const country = countries.find((item) => schoolItem.code.startsWith(item.code)) ?? countries[0];
+  subscriptions.push({
+    id: `SUB-${schoolItem.code}`,
+    schoolCode: schoolItem.code,
+    countryCode: country.code,
+    country: schoolItem.country,
+    plan: schoolItem.subscriptionPlan,
+    monthlyPrice: [60, 90, 120][index % 3],
+    annualPrice: [600, 900, 1200][index % 3],
+    currency: "USD",
+    status: schoolItem.status,
+    paymentStatus: index % 8 === 0 ? "En retard" : "À jour",
+    startDate: "01-09-2025",
+    endDate: index % 8 === 0 ? "31-05-2026" : "31-08-2026",
+    lastPaymentDate: `${String((index % 27) + 1).padStart(2, "0")}-05-2026`,
+  });
+}
+
+while (teachers.length < 50) {
+  const index = teachers.length + 1;
+  const subject = demoSubjects[index % demoSubjects.length];
+  const firstName = demoFirstNames[index % demoFirstNames.length];
+  const lastName = demoLastNames[index % demoLastNames.length];
+  teachers.push({
+    id: `T${index}`,
+    publicId: `CD-2026-0001-ENS-${String(index).padStart(4, "0")}`,
+    name: `${firstName} ${lastName}`,
+    firstName,
+    gender: index % 2 === 0 ? "Féminin" : "Masculin",
+    phone: `+243 810 100 ${String(index).padStart(3, "0")}`,
+    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${index}@schoollink.cd`,
+    mainSubject: subject,
+    password: "1234",
+    assignments: [],
+  });
+}
+
+while (classes.length < 50) {
+  const index = classes.length + 1;
+  const level = demoLevels[index % demoLevels.length];
+  const suffix = String.fromCharCode(65 + (index % 5));
+  classes.push({
+    id: `C${index}`,
+    publicId: `CLS-2026-${String(index).padStart(6, "0")}`,
+    name: `${level} ${suffix}`,
+    level,
+    track: demoTracks[index % demoTracks.length],
+    teacherId: teachers[index % teachers.length].id,
+  });
+}
+
+while (courses.length < 50) {
+  const index = courses.length + 1;
+  const classItem = classes[index % classes.length];
+  const subject = demoSubjects[index % demoSubjects.length];
+  courses.push({
+    id: `COURSE${index}`,
+    publicId: `COU-2026-${String(index).padStart(6, "0")}`,
+    className: classItem.name,
+    name: subject,
+    coefficient: (index % 3) + 1,
+  });
+}
+
+courses.forEach((course, index) => {
+  const teacher = teachers[index % teachers.length];
+  const exists = teacher.assignments.some(
+    (assignment) => assignment.className === course.className && assignment.course === course.name
+  );
+  if (!exists) {
+    teacher.assignments.push({ className: course.className, course: course.name });
+  }
+});
+
+while (students.length < 50) {
+  const index = students.length + 1;
+  const firstName = demoFirstNames[index % demoFirstNames.length];
+  const lastName = demoLastNames[(index + 3) % demoLastNames.length];
+  const classItem = classes[index % classes.length];
+  students.push({
+    id: String(index),
+    publicId: `CD-2026-0001-ELE-${String(index).padStart(4, "0")}`,
+    name: `${firstName} ${lastName}`,
+    firstName,
+    matricule: `CD-2026-0001-ELE-${String(index).padStart(4, "0")}`,
+    gender: index % 2 === 0 ? "Féminin" : "Masculin",
+    birthDate: `${String((index % 27) + 1).padStart(2, "0")}-${String((index % 12) + 1).padStart(2, "0")}-2012`,
+    className: classItem.name,
+    schoolCode: "CD-2026-0001",
+    pin: "1234",
+    parentName: `Parent ${lastName}`,
+    parentPhone: `+243 820 100 ${String(Math.ceil(index / 2)).padStart(3, "0")}`,
+    parentEmail: `parent-${index}@example.com`,
+    archived: index % 17 === 0,
+  });
+}
+
+while (notes.length < 50) {
+  const index = notes.length + 1;
+  const student = students[index % students.length];
+  const subject = demoSubjects[index % demoSubjects.length];
+  const value = 8 + (index % 13);
+  notes.push({
+    id: `N${index}`,
+    studentId: student.id,
+    subject,
+    value,
+    coefficient: (index % 3) + 1,
+    date: `2026-05-${String((index % 27) + 1).padStart(2, "0")}`,
+    evaluationId: `EVAL${index}`,
+    scale: 20,
+    evaluationCoefficient: (index % 2) + 1,
+    authorId: teachers[index % teachers.length].id,
+    enteredAt: `${String((index % 27) + 1).padStart(2, "0")}-05-2026 09:00`,
+    audit: [{ authorId: teachers[index % teachers.length].id, newValue: value, date: `${String((index % 27) + 1).padStart(2, "0")}-05-2026 09:00` }],
+  });
+}
+
+while (presences.length < 50) {
+  const index = presences.length + 1;
+  const student = students[index % students.length];
+  const status = ["Present", "Absent", "Retard", "Justifié"][index % 4];
+  presences.push({
+    id: `P${index}`,
+    publicId: `PRE-2026-${String(index).padStart(6, "0")}`,
+    studentId: student.id,
+    date: `2026-05-${String((index % 27) + 1).padStart(2, "0")}`,
+    present: status === "Present" || status === "Justifié",
+    status,
+  });
+}
+
+while (payments.length < 50) {
+  const index = payments.length + 1;
+  const student = students[index % students.length];
+  payments.push({
+    id: `PAY${index}`,
+    publicId: `PAY-2026-${String(index).padStart(6, "0")}`,
+    studentId: student.id,
+    amount: 10000 + (index % 5) * 5000,
+    date: `2026-05-${String((index % 27) + 1).padStart(2, "0")}`,
+    status: index % 4 === 0 ? "EN_ATTENTE" : "PAYE",
+    method: ["Mobile Money", "Especes", "Virement bancaire", "Carte bancaire"][index % 4],
+  });
+}
+
+while (announcements.length < 50) {
+  const index = announcements.length + 1;
+  announcements.push({
+    id: `A${index}`,
+    title: `Annonce SchoolLink ${index}`,
+    message: `Communication importante numéro ${index} pour les familles et le personnel.`,
+    date: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+  });
+}
+
+while (platformNotifications.length < 50) {
+  const index = platformNotifications.length + 1;
+  const country = countries[index % countries.length];
+  platformNotifications.push({
+    id: `NOTIF-${String(index).padStart(3, "0")}`,
+    audience: index % 2 === 0 ? "Super Administrateur SchoolLink" : "Admin Pays",
+    countryCode: index % 2 === 0 ? "*" : country.code,
+    title: `Notification plateforme ${index}`,
+    message: `Événement SchoolLink ${index} à traiter selon le niveau de priorité.`,
+    type: ["Paiement", "Inscription", "Abonnement", "Maintenance", "Support"][index % 5],
+    priority: ["Faible", "Moyenne", "Haute", "Critique"][index % 4],
+    channels: ["Web", "Tablette", "Mobile"],
+    status: index % 3 === 0 ? "Lu" : "Non lu",
+    date: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+    createdBy: "Système",
+  });
+}
+
+while (userAccounts.length < 50) {
+  const index = userAccounts.length + 1;
+  const roleNames = Object.keys(rolePermissions);
+  const role = roleNames[index % roleNames.length];
+  const isBackOffice = role === "Super Administrateur SchoolLink" || role === "Admin Pays" || index % 5 === 0;
+  const country = countries[index % countries.length];
+  const schoolItem = platformSchools[index % platformSchools.length];
+  userAccounts.push({
+    id: `USER-DEMO-${String(index).padStart(4, "0")}`,
+    publicId: role === "Admin Pays" ? `ADM-${country.code}-2026-${String(index).padStart(4, "0")}` : `USR-2026-${String(index).padStart(6, "0")}`,
+    lastName: demoLastNames[index % demoLastNames.length],
+    firstName: demoFirstNames[index % demoFirstNames.length],
+    gender: index % 2 === 0 ? "Féminin" : "Masculin",
+    phone: `${country.phonePrefix} 830 000 ${String(index).padStart(3, "0")}`,
+    email: `user-${index}@schoollink.demo`,
+    role,
+    secondaryRoles: index % 6 === 0 ? ["Auditeur"] : [],
+    scopeLevel: role === "Super Administrateur SchoolLink" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+    countryScope: country.name.includes("République Démocratique") ? "RDC" : country.code,
+    schoolCode: role === "Super Administrateur SchoolLink" || role === "Admin Pays" ? "*" : schoolItem.code,
+    accessChannel: isBackOffice ? "BackOffice" : "Application",
+    identifier: isBackOffice ? `demo-user-${index}` : `APP-${String(index).padStart(4, "0")}`,
+    password: isBackOffice ? "1234" : undefined,
+    status: index % 13 === 0 ? "Suspendu" : "Actif",
+    permissions: rolePermissions[role] ?? ["Voir tableau de bord"],
+    temporaryPassword: "",
+    photoUrl: "",
+    createdAt: `${String((index % 27) + 1).padStart(2, "0")}-01-2026`,
+    lastLoginAt: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+    createdBy: "Super Administrateur SchoolLink",
+    history: [`Compte démo ${index} créé automatiquement`],
+  });
+}
+
 module.exports = {
   school,
+  platformSchools,
   teachers,
   classes,
   courses,

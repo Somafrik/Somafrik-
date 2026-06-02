@@ -1,0 +1,211 @@
+Exigences métier – Gestion des notifications et messages (SchoolLink)
+
+1. Objectif
+
+Permettre la communication rapide et sécurisée entre les établissements, les enseignants, les élèves, les parents et les administrateurs via des notifications et une messagerie intégrée.
+
+2. Gestion des notifications
+2.1 Création d'une notification
+Acteurs
+Super Administrateur
+Administrateur Pays
+Administrateur Établissement
+Secrétaire
+Enseignant (selon droits)
+Exigences
+
+Le système doit permettre :
+
+La création d'une notification.
+L'ajout d'un titre.
+L'ajout d'un contenu détaillé.
+L'ajout d'une pièce jointe (PDF, image).
+La sélection des destinataires.
+La planification de l'envoi.
+L'envoi immédiat.
+Types de notifications
+Information générale
+Réunion
+Absence enseignant
+Absence élève
+Paiement scolaire
+Résultats scolaires
+Bulletin disponible
+Événement scolaire
+Urgence
+Maintenance système
+2.2 Destinataires
+
+Le système doit permettre l'envoi à :
+
+Tous les utilisateurs
+Tous les enseignants
+Tous les élèves
+Tous les parents
+Une classe spécifique
+Plusieurs classes
+Un utilisateur précis
+Un groupe personnalisé
+2.3 Réception des notifications
+
+Le système doit :
+
+Afficher une notification push mobile.
+Afficher une notification web.
+Afficher une notification tablette.
+Afficher un badge indiquant le nombre de notifications non lues.
+Conserver l'historique des notifications.
+2.4 Lecture des notifications
+
+Le système doit permettre :
+
+Marquer comme lue.
+Marquer plusieurs notifications comme lues.
+Supprimer une notification personnelle.
+Archiver une notification.
+2.5 Priorité
+
+Chaque notification doit posséder un niveau :
+
+Niveau	Description
+Faible	Information simple
+Moyenne	Action souhaitée
+Haute	Action rapide requise
+Critique	Urgence immédiate
+3. Gestion des messages
+3.1 Messagerie interne
+
+Le système doit permettre :
+
+L'envoi de messages privés.
+La réception de messages.
+Les réponses.
+Le transfert.
+La suppression.
+L'archivage.
+3.2 Conversations
+
+Le système doit :
+
+Créer automatiquement une discussion.
+Conserver l'historique complet.
+Afficher la date et l'heure.
+Afficher le statut du message.
+Statuts
+Envoyé
+Distribué
+Lu
+Archivé
+3.3 Pièces jointes
+
+Le système doit permettre l'envoi :
+
+PDF
+Word
+Excel
+Image
+Audio
+Vidéo
+Taille maximale
+
+Paramétrable par le Super Administrateur.
+
+3.4 Communication par rôle
+Enseignant ↔ Parent
+Discussion concernant un élève.
+Signalement d'absence.
+Résultats scolaires.
+Comportement.
+Enseignant ↔ Enseignant
+Coordination pédagogique.
+Partage de documents.
+Administration ↔ Parents
+Paiements.
+Réunions.
+Convocations.
+Administration ↔ Enseignants
+Notes de service.
+Planning.
+Affectations.
+4. Notifications automatiques
+
+Le système doit générer automatiquement des notifications lors des événements suivants :
+
+Présence
+Absence élève enregistrée.
+Retard élève enregistré.
+Paiement
+Paiement validé.
+Paiement refusé.
+Échéance proche.
+Impayé.
+Notes
+Nouvelle note publiée.
+Bulletin disponible.
+Discipline
+Sanction enregistrée.
+Observation enregistrée.
+Administration
+Création de compte.
+Réinitialisation mot de passe.
+Changement de rôle.
+5. Recherche et filtrage
+
+Le système doit permettre de filtrer :
+
+Notifications
+Par date
+Par type
+Par priorité
+Par statut (lu/non lu)
+Messages
+Par expéditeur
+Par destinataire
+Par date
+Par mot-clé
+6. Journalisation (Audit)
+
+Le système doit enregistrer :
+
+Créateur de la notification.
+Date de création.
+Destinataires.
+Date d'envoi.
+Date de lecture.
+Suppression.
+Archivage.
+7. Exigences mobiles
+
+L'application mobile doit permettre :
+
+Réception des notifications push même lorsque l'application est fermée.
+Ouverture directe de l'écran concerné après clic sur une notification.
+Téléchargement des pièces jointes.
+Réponse rapide depuis la notification.
+8. Critères d'acceptation
+Écran Notifications
+
+✅ Création d'une notification en moins de 30 secondes.
+✅ Sélection multiple des destinataires.
+✅ Affichage du nombre de notifications non lues.
+✅ Historique consultable.
+
+Écran Messagerie
+
+✅ Envoi d'un message avec pièce jointe.
+✅ Affichage du statut envoyé/lu.
+✅ Historique complet accessible.
+✅ Recherche instantanée des conversations.
+
+Notifications automatiques
+
+✅ Notification envoyée automatiquement après un paiement validé.
+✅ Notification envoyée automatiquement lorsqu'un bulletin est publié.
+✅ Notification envoyée automatiquement lors d'une absence enregistrée.
+
+Mobile
+
+✅ Réception des notifications push en moins de 10 secondes après l'événement.
+✅ Ouverture directe du module concerné après clic sur la notification.
+
+Ces exigences sont adaptées à l'architecture SaaS multi-pays de SchoolLink et à son utilisation sur web, tablette et mobile.

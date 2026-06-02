@@ -3,6 +3,7 @@ const cors = require("cors");
 const path = require("path");
 const {
   school,
+  platformSchools,
   teachers,
   classes,
   students,
@@ -19,12 +20,15 @@ const {
 const { AuthService, BusinessError } = require("./services/authService");
 const { BackOfficeAccessService } = require("./services/backOfficeAccessService");
 const { GradeBookService } = require("./services/gradeBookService");
+const { MvpBusinessService } = require("./services/mvpBusinessService");
 
 const app = express();
 const authService = new AuthService({ school, teachers, students, userAccounts });
 const gradeBookService = new GradeBookService({ students, notes, courses });
+const mvpBusinessService = new MvpBusinessService({ school, students, classes, courses, notes, payments });
 const backOfficeAccessService = new BackOfficeAccessService({
   school,
+  schools: platformSchools,
   userAccounts,
   countries,
   subscriptions,
@@ -61,6 +65,8 @@ app.get("/", (req, res) => {
       "/api/backoffice/countries",
       "/api/backoffice/subscriptions",
       "/api/backoffice/notifications",
+      "/api/mvp/readiness",
+      "/api/mvp/snapshot",
     ],
   });
 });
@@ -70,15 +76,17 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/schools", (req, res) => {
-  res.json([school]);
+  res.json(platformSchools);
 });
 
 app.get("/api/schools/:code", (req, res) => {
-  if (req.params.code.toUpperCase() !== school.code) {
+  const foundSchool = platformSchools.find((item) => item.code === req.params.code.toUpperCase());
+
+  if (!foundSchool) {
     return res.status(404).json({ message: "Code etablissement invalide" });
   }
 
-  res.json(school);
+  res.json(foundSchool);
 });
 
 app.post("/api/backoffice/login", (req, res) => {
@@ -208,6 +216,14 @@ app.get("/api/backoffice/subscriptions", (req, res) => {
 
 app.get("/api/backoffice/notifications", (req, res) => {
   res.json(platformNotifications);
+});
+
+app.get("/api/mvp/readiness", (req, res) => {
+  res.json(mvpBusinessService.getReadiness());
+});
+
+app.get("/api/mvp/snapshot", (req, res) => {
+  res.json(mvpBusinessService.getSnapshot());
 });
 
 function handleBusinessResponse(res, action) {

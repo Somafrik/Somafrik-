@@ -1,0 +1,226 @@
+Pour SchoolLink, le module Gestion des établissements est le point d'entrée principal de l'application. Voici les exigences métier détaillées.
+
+Gestion des établissements
+Objectif
+
+Permettre la création, la configuration et l'administration des établissements scolaires (écoles, instituts, universités) utilisant SchoolLink.
+
+Exigences fonctionnelles
+EF-ETAB-001 : Création d'un établissement
+Description
+
+Un super administrateur peut enregistrer un nouvel établissement.
+
+Données obligatoires
+Nom de l'établissement
+Code établissement unique
+Type d'établissement
+École primaire
+Collège
+Lycée
+Université
+Institut
+Pays
+Ville
+Adresse
+Téléphone
+Email
+Logo
+Règles métier
+Le code établissement doit être unique.
+Le logo est facultatif lors de la création.
+L'établissement est créé avec le statut "Actif".
+Critères d'acceptation
+
+✅ Le système enregistre l'établissement.
+
+✅ Un identifiant unique est généré.
+
+✅ Le code établissement est vérifié avant l'enregistrement.
+
+EF-ETAB-002 : Consultation de la liste des établissements
+Description
+
+Le super administrateur consulte tous les établissements.
+
+Informations affichées
+Logo
+Nom
+Code établissement
+Type
+Ville
+Nombre d'élèves
+Nombre d'enseignants
+Statut
+Critères d'acceptation
+
+✅ La liste est paginée.
+
+✅ Une recherche est disponible.
+
+✅ Un filtre par pays et type est disponible.
+
+EF-ETAB-003 : Recherche d'un établissement
+Description
+
+L'utilisateur recherche un établissement.
+
+Critères de recherche
+Nom
+Code établissement
+Ville
+Pays
+Critères d'acceptation
+
+✅ Les résultats apparaissent instantanément.
+
+✅ Les établissements correspondants sont affichés.
+
+EF-ETAB-004 : Modification d'un établissement
+Description
+
+Le super administrateur modifie les informations.
+
+Champs modifiables
+Nom
+Logo
+Adresse
+Téléphone
+Email
+Statut
+Critères d'acceptation
+
+✅ Les modifications sont enregistrées.
+
+✅ Une confirmation est affichée.
+
+EF-ETAB-005 : Désactivation d'un établissement
+Description
+
+Le super administrateur suspend un établissement.
+
+Effets
+Les utilisateurs ne peuvent plus se connecter.
+Les données restent conservées.
+Critères d'acceptation
+
+✅ Le statut passe à "Suspendu".
+
+✅ Les connexions sont bloquées.
+
+EF-ETAB-006 : Gestion du logo
+Description
+
+L'établissement peut personnaliser son identité visuelle.
+
+Fonctionnalités
+Ajouter un logo
+Modifier un logo
+Supprimer un logo
+Critères d'acceptation
+
+✅ Les formats JPG, PNG et WebP sont acceptés.
+
+✅ Le logo apparaît sur l'écran de connexion.
+
+✅ Le logo apparaît dans les tableaux de bord.
+
+EF-ETAB-007 : Paramétrage de l'établissement
+Description
+
+L'administrateur configure l'établissement.
+
+Paramètres
+Année scolaire
+Devise
+Fuseau horaire
+Langue
+Format de date
+Couleurs de l'établissement
+Critères d'acceptation
+
+✅ Les paramètres sont sauvegardés.
+
+✅ Ils sont appliqués à tout l'établissement.
+
+EF-ETAB-008 : Gestion de l'abonnement
+Description
+
+SchoolLink gère les abonnements des établissements.
+
+Informations
+Plan
+Date de début
+Date d'expiration
+Nombre maximum d'élèves
+Nombre maximum d'enseignants
+Critères d'acceptation
+
+✅ Les limites sont contrôlées.
+
+✅ Une alerte est envoyée avant expiration.
+
+Écran : Sélection de l'établissement
+
+Selon votre nouveau processus de connexion :
+
+Étape 1
+
+L'utilisateur saisit :
+
+Code établissement
+Étape 2
+
+Le système affiche :
+
+Logo établissement
+Nom établissement
+Étape 3
+
+L'utilisateur saisit :
+
+Identifiant
+Étape 4
+
+Le système affiche :
+
+Rôle détecté :
+Administrateur
+Enseignant
+Parent
+Étudiant
+Comptable
+Secrétaire
+Étape 5
+
+L'utilisateur saisit :
+
+Mot de passe
+Étape 6
+
+Authentification
+
+Étape 7
+
+Redirection vers le tableau de bord correspondant au rôle.
+
+Données à stocker
+Champ	Type
+id	UUID
+nom	Texte
+code	Texte
+type	Texte
+pays	Texte
+ville	Texte
+adresse	Texte
+téléphone	Texte
+email	Texte
+logo	URL
+statut	Actif/Suspendu
+année_scolaire	Texte
+devise	Texte
+langue	Texte
+date_creation	Date
+abonnement	Texte
+
+Cette gestion des établissements constitue le socle du SaaS SchoolLink avant les modules Classes, Élèves, Enseignants, Présences et Paiements.
