@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SchoolLink BackOffice</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="login-panel" id="loginPanel">
+        <div class="brand-block">
+          <div class="brand-mark">SL</div>
+          <div>
+            <p class="eyebrow">BackOffice</p>
+            <h1>SchoolLink</h1>
+            <p class="muted">Pilotage global, pays et établissements.</p>
+          </div>
+        </div>
+
+        <form class="login-card" id="loginForm">
+          <h2>Connexion BackOffice</h2>
+          <label>
+            Identifiant
+            <input id="identifierInput" autocomplete="username" placeholder="superadmin" />
+          </label>
+          <label>
+            Mot de passe
+            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="1234" />
+          </label>
+          <button type="submit">Se connecter</button>
+          <p class="error" id="loginError"></p>
+          <div class="demo-box">
+            <button type="button" data-demo="superadmin">Super Admin demo</button>
+            <button type="button" data-demo="admin-rdc">Admin Pays demo</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="app-panel hidden" id="appPanel">
+        <aside class="sidebar">
+          <div class="brand-mini">
+            <div class="brand-mark">SL</div>
+            <div>
+              <strong>SchoolLink</strong>
+              <span>BackOffice</span>
+            </div>
+          </div>
+          <nav>
+            <button class="nav-item active" data-view="overview">Vue globale</button>
+            <button class="nav-item" data-view="schools">Établissements</button>
+            <button class="nav-item" data-view="users">Utilisateurs</button>
+            <button class="nav-item" data-view="permissions">Permissions</button>
+          </nav>
+          <button class="logout" id="logoutButton">Déconnexion</button>
+        </aside>
+
+        <section class="workspace">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow" id="scopeLabel">Périmètre</p>
+              <h2 id="pageTitle">Vue globale</h2>
+            </div>
+            <div class="user-pill">
+              <span id="userInitials">SA</span>
+              <div>
+                <strong id="userName">Super Admin</strong>
+                <small id="userRole">Super Administrateur</small>
+              </div>
+            </div>
+          </header>
+
+          <section class="cards-grid" id="kpiGrid"></section>
+
+          <section class="view" id="overviewView">
+            <div class="section-head">
+              <h3>Contrôle métier</h3>
+              <span id="controlHint"></span>
+            </div>
+            <div class="control-grid" id="controlGrid"></div>
+          </section>
+
+          <section class="view hidden" id="schoolsView">
+            <div class="section-head">
+              <h3>Établissements</h3>
+              <input id="schoolSearch" placeholder="Rechercher une école" />
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>École</th>
+                    <th>Code</th>
+                    <th>Pays</th>
+                    <th>Ville</th>
+                    <th>Statut</th>
+                    <th>Abonnement</th>
+                  </tr>
+                </thead>
+                <tbody id="schoolsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="usersView">
+            <div class="section-head">
+              <h3>Utilisateurs BackOffice et écoles</h3>
+              <input id="userSearch" placeholder="Rechercher un utilisateur" />
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Utilisateur</th>
+                    <th>Rôle</th>
+                    <th>Périmètre</th>
+                    <th>Canal</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="permissionsView">
+            <div class="section-head">
+              <h3>Permissions du compte</h3>
+              <span id="permissionCount"></span>
+            </div>
+            <div class="permissions-list" id="permissionsList"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

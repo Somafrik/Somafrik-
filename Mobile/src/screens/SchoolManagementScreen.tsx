@@ -16,6 +16,16 @@ export default function SchoolManagementScreen({
       <Text style={styles.title}>Gestion de l'école</Text>
 
       <MenuCard
+        title="🏫 Établissements"
+        onPress={() => navigation.navigate("AdminCrud", { entity: "schools" })}
+      />
+
+      <MenuCard
+        title="👤 Utilisateurs"
+        onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
+      />
+
+      <MenuCard
         title="👥 Élèves"
         onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
       />

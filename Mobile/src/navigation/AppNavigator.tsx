@@ -18,13 +18,22 @@ import AnnouncementsScreen from "../screens/AnnouncementsScreen";
 import AdminCrudScreen from "../screens/AdminCrudScreen";
 import MessagesScreen from "../screens/MessagesScreen";
 import { AdminEntity } from "../context/AdminDataContext";
+import { useAuth } from "../context/AuthContext";
 
-export type UserRole = "school_admin" | "teacher" | "parent_student";
+export type UserRole = "school_admin" | "teacher" | "parent_student" | "student";
 
 export type RootStackParamList = {
   RoleSelection: undefined;
   Login: {
-    role: UserRole;
+    school: {
+      id: string;
+      publicId?: string;
+      code: string;
+      name: string;
+      city: string;
+      slogan: string;
+      logoUrl?: string;
+    };
   };
   Home: {
     role: UserRole;
@@ -62,6 +71,14 @@ function HomeTabs() {
 }
 
 export default function AppNavigator() {
+  const { session } = useAuth();
+  const role = session?.role;
+  const isAdmin = role === "school_admin";
+  const isTeacher = role === "teacher";
+  const isParent = role === "parent_student";
+  const isStudent = role === "student";
+  const canOpenStudentScreens = isAdmin || isTeacher || isParent || isStudent;
+
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="RoleSelection">
@@ -83,18 +100,41 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
 
-        <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />
-        <Stack.Screen name="Classes" component={ClassesScreen} />
-        <Stack.Screen name="Students" component={StudentsScreen} options={{ title: "Élèves" }} />
-        <Stack.Screen name="StudentDetail" component={StudentDetailScreen} />
-        <Stack.Screen name="StudentNotes" component={StudentNotesScreen} options={{ title: "Notes" }} />
-        <Stack.Screen name="StudentPresences" component={StudentPresencesScreen} options={{ title: "Présences" }} />
-        <Stack.Screen name="StudentPayments" component={StudentPaymentsScreen} options={{ title: "Paiements" }} />
-        <Stack.Screen name="Teachers" component={TeachersScreen} />
-        <Stack.Screen name="Payments" component={PaymentsScreen} />
-        <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
-        <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages" }} />
-        <Stack.Screen name="AdminCrud" component={AdminCrudScreen} options={{ title: "Administration" }} />
+        {isAdmin && (
+          <>
+            <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />
+            <Stack.Screen name="Teachers" component={TeachersScreen} />
+            <Stack.Screen name="Payments" component={PaymentsScreen} />
+            <Stack.Screen name="AdminCrud" component={AdminCrudScreen} options={{ title: "Administration" }} />
+          </>
+        )}
+
+        {(isAdmin || isTeacher) && (
+          <>
+            <Stack.Screen name="Classes" component={ClassesScreen} />
+            <Stack.Screen name="Students" component={StudentsScreen} options={{ title: "Élèves" }} />
+          </>
+        )}
+
+        {canOpenStudentScreens && (
+          <>
+            <Stack.Screen name="StudentDetail" component={StudentDetailScreen} />
+            <Stack.Screen name="StudentNotes" component={StudentNotesScreen} options={{ title: "Notes" }} />
+            <Stack.Screen name="StudentPresences" component={StudentPresencesScreen} options={{ title: "Présences" }} />
+          </>
+        )}
+
+        {(isAdmin || isParent || isStudent) && (
+          <Stack.Screen name="StudentPayments" component={StudentPaymentsScreen} options={{ title: "Paiements" }} />
+        )}
+
+        {(isAdmin || isTeacher || isParent || isStudent) && (
+          <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
+        )}
+
+        {(isAdmin || isTeacher || isParent) && (
+          <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages" }} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

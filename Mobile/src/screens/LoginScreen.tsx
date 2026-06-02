@@ -1,47 +1,66 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  View,
+  Alert,
+  Image,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
+  View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { login } from "../services/api";
+import { IdentifyResponse, identifyAccount, login } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 
 export default function LoginScreen({ navigation, route }: Props) {
-  const [schoolCode, setSchoolCode] = useState("SCH001");
+  const { school } = route.params;
   const [identifier, setIdentifier] = useState("");
-  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
+  const [identity, setIdentity] = useState<IdentifyResponse | null>(null);
+  const [isIdentifying, setIsIdentifying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { role } = route.params;
   const { setSession } = useAuth();
 
-  const roleLabel =
-    role === "school_admin"
-      ? "Administration"
-      : role === "teacher"
-        ? "Enseignant"
-        : "Parent / Étudiant";
+  useEffect(() => {
+    const normalizedIdentifier = identifier.trim();
+    setIdentity(null);
 
-  const identifierPlaceholder =
-    role === "school_admin"
-      ? "Identifiant administrateur"
-      : role === "teacher"
-        ? "Téléphone ou code enseignant"
-        : "Téléphone parent ou matricule";
-  const secretPlaceholder =
-    role === "parent_student" ? "Code PIN" : "Mot de passe";
+    if (normalizedIdentifier.length < 3) {
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setIsIdentifying(true);
+
+      try {
+        const result = await identifyAccount({
+          schoolCode: school.code,
+          identifier: normalizedIdentifier,
+        });
+        setIdentity(result);
+      } catch {
+        setIdentity(null);
+      } finally {
+        setIsIdentifying(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timeout);
+  }, [identifier, school.code]);
 
   const handleLogin = async () => {
-    if (!schoolCode.trim() || !identifier.trim() || !pin.trim()) {
-      Alert.alert("Erreur", "Veuillez remplir tous les champs");
+    if (!identifier.trim() || !password.trim()) {
+      Alert.alert("Erreur", "Veuillez saisir votre identifiant et votre mot de passe.");
+      return;
+    }
+
+    if (!identity) {
+      Alert.alert("Compte introuvable", "Veuillez saisir un identifiant reconnu par l'établissement.");
       return;
     }
 
@@ -49,15 +68,15 @@ export default function LoginScreen({ navigation, route }: Props) {
 
     try {
       const session = await login({
-        role,
-        schoolCode: schoolCode.trim().toUpperCase(),
+        role: identity.role,
+        schoolCode: school.code,
         identifier: identifier.trim(),
-        pin: pin.trim(),
+        pin: password.trim(),
       });
 
       setSession(session);
       navigation.navigate("Home", {
-        role,
+        role: identity.role,
       });
     } catch (error) {
       Alert.alert(
@@ -69,69 +88,66 @@ export default function LoginScreen({ navigation, route }: Props) {
     }
   };
 
+  const fillDemo = () => {
+    setIdentifier("+243 810 000 101");
+    setPassword("1234");
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>SchoolLink</Text>
-
-      <Text style={styles.roleBadge}>{roleLabel}</Text>
-      <Text style={styles.subtitle}>
-        Connectez-vous à votre établissement
-      </Text>
-      <TextInput
-         placeholder="Code établissement"
-         value={schoolCode}
-         onChangeText={setSchoolCode}
-         autoCapitalize="characters"
-         style={styles.input}
-      />
+      <View style={styles.schoolLogo}>
+        {school.logoUrl ? (
+          <Image source={{ uri: school.logoUrl }} style={styles.schoolLogoImage} />
+        ) : (
+          <Ionicons name="school-outline" size={38} color="#2563EB" />
+        )}
+      </View>
+      <Text style={styles.title}>{school.name}</Text>
+      <Text style={styles.subtitle}>{school.city} • {school.code}</Text>
 
       <TextInput
-        placeholder={identifierPlaceholder}
+        placeholder="Identifiant"
         value={identifier}
         onChangeText={setIdentifier}
         autoCapitalize="none"
         style={styles.input}
       />
 
-      <TextInput
-        placeholder={secretPlaceholder}
-        value={pin}
-        onChangeText={setPin}
-        keyboardType={role === "parent_student" ? "number-pad" : "default"}
-        secureTextEntry
-        maxLength={role === "parent_student" ? 6 : undefined}
-        style={styles.input}
-      />
+      <View style={styles.roleRow}>
+        <Text style={styles.roleLabel}>Rôle détecté</Text>
+        {isIdentifying ? (
+          <ActivityIndicator size="small" color="#2563EB" />
+        ) : (
+          <Text style={[styles.roleBadge, !identity && styles.roleBadgeMuted]}>
+            {identity?.roleLabel ?? "En attente"}
+          </Text>
+        )}
+      </View>
+
+      {identity && (
+        <TextInput
+          placeholder="Mot de passe"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          style={styles.input}
+        />
+      )}
 
       <TouchableOpacity
-        style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+        style={[styles.loginButton, (!identity || isLoading) && styles.loginButtonDisabled]}
         onPress={handleLogin}
-        disabled={isLoading}
+        disabled={!identity || isLoading}
       >
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.loginButtonText}>
-            Se connecter
-          </Text>
+          <Text style={styles.loginButtonText}>Se connecter</Text>
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.demoButton}
-        onPress={() => {
-          setSchoolCode("SCH001");
-          setIdentifier(
-            role === "school_admin"
-              ? "admin"
-              : role === "teacher"
-                ? "+243 810 000 101"
-                : "+243 820 000 001"
-          );
-          setPin("1234");
-        }}
-      >
-        <Text style={styles.demoButtonText}>Remplir les identifiants demo</Text>
+      <TouchableOpacity style={styles.demoButton} onPress={fillDemo}>
+        <Text style={styles.demoButtonText}>Remplir un compte enseignant demo</Text>
       </TouchableOpacity>
     </View>
   );
@@ -143,74 +159,94 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
   },
-
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#2563eb",
-    marginBottom: 10,
-  },
-
-  schoolName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-
-  roleBadge: {
+  schoolLogo: {
+    width: 78,
+    height: 78,
+    borderRadius: 26,
     backgroundColor: "#EFF6FF",
-    color: "#2563EB",
-    fontWeight: "800",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    marginBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
   },
-
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 30,
+  schoolLogoImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 26,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: "#0F172A",
     textAlign: "center",
   },
-
+  subtitle: {
+    fontSize: 14,
+    color: "#64748B",
+    fontWeight: "800",
+    marginTop: 6,
+    marginBottom: 28,
+    textAlign: "center",
+  },
   input: {
     width: "100%",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 15,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    padding: 13,
+    marginBottom: 14,
+    color: "#0F172A",
+    fontWeight: "800",
   },
-
+  roleRow: {
+    width: "100%",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  roleLabel: {
+    color: "#64748B",
+    fontWeight: "900",
+  },
+  roleBadge: {
+    color: "#2563EB",
+    backgroundColor: "#EFF6FF",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontWeight: "900",
+  },
+  roleBadgeMuted: {
+    color: "#94A3B8",
+    backgroundColor: "#F1F5F9",
+  },
   loginButton: {
     width: "100%",
-    backgroundColor: "#2563eb",
+    backgroundColor: "#2563EB",
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 14,
     alignItems: "center",
   },
-
   loginButtonDisabled: {
-    opacity: 0.75,
+    opacity: 0.55,
   },
-
   loginButtonText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "900",
   },
-
   demoButton: {
     marginTop: 16,
     padding: 12,
   },
-
   demoButtonText: {
     color: "#2563EB",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "900",
   },
 });

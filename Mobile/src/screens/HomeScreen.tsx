@@ -1,6 +1,7 @@
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -20,7 +21,8 @@ import { useAdminData } from "../context/AdminDataContext";
 
 export default function HomeScreen({ navigation }: any) {
   const { session, selectedStudentId } = useAuth();
-  const { studentsData, teachersData, paymentsData, announcementsData, messagesData } = useAdminData();
+  const { studentsData, teachersData, paymentsData, announcementsData, messagesData, schoolsData, usersData } = useAdminData();
+  const currentSchool = schoolsData[0] ?? school;
   const studentIds = studentsData.map((student) => student.id);
   const presenceRate = getPresenceRate(studentIds);
   const paymentRows = paymentsData.filter((payment) => studentIds.includes(payment.studentId));
@@ -58,7 +60,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.schoolInfo}>
               <Text style={styles.schoolName}>{userName}</Text>
               <Text style={styles.schoolCity}>{courses.join(", ") || "Cours non renseignés"}</Text>
-              <Text style={styles.schoolTagline}>{assignedClasses.join(", ") || school.name}</Text>
+              <Text style={styles.schoolTagline}>{assignedClasses.join(", ") || currentSchool.name}</Text>
             </View>
           </TouchableOpacity>
 
@@ -155,7 +157,7 @@ export default function HomeScreen({ navigation }: any) {
     );
   }
 
-  if (session?.role === "parent_student" && selectedStudentId) {
+  if ((session?.role === "parent_student" || session?.role === "student") && selectedStudentId) {
     const student = studentsData.find((item) => item.id === selectedStudentId) ?? getStudentById(selectedStudentId);
     const studentNotes = notes.filter((note) => note.studentId === selectedStudentId);
     const studentPresences = presences.filter((presence) => presence.studentId === selectedStudentId);
@@ -188,7 +190,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.schoolInfo}>
               <Text style={styles.schoolName}>{student?.name ?? "Élève"}</Text>
               <Text style={styles.schoolCity}>{student?.className ?? "Classe non renseignée"}</Text>
-              <Text style={styles.schoolTagline}>{school.name}</Text>
+              <Text style={styles.schoolTagline}>{currentSchool.name}</Text>
             </View>
           </TouchableOpacity>
 
@@ -198,7 +200,9 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate("StudentNotes", { studentId: selectedStudentId })}
           >
             <View>
-              <Text style={styles.welcomeTitle}>Suivi scolaire</Text>
+              <Text style={styles.welcomeTitle}>
+                {session.role === "student" ? "Espace élève" : "Suivi scolaire"}
+              </Text>
               <Text style={styles.welcomeText}>
                 Consultez les résultats, présences et paiements de l'élève.
               </Text>
@@ -277,11 +281,13 @@ export default function HomeScreen({ navigation }: any) {
               label="Paiements"
               onPress={() => navigation.navigate("StudentPayments", { studentId: selectedStudentId })}
             />
-            <QuickAction
-              icon="chatbubbles-outline"
-              label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
-              onPress={() => navigation.navigate("Messages")}
-            />
+            {session.role === "parent_student" && (
+              <QuickAction
+                icon="chatbubbles-outline"
+                label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
+                onPress={() => navigation.navigate("Messages")}
+              />
+            )}
           </View>
 
           <View style={styles.sectionHeader}>
@@ -327,13 +333,17 @@ export default function HomeScreen({ navigation }: any) {
           onPress={() => navigation.navigate("SchoolManagement")}
         >
           <View style={styles.schoolIconBox}>
-            <Ionicons name="school-outline" size={28} color="#2563EB" />
+            {currentSchool.logoUrl ? (
+              <Image source={{ uri: currentSchool.logoUrl }} style={styles.schoolLogoImage} />
+            ) : (
+              <Ionicons name="school-outline" size={28} color="#2563EB" />
+            )}
           </View>
 
           <View style={styles.schoolInfo}>
-            <Text style={styles.schoolName}>{school.name}</Text>
-            <Text style={styles.schoolCity}>{school.city}</Text>
-            <Text style={styles.schoolTagline}>{school.slogan}</Text>
+            <Text style={styles.schoolName}>{currentSchool.name}</Text>
+            <Text style={styles.schoolCity}>{currentSchool.city}</Text>
+            <Text style={styles.schoolTagline}>{currentSchool.slogan}</Text>
           </View>
         </TouchableOpacity>
 
@@ -370,11 +380,11 @@ export default function HomeScreen({ navigation }: any) {
 
           <StatCard
             icon="person-outline"
-            value={String(teachersData.length)}
-            label="Enseignants"
+            value={String(usersData.length)}
+            label="Utilisateurs"
             color="#7C3AED"
             bg="#F5F3FF"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
+            onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
           />
 
           <StatCard
@@ -441,6 +451,16 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.actionsGrid}>
+          <QuickAction
+            icon="business-outline"
+            label="Établissement"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "schools" })}
+          />
+          <QuickAction
+            icon="person-circle-outline"
+            label="Utilisateurs"
+            onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
+          />
           <QuickAction
             icon="add-circle-outline"
             label="Élèves"
@@ -663,6 +683,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
+  },
+  schoolLogoImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 20,
   },
 
   schoolInfo: {

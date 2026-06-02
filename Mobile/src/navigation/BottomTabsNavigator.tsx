@@ -94,7 +94,7 @@ const tabConfig: Record<
 
 export default function BottomTabsNavigator() {
   const { session } = useAuth();
-  const isParentStudent = session?.role === "parent_student";
+  const isParentStudent = session?.role === "parent_student" || session?.role === "student";
   const isTeacher = session?.role === "teacher";
 
   return (

@@ -15,7 +15,7 @@ export default function StudentPresencesScreen({ route, navigation }: Partial<Pr
   const presencesEleve = presences.filter(
     (presence) => presence.studentId === studentId
   );
-  const presentCount = presencesEleve.filter((presence) => presence.present).length;
+  const presentCount = presencesEleve.filter((presence) => getPresenceStatus(presence) === "Présent").length;
   const rate = presencesEleve.length
     ? Math.round((presentCount / presencesEleve.length) * 100)
     : 0;
@@ -46,14 +46,25 @@ export default function StudentPresencesScreen({ route, navigation }: Partial<Pr
             onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
           >
             <Text style={styles.name}>{item.date}</Text>
-            <Text style={[styles.badge, item.present ? styles.success : styles.danger]}>
-              {item.present ? "Présent" : "Absent"}
+            <Text style={[styles.badge, getPresenceStyle(getPresenceStatus(item))]}>
+              {getPresenceStatus(item)}
             </Text>
           </TouchableOpacity>
         )}
       />
     </View>
   );
+}
+
+function getPresenceStatus(item: any) {
+  return item.status ?? (item.present ? "Présent" : "Absent");
+}
+
+function getPresenceStyle(status: string) {
+  if (status === "Présent") return styles.success;
+  if (status === "Retard") return styles.warning;
+  if (status === "Justifié") return styles.info;
+  return styles.danger;
 }
 
 const styles = StyleSheet.create({
@@ -80,6 +91,8 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: "900", color: "#0F172A" },
   badge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, fontWeight: "900" },
   success: { backgroundColor: "#DCFCE7", color: "#166534" },
+  warning: { backgroundColor: "#FEF3C7", color: "#92400E" },
+  info: { backgroundColor: "#DBEAFE", color: "#1D4ED8" },
   danger: { backgroundColor: "#FEE2E2", color: "#991B1B" },
   empty: { color: "#64748B", fontWeight: "700" },
 });

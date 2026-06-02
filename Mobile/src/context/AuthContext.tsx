@@ -17,7 +17,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const saveSession = (nextSession: LoginResponse | null) => {
     setSession(nextSession);
-    setSelectedStudentId(nextSession?.user.children?.[0]?.id ?? null);
+    setSelectedStudentId(nextSession?.user.children?.[0]?.id ?? nextSession?.user.id ?? null);
   };
 
   const value = useMemo(

@@ -13,6 +13,8 @@ type MenuItem = {
 };
 
 const adminMenuItems: MenuItem[] = [
+  { label: "🏫 Établissements", entity: "schools" },
+  { label: "👤 Utilisateurs", entity: "users" },
   { label: "👥 Élèves", entity: "students" },
   { label: "👨‍🏫 Enseignants", entity: "teachers" },
   { label: "📚 Classes", entity: "classes" },
@@ -34,6 +36,14 @@ const parentMenuItems: MenuItem[] = [
   { label: "🆘 Support", message: "Le module support sera connecté au secrétariat de l'école." },
 ];
 
+const studentMenuItems: MenuItem[] = [
+  { label: "👤 Mon profil", route: "Profil" },
+  { label: "📚 Mes notes", route: "Notes" },
+  { label: "✅ Mes présences", route: "Presences" },
+  { label: "💰 Mes paiements", route: "FraisEleve" },
+  { label: "📢 Annonces", route: "Announcements" },
+];
+
 const teacherMenuItems: MenuItem[] = [
   { label: "👨‍🏫 Profil enseignant", message: "Votre profil enseignant sera disponible ici." },
   { label: "📚 Mes classes", route: "Classes" },
@@ -49,9 +59,12 @@ export default function MenuScreen() {
   const { session, logout } = useAuth();
   const { messagesData, studentsData } = useAdminData();
   const isParentStudent = session?.role === "parent_student";
+  const isStudent = session?.role === "student";
   const isTeacher = session?.role === "teacher";
   const unreadMessages = getUnreadMessagesCount(session, messagesData, studentsData);
-  const menuItems = isParentStudent
+  const menuItems = isStudent
+    ? studentMenuItems
+    : isParentStudent
     ? parentMenuItems
     : isTeacher
       ? teacherMenuItems

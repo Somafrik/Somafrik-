@@ -21,8 +21,9 @@ export default function StudentDetailScreen({
   route,
   navigation,
 }: Partial<Props>) {
-  const { selectedStudentId } = useAuth();
+  const { session, selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
+  const canSeePayments = session?.role === "school_admin" || session?.role === "parent_student" || session?.role === "student";
 
   const student = studentId ? getStudentById(studentId) : undefined;
 
@@ -90,12 +91,14 @@ export default function StudentDetailScreen({
         onPress={() => navigation?.navigate("StudentPresences", { studentId: student.id })}
       />
 
-      <StudentAction
-        icon="card-outline"
-        label="Paiements"
-        detail={`${payments.filter((item) => item.studentId === student.id).length} opération(s)`}
-        onPress={() => navigation?.navigate("StudentPayments", { studentId: student.id })}
-      />
+      {canSeePayments && (
+        <StudentAction
+          icon="card-outline"
+          label="Paiements"
+          detail={`${payments.filter((item) => item.studentId === student.id).length} opération(s)`}
+          onPress={() => navigation?.navigate("StudentPayments", { studentId: student.id })}
+        />
+      )}
     </ScrollView>
   );
 }

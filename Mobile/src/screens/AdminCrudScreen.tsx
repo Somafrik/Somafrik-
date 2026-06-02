@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
-import { messageThemes } from "../data/catalog";
+import { messageThemes, rolePermissions } from "../data/catalog";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
 
@@ -38,20 +38,27 @@ const configs: Record<
     addLabel: "Ajouter un élève",
     fields: [
       { key: "name", label: "Nom", placeholder: "Nom complet" },
-      { key: "matricule", label: "Matricule", placeholder: "MAT005" },
+      { key: "firstName", label: "Prénom", placeholder: "Prénom" },
+      { key: "matricule", label: "Identifiant élève", placeholder: "Auto : ELE-2026-000001" },
       { key: "gender", label: "Sexe", placeholder: "Choisir le sexe", type: "select" },
+      { key: "birthDate", label: "Date de naissance", placeholder: "JJ-MM-AAAA", type: "date" },
       { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
+      { key: "parentName", label: "Nom du parent", placeholder: "Nom complet du parent" },
       { key: "parentPhone", label: "Téléphone parent", placeholder: "+243 ..." },
+      { key: "parentEmail", label: "Email parent", placeholder: "parent@email.com" },
     ],
   },
   teachers: {
     title: "Gestion des enseignants",
     addLabel: "Ajouter un enseignant",
     fields: [
-      { key: "id", label: "ID enseignant", placeholder: "T5" },
+      { key: "publicId", label: "ID enseignant", placeholder: "Auto : CD-2026-0001-ENS-0001" },
       { key: "name", label: "Nom", placeholder: "Nom complet" },
+      { key: "firstName", label: "Prénom", placeholder: "Prénom" },
       { key: "gender", label: "Sexe", placeholder: "Choisir le sexe", type: "select" },
       { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
+      { key: "email", label: "Email", placeholder: "enseignant@email.com" },
+      { key: "mainSubject", label: "Matière principale", placeholder: "Mathématiques" },
     ],
   },
   classes: {
@@ -59,6 +66,8 @@ const configs: Record<
     addLabel: "Ajouter une classe",
     fields: [
       { key: "name", label: "Nom de classe", placeholder: "4ème A" },
+      { key: "level", label: "Niveau", placeholder: "4ème" },
+      { key: "track", label: "Filière", placeholder: "Générale" },
       { key: "teacherId", label: "Responsable", placeholder: "Choisir un enseignant", type: "select" },
     ],
   },
@@ -88,6 +97,7 @@ const configs: Record<
       { key: "amount", label: "Montant", placeholder: "25000", keyboardType: "numeric" },
       { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
       { key: "status", label: "Statut", placeholder: "Choisir un statut", type: "select" },
+      { key: "method", label: "Mode de paiement", placeholder: "Choisir un mode", type: "select" },
     ],
   },
   paymentStatuses: {
@@ -96,6 +106,55 @@ const configs: Record<
     fields: [
       { key: "label", label: "Libellé", placeholder: "Payé" },
       { key: "value", label: "Code", placeholder: "PAYE" },
+    ],
+  },
+  schools: {
+    title: "Gestion des établissements",
+    addLabel: "Ajouter un établissement",
+    fields: [
+      { key: "name", label: "Nom", placeholder: "Nom de l'établissement" },
+      { key: "code", label: "Code unique", placeholder: "Auto : CD-2026-0001" },
+      { key: "type", label: "Type", placeholder: "Choisir le type", type: "select" },
+      { key: "country", label: "Pays", placeholder: "RDC" },
+      { key: "city", label: "Ville", placeholder: "Kinshasa" },
+      { key: "address", label: "Adresse", placeholder: "Adresse complète" },
+      { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
+      { key: "email", label: "Email", placeholder: "contact@ecole.cd" },
+      { key: "website", label: "Site web", placeholder: "https://..." },
+      { key: "slogan", label: "Slogan", placeholder: "Excellence et Innovation" },
+      { key: "logoUrl", label: "Logo", placeholder: "URL JPG, PNG ou WebP" },
+      { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
+      { key: "schoolYear", label: "Année scolaire", placeholder: "2025-2026" },
+      { key: "currency", label: "Devise", placeholder: "Choisir la devise", type: "select" },
+      { key: "timezone", label: "Fuseau horaire", placeholder: "Choisir le fuseau", type: "select" },
+      { key: "language", label: "Langue", placeholder: "Choisir la langue", type: "select" },
+      { key: "dateFormat", label: "Format date", placeholder: "Choisir le format", type: "select" },
+      { key: "primaryColor", label: "Couleur principale", placeholder: "#2563EB" },
+      { key: "subscriptionPlan", label: "Abonnement", placeholder: "Choisir le plan", type: "select" },
+      { key: "subscriptionStartDate", label: "Début abonnement", placeholder: "JJ-MM-AAAA", type: "date" },
+      { key: "subscriptionEndDate", label: "Fin abonnement", placeholder: "JJ-MM-AAAA", type: "date" },
+      { key: "maxStudents", label: "Maximum élèves", placeholder: "1200", keyboardType: "numeric" },
+      { key: "maxTeachers", label: "Maximum enseignants", placeholder: "120", keyboardType: "numeric" },
+    ],
+  },
+  users: {
+    title: "Gestion des utilisateurs",
+    addLabel: "Créer un utilisateur",
+    fields: [
+      { key: "lastName", label: "Nom", placeholder: "Nom" },
+      { key: "firstName", label: "Prénom", placeholder: "Prénom" },
+      { key: "gender", label: "Sexe", placeholder: "Choisir le sexe", type: "select" },
+      { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
+      { key: "email", label: "Email", placeholder: "email@exemple.com" },
+      { key: "role", label: "Rôle", placeholder: "Choisir le rôle", type: "select" },
+      { key: "secondaryRoles", label: "Rôles secondaires", placeholder: "Directeur, Comptable" },
+      { key: "scopeLevel", label: "Niveau de contrôle", placeholder: "Automatique selon le rôle", type: "select" },
+      { key: "countryScope", label: "Pays géré", placeholder: "RDC" },
+      { key: "schoolCode", label: "Établissement", placeholder: "Choisir l'établissement", type: "select" },
+      { key: "accessChannel", label: "Canal d'accès", placeholder: "BackOffice ou Application", type: "select" },
+      { key: "identifier", label: "Identifiant unique", placeholder: "USR001" },
+      { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
+      { key: "photoUrl", label: "Photo", placeholder: "URL de la photo" },
     ],
   },
   announcements: {
@@ -134,6 +193,9 @@ export default function AdminCrudScreen({ route }: Props) {
     coursesData,
     assignmentsData,
     paymentStatusesData,
+    schoolsData,
+    usersData,
+    paymentsData,
   } = useAdminData();
   const config = configs[entity];
   const items = getItems(entity);
@@ -142,6 +204,12 @@ export default function AdminCrudScreen({ route }: Props) {
   const [visible, setVisible] = useState(false);
   const [selectField, setSelectField] = useState<Field | null>(null);
   const [selectedCourseClass, setSelectedCourseClass] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [schoolTypeFilter, setSchoolTypeFilter] = useState("Tous");
+  const [schoolCountryFilter, setSchoolCountryFilter] = useState("Tous");
+  const [userRoleFilter, setUserRoleFilter] = useState("Tous");
+  const [userSchoolFilter, setUserSchoolFilter] = useState("Tous");
+  const [userStatusFilter, setUserStatusFilter] = useState("Tous");
   const [dateField, setDateField] = useState<Field | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
@@ -152,12 +220,57 @@ export default function AdminCrudScreen({ route }: Props) {
   }, [classesData, entity, selectedCourseClass]);
 
   const visibleItems = useMemo(() => {
-    if (entity !== "courses" || !selectedCourseClass) {
-      return items;
+    if (entity === "courses" && selectedCourseClass) {
+      return items.filter((item: any) => normalize(item.className) === normalize(selectedCourseClass));
     }
 
-    return items.filter((item: any) => normalize(item.className) === normalize(selectedCourseClass));
-  }, [entity, items, selectedCourseClass]);
+    if (entity === "schools") {
+      const query = normalize(searchQuery);
+      const type = normalize(schoolTypeFilter);
+      const country = normalize(schoolCountryFilter);
+
+      return items.filter((item: any) => {
+        const matchesSearch =
+          !query ||
+          [item.name, item.code, item.city, item.country].some((value) =>
+            normalize(value).includes(query)
+          );
+        const matchesType = schoolTypeFilter === "Tous" || normalize(item.type) === type;
+        const matchesCountry = schoolCountryFilter === "Tous" || normalize(item.country) === country;
+
+        return matchesSearch && matchesType && matchesCountry;
+      });
+    }
+
+    if (entity === "users") {
+      const query = normalize(searchQuery);
+
+      return items.filter((item: any) => {
+        const matchesSearch =
+          !query ||
+          [item.lastName, item.firstName, item.phone, item.email, item.identifier].some((value) =>
+            normalize(value).includes(query)
+          );
+        const matchesRole = userRoleFilter === "Tous" || normalize(item.role) === normalize(userRoleFilter);
+        const matchesSchool = userSchoolFilter === "Tous" || normalize(item.schoolCode) === normalize(userSchoolFilter);
+        const matchesStatus = userStatusFilter === "Tous" || normalize(item.status) === normalize(userStatusFilter);
+
+        return matchesSearch && matchesRole && matchesSchool && matchesStatus;
+      });
+    }
+
+    return items;
+  }, [
+    entity,
+    items,
+    schoolCountryFilter,
+    schoolTypeFilter,
+    searchQuery,
+    selectedCourseClass,
+    userRoleFilter,
+    userSchoolFilter,
+    userStatusFilter,
+  ]);
 
   const statsLabel = useMemo(() => `${visibleItems.length} élément(s)`, [visibleItems.length]);
 
@@ -182,7 +295,15 @@ export default function AdminCrudScreen({ route }: Props) {
   };
 
   const save = () => {
-    const nextItem = formToItem(entity, form, editingItem?.id);
+    const nextItem = formToItem(entity, form, editingItem?.id, {
+      studentsData,
+      teachersData,
+      classesData,
+      coursesData,
+      paymentsData,
+      schoolsData,
+      usersData,
+    });
 
     if (!nextItem) {
       Alert.alert("Formulaire incomplet", "Veuillez remplir les champs principaux.");
@@ -197,6 +318,9 @@ export default function AdminCrudScreen({ route }: Props) {
       classesData,
       coursesData,
       assignmentsData,
+      schoolsData,
+      studentsData,
+      usersData,
     });
 
     if (businessError) {
@@ -228,6 +352,24 @@ export default function AdminCrudScreen({ route }: Props) {
     ]);
   };
 
+  const resetUserPassword = (item: any) => {
+    const temporaryPassword = generateTemporaryPassword();
+    const nextItem = {
+      ...item,
+      temporaryPassword,
+      history: [
+        ...(item.history ?? []),
+        `Mot de passe temporaire généré le ${formatDate(new Date())}`,
+      ],
+    };
+
+    updateItem("users", nextItem);
+    Alert.alert(
+      "Mot de passe réinitialisé",
+      `Nouveau mot de passe temporaire : ${temporaryPassword}`
+    );
+  };
+
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -241,6 +383,109 @@ export default function AdminCrudScreen({ route }: Props) {
             <Text style={styles.addButtonText}>Ajouter</Text>
           </TouchableOpacity>
         </View>
+
+        {entity === "schools" && (
+          <View style={styles.filtersCard}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search-outline" size={18} color="#64748B" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Rechercher nom, code, ville ou pays"
+                style={styles.searchInput}
+              />
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {["Tous", ...new Set(schoolsData.map((item) => item.type).filter(Boolean))].map((type) => (
+                <TouchableOpacity
+                  key={`type-${type}`}
+                  activeOpacity={0.85}
+                  style={[styles.filterPill, schoolTypeFilter === type && styles.filterPillActive]}
+                  onPress={() => setSchoolTypeFilter(type)}
+                >
+                  <Text style={[styles.filterText, schoolTypeFilter === type && styles.filterTextActive]}>
+                    {type}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {["Tous", ...new Set(schoolsData.map((item) => item.country).filter(Boolean))].map((country) => (
+                <TouchableOpacity
+                  key={`country-${country}`}
+                  activeOpacity={0.85}
+                  style={[styles.filterPill, schoolCountryFilter === country && styles.filterPillActive]}
+                  onPress={() => setSchoolCountryFilter(country)}
+                >
+                  <Text style={[styles.filterText, schoolCountryFilter === country && styles.filterTextActive]}>
+                    {country}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {entity === "users" && (
+          <View style={styles.filtersCard}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search-outline" size={18} color="#64748B" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Rechercher nom, téléphone, email ou identifiant"
+                style={styles.searchInput}
+              />
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {["Tous", ...Object.keys(rolePermissions)].map((role) => (
+                <TouchableOpacity
+                  key={`role-${role}`}
+                  activeOpacity={0.85}
+                  style={[styles.filterPill, userRoleFilter === role && styles.filterPillActive]}
+                  onPress={() => setUserRoleFilter(role)}
+                >
+                  <Text style={[styles.filterText, userRoleFilter === role && styles.filterTextActive]}>
+                    {role}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {["Tous", ...schoolsData.map((item) => item.code)].map((schoolCode) => (
+                <TouchableOpacity
+                  key={`school-${schoolCode}`}
+                  activeOpacity={0.85}
+                  style={[styles.filterPill, userSchoolFilter === schoolCode && styles.filterPillActive]}
+                  onPress={() => setUserSchoolFilter(schoolCode)}
+                >
+                  <Text style={[styles.filterText, userSchoolFilter === schoolCode && styles.filterTextActive]}>
+                    {schoolCode}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {["Tous", "Actif", "Suspendu", "Désactivé"].map((status) => (
+                <TouchableOpacity
+                  key={`user-status-${status}`}
+                  activeOpacity={0.85}
+                  style={[styles.filterPill, userStatusFilter === status && styles.filterPillActive]}
+                  onPress={() => setUserStatusFilter(status)}
+                >
+                  <Text style={[styles.filterText, userStatusFilter === status && styles.filterTextActive]}>
+                    {status}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {entity === "courses" && (
           <View style={styles.classCardsBlock}>
@@ -292,6 +537,11 @@ export default function AdminCrudScreen({ route }: Props) {
             <TouchableOpacity style={styles.iconButton} onPress={() => openEdit(item)}>
               <Ionicons name="create-outline" size={20} color="#2563EB" />
             </TouchableOpacity>
+            {entity === "users" && (
+              <TouchableOpacity style={styles.iconButtonWarning} onPress={() => resetUserPassword(item)}>
+                <Ionicons name="key-outline" size={20} color="#B45309" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.iconButtonDanger} onPress={() => confirmDelete(item)}>
               <Ionicons name="trash-outline" size={20} color="#DC2626" />
             </TouchableOpacity>
@@ -311,55 +561,57 @@ export default function AdminCrudScreen({ route }: Props) {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>{editingItem ? "Modifier" : config.addLabel}</Text>
 
-            {config.fields.map((field) => (
-              <View key={field.key} style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>{field.label}</Text>
-                {field.type === "select" ? (
-                  <TouchableOpacity
-                    style={styles.selectInput}
-                    activeOpacity={0.85}
-                    onPress={() => setSelectField(field)}
-                  >
-                    <Text
-                      style={[
-                        styles.selectText,
-                        !form[field.key] && styles.selectPlaceholder,
-                      ]}
+            <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+              {config.fields.map((field) => (
+                <View key={field.key} style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>{field.label}</Text>
+                  {field.type === "select" ? (
+                    <TouchableOpacity
+                      style={styles.selectInput}
+                      activeOpacity={0.85}
+                      onPress={() => setSelectField(field)}
                     >
-                      {form[field.key] || field.placeholder}
-                    </Text>
-                    <Ionicons name="chevron-down" size={18} color="#64748B" />
-                  </TouchableOpacity>
-                ) : field.type === "date" ? (
-                  <TouchableOpacity
-                    style={styles.selectInput}
-                    activeOpacity={0.85}
-                    onPress={() => {
-                      setCalendarMonth(parseDisplayDate(form[field.key]) ?? new Date());
-                      setDateField(field);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.selectText,
-                        !form[field.key] && styles.selectPlaceholder,
-                      ]}
+                      <Text
+                        style={[
+                          styles.selectText,
+                          !form[field.key] && styles.selectPlaceholder,
+                        ]}
+                      >
+                        {form[field.key] || field.placeholder}
+                      </Text>
+                      <Ionicons name="chevron-down" size={18} color="#64748B" />
+                    </TouchableOpacity>
+                  ) : field.type === "date" ? (
+                    <TouchableOpacity
+                      style={styles.selectInput}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setCalendarMonth(parseDisplayDate(form[field.key]) ?? new Date());
+                        setDateField(field);
+                      }}
                     >
-                      {form[field.key] || field.placeholder}
-                    </Text>
-                    <Ionicons name="calendar-outline" size={18} color="#64748B" />
-                  </TouchableOpacity>
-                ) : (
-                  <TextInput
-                    value={form[field.key] ?? ""}
-                    onChangeText={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
-                    placeholder={field.placeholder}
-                    keyboardType={field.keyboardType ?? "default"}
-                    style={styles.input}
-                  />
-                )}
-              </View>
-            ))}
+                      <Text
+                        style={[
+                          styles.selectText,
+                          !form[field.key] && styles.selectPlaceholder,
+                        ]}
+                      >
+                        {form[field.key] || field.placeholder}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={18} color="#64748B" />
+                    </TouchableOpacity>
+                  ) : (
+                    <TextInput
+                      value={form[field.key] ?? ""}
+                      onChangeText={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
+                      placeholder={field.placeholder}
+                      keyboardType={field.keyboardType ?? "default"}
+                      style={styles.input}
+                    />
+                  )}
+                </View>
+              ))}
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelButton} onPress={() => setVisible(false)}>
@@ -391,6 +643,7 @@ export default function AdminCrudScreen({ route }: Props) {
                 classesData,
                 coursesData,
                 paymentStatusesData,
+                schoolsData,
                 form
               ).map((option) => (
                 <TouchableOpacity
@@ -402,6 +655,9 @@ export default function AdminCrudScreen({ route }: Props) {
                       setForm((current) => ({
                         ...current,
                         [selectField.key]: option,
+                        ...(entity === "users" && selectField.key === "role"
+                          ? getRoleDefaults(option)
+                          : {}),
                         ...(entity === "assignments" && selectField.key === "className"
                           ? { course: "" }
                           : {}),
@@ -484,57 +740,80 @@ export default function AdminCrudScreen({ route }: Props) {
 }
 
 function itemToForm(entity: AdminEntity, item: any) {
+  if (entity === "users") {
+    return {
+      ...Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value ?? "")])),
+      secondaryRoles: (item.secondaryRoles ?? []).join(", "),
+    };
+  }
+
   return Object.fromEntries(
     Object.entries(item).map(([key, value]) => [key, String(value)])
   );
 }
 
-function getInitialForm(entity: AdminEntity): Record<string, string> {
-  if (entity === "teachers") {
-    return {
-      id: `T${Date.now().toString().slice(-4)}`,
-    };
-  }
-
+function getInitialForm(_entity: AdminEntity): Record<string, string> {
   return {};
 }
 
-function formToItem(entity: AdminEntity, form: Record<string, string>, id?: string) {
-  const nextId = id ?? `${entity}-${Date.now()}`;
+function formToItem(entity: AdminEntity, form: Record<string, string>, id?: string, context?: any) {
+  const nextId = id ?? createInternalId(entity);
+  const year = String(new Date().getFullYear());
+  const schoolCode = context?.schoolsData?.[0]?.code ?? "CD-2026-0001";
 
   if (entity === "students") {
-    if (!form.name || !form.matricule || !form.className) return null;
+    if (!form.name || !form.className) return null;
+    const publicId = form.matricule || generatePublicId("ELE", year, context?.studentsData ?? [], 6);
     return {
       id: nextId,
+      publicId,
       name: form.name,
-      matricule: form.matricule,
+      firstName: form.firstName ?? "",
+      matricule: publicId,
       gender: form.gender || "Non renseigné",
+      birthDate: form.birthDate || "",
       className: form.className,
-      schoolCode: "SCH001",
+      schoolCode,
+      parentName: form.parentName ?? "",
       parentPhone: form.parentPhone ?? "",
+      parentEmail: form.parentEmail ?? "",
+      archived: false,
     };
   }
 
   if (entity === "teachers") {
-    if (!form.id || !form.name || !form.phone) return null;
+    if (!form.name || !form.phone) return null;
+    const publicId = form.publicId || generateTeacherPublicId(schoolCode, context?.teachersData ?? []);
     return {
-      id: form.id.trim(),
+      id: nextId,
+      publicId,
       name: form.name,
+      firstName: form.firstName ?? "",
       gender: form.gender || "Non renseigné",
       phone: form.phone,
+      email: form.email ?? "",
+      mainSubject: form.mainSubject ?? "",
       assignments: [],
     };
   }
 
   if (entity === "classes") {
     if (!form.name) return null;
-    return { id: nextId, name: form.name, teacherId: form.teacherId ?? "" };
+    return {
+      id: nextId,
+      publicId: form.publicId || generatePublicId("CLS", year, context?.classesData ?? [], 6),
+      name: form.name,
+      level: form.level ?? "",
+      track: form.track ?? "",
+      teacherId: form.teacherId ?? "",
+    };
   }
 
   if (entity === "courses") {
     if (!form.className || !form.name) return null;
     return {
       id: nextId,
+      publicId: form.publicId || generatePublicId("COU", year, context?.coursesData ?? [], 6),
       className: form.className,
       name: form.name,
       coefficient: Number(form.coefficient) || 1,
@@ -555,10 +834,12 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     if (!form.studentId || !form.amount) return null;
     return {
       id: nextId,
+      publicId: form.publicId || generatePublicId("PAY", year, context?.paymentsData ?? [], 6),
       studentId: form.studentId,
       amount: Number(form.amount) || 0,
       date: form.date || formatDate(new Date()),
       status: form.status || "PAYE",
+      method: form.method || "Mobile Money",
     };
   }
 
@@ -568,6 +849,96 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       id: nextId,
       label: form.label,
       value: form.value.trim().toUpperCase().replace(/\s+/g, "_"),
+    };
+  }
+
+  if (entity === "schools") {
+    if (
+      !form.name ||
+      !form.type ||
+      !form.country ||
+      !form.city ||
+      !form.address ||
+      !form.phone ||
+      !form.email
+    ) {
+      return null;
+    }
+    const code = form.code?.trim().toUpperCase() || generateSchoolCode(form.country, year, context?.schoolsData ?? []);
+
+    return {
+      id: id ?? createInternalId("school"),
+      publicId: code,
+      code,
+      name: form.name,
+      type: form.type,
+      city: form.city,
+      country: form.country,
+      address: form.address,
+      phone: form.phone,
+      email: form.email,
+      website: form.website ?? "",
+      currency: form.currency || "CDF",
+      slogan: form.slogan ?? "",
+      status: form.status || "Actif",
+      logoUrl: form.logoUrl ?? "",
+      schoolYear: form.schoolYear || "2025-2026",
+      timezone: form.timezone || "Africa/Kinshasa",
+      language: form.language || "Français",
+      dateFormat: form.dateFormat || "JJ-MM-AAAA",
+      primaryColor: form.primaryColor || "#2563EB",
+      subscriptionPlan: form.subscriptionPlan || "Essentiel",
+      subscriptionStartDate: form.subscriptionStartDate || formatDate(new Date()),
+      subscriptionEndDate: form.subscriptionEndDate || formatDate(addMonths(new Date(), 12)),
+      maxStudents: Number(form.maxStudents) || 500,
+      maxTeachers: Number(form.maxTeachers) || 50,
+      createdAt: form.createdAt || formatDate(new Date()),
+    };
+  }
+
+  if (entity === "users") {
+    const defaults = getRoleDefaults(form.role);
+    if (
+      !form.lastName ||
+      !form.firstName ||
+      !form.gender ||
+      !form.phone ||
+      !form.role ||
+      (!isBackOfficeRole(form.role) && !form.schoolCode) ||
+      !form.identifier
+    ) {
+      return null;
+    }
+
+    const permissions = rolePermissions[form.role] ?? [];
+    const publicId = form.publicId || generatePublicId("USR", year, context?.usersData ?? [], 6);
+
+    return {
+      id: id ?? `USER-${Date.now()}`,
+      publicId,
+      lastName: form.lastName,
+      firstName: form.firstName,
+      gender: form.gender,
+      phone: form.phone,
+      email: form.email ?? "",
+      role: form.role,
+      secondaryRoles: splitList(form.secondaryRoles),
+      scopeLevel: form.scopeLevel || defaults.scopeLevel,
+      countryScope: form.countryScope ?? "",
+      schoolCode: form.schoolCode || "*",
+      accessChannel: form.accessChannel || defaults.accessChannel,
+      identifier: form.identifier.trim(),
+      status: form.status || "Actif",
+      permissions,
+      temporaryPassword: form.temporaryPassword ?? "",
+      photoUrl: form.photoUrl ?? "",
+      createdAt: form.createdAt || formatDate(new Date()),
+      lastLoginAt: form.lastLoginAt ?? "",
+      createdBy: form.createdBy || "Administrateur",
+      history: [
+        ...(splitList(form.history).length ? splitList(form.history) : []),
+        `${id ? "Compte modifié" : "Compte créé"} le ${formatDate(new Date())}`,
+      ],
     };
   }
 
@@ -598,6 +969,8 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
 function getPrimaryText(entity: AdminEntity, item: any) {
   if (entity === "payments") return `${item.amount?.toLocaleString?.() ?? item.amount} FC`;
   if (entity === "paymentStatuses") return item.label;
+  if (entity === "schools") return `${item.name} • ${item.publicId ?? item.code}`;
+  if (entity === "users") return `${item.firstName} ${item.lastName}`;
   if (entity === "announcements") return item.title;
   if (entity === "assignments") return `${item.className} - ${item.course}`;
   if (entity === "messages") return item.theme;
@@ -605,15 +978,21 @@ function getPrimaryText(entity: AdminEntity, item: any) {
 }
 
 function getSecondaryText(entity: AdminEntity, item: any) {
-  if (entity === "students") return `${item.matricule} • ${item.gender ?? "Sexe non renseigné"} • ${item.className}`;
+  if (entity === "students") return `${item.publicId ?? item.matricule} • ${item.gender ?? "Sexe non renseigné"} • ${item.className} • Parent : ${item.parentPhone}`;
   if (entity === "teachers") {
-    return `ID : ${item.id} • ${item.gender ?? "Sexe non renseigné"} • ${item.phone}`;
+    return `ID : ${item.publicId ?? item.id} • ${item.mainSubject ?? "Matière non renseignée"} • ${item.phone}`;
   }
-  if (entity === "classes") return `Responsable : ${item.teacherId || "Non assigné"}`;
-  if (entity === "courses") return `${item.className} • Coefficient : ${item.coefficient}`;
+  if (entity === "classes") return `${item.publicId ?? item.id} • ${item.level ?? "Niveau non renseigné"} • ${item.track ?? "Filière non renseignée"} • Responsable : ${item.teacherId || "Non assigné"}`;
+  if (entity === "courses") return `${item.publicId ?? item.id} • ${item.className} • Coefficient : ${item.coefficient}`;
   if (entity === "assignments") return `Enseignant : ${item.teacherId}`;
   if (entity === "paymentStatuses") return `Code : ${item.value}`;
-  if (entity === "payments") return `Élève ${item.studentId} • ${item.date} • ${item.status}`;
+  if (entity === "schools") {
+    return `${item.type} • ${item.city}, ${item.country} • ${item.status} • ${item.maxStudents} élèves / ${item.maxTeachers} enseignants`;
+  }
+  if (entity === "users") {
+    return `${item.role} • ${item.scopeLevel} • ${item.accessChannel} • ${item.schoolCode} • ${item.status} • Dernière connexion : ${item.lastLoginAt || "Jamais"}`;
+  }
+  if (entity === "payments") return `${item.publicId ?? item.id} • Élève ${item.studentId} • ${item.date} • ${item.status} • ${item.method ?? "Mode non renseigné"}`;
   if (entity === "messages") {
     return `${item.direction} • ${item.parentPhone} • ${item.status} • ${item.date}`;
   }
@@ -628,6 +1007,9 @@ type BusinessValidationInput = {
   classesData: any[];
   coursesData: any[];
   assignmentsData: any[];
+  schoolsData: any[];
+  studentsData: any[];
+  usersData: any[];
 };
 
 function validateBusinessRules({
@@ -638,7 +1020,86 @@ function validateBusinessRules({
   classesData,
   coursesData,
   assignmentsData,
+  schoolsData,
+  studentsData,
+  usersData,
 }: BusinessValidationInput) {
+  if (entity === "users") {
+    const identifier = normalize(item.identifier);
+    const phone = normalize(item.phone);
+    const isBackOffice = item.accessChannel === "BackOffice";
+    const schoolExists = schoolsData.some((schoolItem) => normalize(schoolItem.code) === normalize(item.schoolCode));
+    const duplicateIdentifier = usersData.find(
+      (user) =>
+        user.id !== editingId &&
+        normalize(user.schoolCode) === normalize(item.schoolCode) &&
+        normalize(user.identifier) === identifier
+    );
+    const duplicatePhone = usersData.find(
+      (user) =>
+        user.id !== editingId &&
+        normalize(user.schoolCode) === normalize(item.schoolCode) &&
+        normalize(user.phone) === phone
+    );
+
+    if (isBackOfficeRole(item.role) && item.accessChannel !== "BackOffice") {
+      return "Utilisateur impossible : Super Admin et Admin Pays doivent utiliser le BackOffice.";
+    }
+
+    if (item.role === "Admin Pays" && !item.countryScope) {
+      return "Utilisateur impossible : un Admin Pays doit être rattaché à un pays.";
+    }
+
+    if (!isBackOffice && !schoolExists) {
+      return "Utilisateur impossible : l'établissement sélectionné n'existe pas.";
+    }
+
+    if (duplicateIdentifier) {
+      return "Utilisateur impossible : cet identifiant est déjà utilisé dans cet établissement.";
+    }
+
+    if (duplicatePhone) {
+      return "Utilisateur impossible : ce téléphone est déjà utilisé par un autre compte.";
+    }
+
+    if (item.photoUrl && !/^https?:\/\//i.test(item.photoUrl)) {
+      return "Photo impossible : veuillez saisir une URL valide.";
+    }
+
+    return null;
+  }
+
+  if (entity === "schools") {
+    const code = normalize(item.code);
+    const duplicateCode = schoolsData.find(
+      (schoolItem) => schoolItem.id !== editingId && normalize(schoolItem.code) === code
+    );
+
+    if (duplicateCode) {
+      return "Création impossible : ce code établissement existe déjà.";
+    }
+
+    if (item.logoUrl && !/\.(jpg|jpeg|png|webp)$/i.test(item.logoUrl)) {
+      return "Logo impossible : le fichier doit être au format JPG, PNG ou WebP.";
+    }
+
+    if (Number(item.maxStudents) < studentsData.length) {
+      return `Abonnement impossible : la limite élèves (${item.maxStudents}) est inférieure à l'effectif actuel (${studentsData.length}).`;
+    }
+
+    if (Number(item.maxTeachers) < teachersData.length) {
+      return `Abonnement impossible : la limite enseignants (${item.maxTeachers}) est inférieure à l'effectif actuel (${teachersData.length}).`;
+    }
+
+    const endDate = parseDisplayDate(item.subscriptionEndDate);
+
+    if (endDate && endDate.getTime() < Date.now()) {
+      return "Abonnement expiré : la date de fin doit être future pour un établissement actif.";
+    }
+
+    return null;
+  }
+
   if (entity === "classes") {
     const teacherId = normalize(item.teacherId);
 
@@ -646,7 +1107,9 @@ function validateBusinessRules({
       return null;
     }
 
-    const teacherExists = teachersData.some((teacher) => normalize(teacher.id) === teacherId);
+    const teacherExists = teachersData.some(
+      (teacher) => normalize(teacher.id) === teacherId || normalize(teacher.publicId) === teacherId
+    );
 
     if (!teacherExists) {
       return "Classe impossible : cet ID responsable n'est pas enregistré dans les enseignants.";
@@ -662,7 +1125,9 @@ function validateBusinessRules({
   const teacherId = normalize(item.teacherId);
   const className = normalize(item.className);
   const course = normalize(item.course);
-  const teacherExists = teachersData.some((teacher) => normalize(teacher.id) === teacherId);
+  const teacherExists = teachersData.some(
+    (teacher) => normalize(teacher.id) === teacherId || normalize(teacher.publicId) === teacherId
+  );
   const classExists = classesData.some((schoolClass) => normalize(schoolClass.name) === className);
   const courseExists = coursesData.some(
     (courseItem) =>
@@ -706,6 +1171,94 @@ function normalize(value: unknown) {
     .toLowerCase();
 }
 
+function splitList(value?: string) {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function createInternalId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function generatePublicId(prefix: string, year: string, items: any[], size = 6) {
+  const next = getNextSequence(items, new RegExp(`^${prefix}-${year}-(\\d+)$`, "i"));
+  return `${prefix}-${year}-${String(next).padStart(size, "0")}`;
+}
+
+function generateTeacherPublicId(schoolCode: string, teachersData: any[]) {
+  const next = getNextSequence(
+    teachersData,
+    new RegExp(`^${escapeRegExp(schoolCode)}-ENS-(\\d+)$`, "i")
+  );
+  return `${schoolCode}-ENS-${String(next).padStart(4, "0")}`;
+}
+
+function generateSchoolCode(country: string, year: string, schoolsData: any[]) {
+  const countryCode = getCountryCode(country);
+  const next = getNextSequence(
+    schoolsData,
+    new RegExp(`^${countryCode}-${year}-(\\d+)$`, "i"),
+    "code"
+  );
+  return `${countryCode}-${year}-${String(next).padStart(4, "0")}`;
+}
+
+function getNextSequence(items: any[], pattern: RegExp, field = "publicId") {
+  const highest = items.reduce((max, item) => {
+    const value = String(item[field] ?? item.matricule ?? item.id ?? "");
+    const match = value.match(pattern);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+
+  return highest + 1;
+}
+
+function getCountryCode(country: string) {
+  const value = normalize(country);
+  const codes: Record<string, string> = {
+    france: "FR",
+    fr: "FR",
+    rdc: "CD",
+    "république démocratique du congo": "CD",
+    "republique democratique du congo": "CD",
+    congo: "CG",
+    cg: "CG",
+    cameroun: "CM",
+    cm: "CM",
+    sénégal: "SN",
+    senegal: "SN",
+    sn: "SN",
+  };
+
+  return codes[value] ?? (value.slice(0, 2).toUpperCase() || "CD");
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isBackOfficeRole(role?: string) {
+  return role === "Super Administrateur SchoolLink" || role === "Admin Pays";
+}
+
+function getRoleDefaults(role?: string) {
+  if (role === "Super Administrateur SchoolLink") {
+    return { scopeLevel: "Global", schoolCode: "*", accessChannel: "BackOffice" };
+  }
+
+  if (role === "Admin Pays") {
+    return { scopeLevel: "Pays", schoolCode: "*", accessChannel: "BackOffice" };
+  }
+
+  return { scopeLevel: "Établissement", schoolCode: "", accessChannel: "Application" };
+}
+
+function generateTemporaryPassword() {
+  return `SL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
 function getSelectOptions(
   key: string | undefined,
   entity: AdminEntity,
@@ -714,6 +1267,7 @@ function getSelectOptions(
   classesData: any[],
   coursesData: any[],
   paymentStatusesData: any[],
+  schoolsData: any[],
   form: Record<string, string>
 ) {
   if (key === "gender") {
@@ -721,7 +1275,7 @@ function getSelectOptions(
   }
 
   if (key === "teacherId") {
-    return teachersData.map((teacher) => teacher.id).filter(Boolean);
+    return teachersData.map((teacher) => teacher.publicId ?? teacher.id).filter(Boolean);
   }
 
   if (key === "parentPhone") {
@@ -739,6 +1293,50 @@ function getSelectOptions(
     return messageThemes;
   }
 
+  if (key === "method") {
+    return ["Mobile Money", "Carte bancaire", "Espèces", "Virement bancaire"];
+  }
+
+  if (key === "type") {
+    return ["École primaire", "Collège", "Lycée", "Université", "Institut"];
+  }
+
+  if (key === "role") {
+    return Object.keys(rolePermissions);
+  }
+
+  if (key === "schoolCode") {
+    return ["*", ...schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean)];
+  }
+
+  if (key === "scopeLevel") {
+    return ["Global", "Pays", "Établissement"];
+  }
+
+  if (key === "accessChannel") {
+    return ["BackOffice", "Application"];
+  }
+
+  if (key === "currency") {
+    return ["CDF", "XOF", "XAF", "EUR", "USD"];
+  }
+
+  if (key === "timezone") {
+    return ["Africa/Kinshasa", "Africa/Abidjan", "Africa/Dakar", "Africa/Douala", "Europe/Paris"];
+  }
+
+  if (key === "language") {
+    return ["Français", "Anglais"];
+  }
+
+  if (key === "dateFormat") {
+    return ["JJ-MM-AAAA", "AAAA-MM-JJ"];
+  }
+
+  if (key === "subscriptionPlan") {
+    return ["Essentiel", "Standard", "Premium"];
+  }
+
   if (key === "className") {
     return classesData.map((schoolClass) => schoolClass.name).filter(Boolean);
   }
@@ -752,6 +1350,14 @@ function getSelectOptions(
   }
 
   if (key === "status") {
+    if (entity === "users") {
+      return ["Actif", "Suspendu", "Désactivé"];
+    }
+
+    if (entity === "schools") {
+      return ["Actif", "Suspendu"];
+    }
+
     if (entity === "messages") {
       return ["Nouveau", "En cours", "Traité"];
     }
@@ -832,6 +1438,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     marginLeft: 5,
+  },
+  filtersCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  searchBox: {
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    color: "#0F172A",
+    fontWeight: "800",
+  },
+  filterRow: {
+    gap: 8,
+    paddingVertical: 4,
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#F1F5F9",
+  },
+  filterPillActive: {
+    backgroundColor: "#0F172A",
+  },
+  filterText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  filterTextActive: {
+    color: "#FFFFFF",
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -928,6 +1578,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: 8,
   },
+  iconButtonWarning: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
   iconButtonDanger: {
     width: 38,
     height: 38,
@@ -947,8 +1606,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     padding: 20,
+    maxHeight: "88%",
   },
   modalTitle: { color: "#0F172A", fontSize: 22, fontWeight: "900", marginBottom: 16 },
+  formScroll: {
+    maxHeight: 480,
+  },
   fieldGroup: { marginBottom: 12 },
   fieldLabel: { color: "#334155", fontSize: 12, fontWeight: "900", marginBottom: 6 },
   input: {
