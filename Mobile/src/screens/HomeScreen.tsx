@@ -147,6 +147,16 @@ export default function HomeScreen({ navigation }: any) {
               onPress={() => navigation.navigate("TeacherGrades")}
             />
             <QuickAction
+              icon="time-outline"
+              label="Planning"
+              onPress={() => navigation.navigate("Timetable")}
+            />
+            <QuickAction
+              icon="document-text-outline"
+              label="Bulletins"
+              onPress={() => navigation.navigate("ReportCards")}
+            />
+            <QuickAction
               icon="chatbubbles-outline"
               label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
               onPress={() => navigation.navigate("Messages")}
@@ -275,6 +285,16 @@ export default function HomeScreen({ navigation }: any) {
               icon="calendar-outline"
               label="Présences"
               onPress={() => navigation.navigate("StudentPresences", { studentId: selectedStudentId })}
+            />
+            <QuickAction
+              icon="time-outline"
+              label="Emploi du temps"
+              onPress={() => navigation.navigate("Timetable")}
+            />
+            <QuickAction
+              icon="document-text-outline"
+              label="Bulletins"
+              onPress={() => navigation.navigate("ReportCards")}
             />
             <QuickAction
               icon="card-outline"
@@ -505,6 +525,16 @@ export default function HomeScreen({ navigation }: any) {
             icon="swap-horizontal-outline"
             label="Affectations"
             onPress={() => navigation.navigate("AdminCrud", { entity: "assignments" })}
+          />
+          <QuickAction
+            icon="time-outline"
+            label="Planning"
+            onPress={() => navigation.navigate("Timetable")}
+          />
+          <QuickAction
+            icon="document-text-outline"
+            label="Bulletins"
+            onPress={() => navigation.navigate("ReportCards")}
           />
         </View>
       </ScrollView>

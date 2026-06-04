@@ -17,6 +17,8 @@ import PaymentsScreen from "../screens/PaymentsScreen";
 import AnnouncementsScreen from "../screens/AnnouncementsScreen";
 import AdminCrudScreen from "../screens/AdminCrudScreen";
 import MessagesScreen from "../screens/MessagesScreen";
+import TimetableScreen from "../screens/TimetableScreen";
+import ReportCardsScreen from "../screens/ReportCardsScreen";
 import { AdminEntity } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
 
@@ -59,6 +61,8 @@ export type RootStackParamList = {
   Payments: undefined;
   Announcements: undefined;
   Messages: undefined;
+  Timetable: undefined;
+  ReportCards: undefined;
   AdminCrud: {
     entity: AdminEntity;
   };
@@ -134,6 +138,13 @@ export default function AppNavigator() {
 
         {(isAdmin || isTeacher || isParent) && (
           <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages" }} />
+        )}
+
+        {(isAdmin || isTeacher || isParent || isStudent) && (
+          <>
+            <Stack.Screen name="Timetable" component={TimetableScreen} options={{ title: "Emploi du temps" }} />
+            <Stack.Screen name="ReportCards" component={ReportCardsScreen} options={{ title: "Bulletins" }} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

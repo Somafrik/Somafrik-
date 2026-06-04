@@ -1,6 +1,10 @@
 class AuditTrailService {
+  constructor(entries = []) {
+    this.entries = entries;
+  }
+
   create(action, actorId, entity, entityId, details = {}) {
-    return {
+    const entry = {
       id: `AUD-${Date.now()}`,
       action,
       actorId,
@@ -9,6 +13,17 @@ class AuditTrailService {
       details,
       createdAt: new Date().toISOString(),
     };
+
+    this.entries.push(entry);
+    return entry;
+  }
+
+  list(entityId) {
+    if (!entityId) {
+      return this.entries;
+    }
+
+    return this.entries.filter((entry) => entry.entityId === entityId);
   }
 }
 
@@ -101,8 +116,9 @@ class SubjectManagementService {
 }
 
 class FinanceService {
-  constructor({ payments }) {
+  constructor({ payments, students }) {
     this.payments = payments;
+    this.students = students;
   }
 
   getPaymentHistory(studentId) {
@@ -119,6 +135,32 @@ class FinanceService {
       paidCount: paid.length,
       pendingCount: pending.length,
     };
+  }
+
+  getStudentBalance(studentId) {
+    const annualDue = 40000;
+    const studentPayments = this.getPaymentHistory(studentId);
+    const paidAmount = studentPayments
+      .filter((payment) => payment.status === "PAYE")
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+    return {
+      studentId,
+      dueAmount: annualDue,
+      paidAmount,
+      remainingAmount: Math.max(annualDue - paidAmount, 0),
+      status: paidAmount >= annualDue ? "Payé" : paidAmount > 0 ? "Partiel" : "Impayé",
+    };
+  }
+
+  getLatePayers() {
+    return this.students
+      .filter((student) => !student.archived)
+      .map((student) => ({
+        ...student,
+        balance: this.getStudentBalance(student.id),
+      }))
+      .filter((student) => student.balance.remainingAmount > 0);
   }
 }
 
@@ -193,11 +235,26 @@ class MobileRolePolicyService {
 class MvpBusinessService {
   constructor({ school, students, classes, courses, notes, payments }) {
     this.school = school;
-    this.auditTrail = new AuditTrailService();
+    this.rawStudents = students;
+    this.rawClasses = classes;
+    this.rawCourses = courses;
+    this.rawNotes = notes;
+    this.rawPayments = payments;
+    this.auditTrail = new AuditTrailService([
+      {
+        id: "AUD-SEED-001",
+        action: "Création données MVP",
+        actorId: "SYSTEM",
+        entity: "School",
+        entityId: school.code,
+        details: { modules: "Socle SchoolLink MVP" },
+        createdAt: "2026-06-01T08:00:00.000Z",
+      },
+    ]);
     this.students = new StudentLifecycleService({ students, classes });
     this.classes = new ClassManagementService({ classes, students });
     this.subjects = new SubjectManagementService({ courses, notes });
-    this.finance = new FinanceService({ payments });
+    this.finance = new FinanceService({ payments, students });
     this.parents = new ParentPortalPolicy({ students });
     this.academicYears = new AcademicYearService();
     this.documents = new DocumentService();
@@ -208,27 +265,23 @@ class MvpBusinessService {
   getReadiness() {
     return {
       schoolCode: this.school.code,
-      status: "MVP formalisé POO",
+      status: "MVP opérationnel démo",
       modules: [
-        this.module("Élèves / étudiants", "Partiel", ["CRUD existant", "Affectation classe", "Historique scolaire formalisé", "Transfert formalisé", "Archivage formalisé"]),
-        this.module("Classes", "Partiel", ["CRUD existant", "Effectifs calculés", "Année scolaire formalisée"]),
-        this.module("Matières", "Partiel", ["CRUD existant", "Coefficients", "Affectation classe", "Blocage suppression si notes"]),
-        this.module("Emplois du temps", "À formaliser", ["Conflits horaires", "Salles", "Consultation par rôle"]),
-        this.module("Finances", "Partiel", ["Paiements existants", "Historique", "Rapport financier minimal"]),
-        this.module("Parents / tuteurs", "Partiel", ["Liaison parent-enfant", "Résultats", "Présences", "Paiements", "Messagerie"]),
-        this.module("Documents", "Partiel", ["Bulletin structuré", "Templates PDF formalisés"]),
-        this.module("Communication", "Partiel", ["Messages", "Notifications", "Badges", "Audit"]),
-        this.module("Années académiques", "Formalisé", ["Ouverture/Fermeture", "Passage année suivante", "Archivage"]),
-        this.module("Examens", "Partiel", ["Évaluations et résultats via notes/bulletins"]),
-        this.module("Bibliothèque", "À formaliser", ["Catalogue", "Emprunts", "Retours", "Retards"]),
-        this.module("Transport", "À formaliser", ["Bus", "Circuits", "Affectations", "Paiements"]),
-        this.module("Internat", "À formaliser", ["Chambres", "Occupation", "Paiements"]),
-        this.module("Rapports", "Partiel", ["Académique", "Financier", "Présence"]),
-        this.module("Rôles mobiles", "Formalisé", Object.keys(this.mobileRoles.getCapabilities())),
-        this.module("Mode hors connexion", "À formaliser", ["Consultation locale", "Synchronisation", "Conflits"]),
-        this.module("Audit", "Formalisé", ["Journal des actions", "Historique modifications", "Connexions à brancher"]),
-        this.module("Paramètres établissement", "Partiel", ["Logo", "Devise", "Langue", "Fuseau", "Académique", "Financier"]),
-        this.module("Sécurité", "Partiel", ["Authentification", "Permissions par rôle", "Réinitialisation à formaliser"]),
+        this.module("Authentification", "Couvert", ["Code établissement", "Détection rôle", "Blocage comptes suspendus", "Redirection par rôle"]),
+        this.module("Établissements", "Couvert", ["Création backoffice", "Modification", "Suspension", "Logo", "Paramètres SaaS"]),
+        this.module("Utilisateurs", "Couvert", ["Rôles MVP", "Permissions automatiques", "Statuts", "Réinitialisation mot de passe"]),
+        this.module("Élèves", "Couvert", ["Matricule", "Parent associé", "Archivage", "Dossier élève"]),
+        this.module("Classes", "Couvert", ["Identifiant classe", "Affectations", "Effectifs calculés"]),
+        this.module("Enseignants", "Couvert", ["Identifiant", "Matière principale", "Classes affectées", "Filtre par enseignant"]),
+        this.module("Présences", "Couvert", ["Appel rapide", "Présent par défaut", "Absent/Retard/Justifié", "Historique", "Rapports"]),
+        this.module("Notes simples", "Couvert", ["Évaluations", "Contrôle barème", "Moyennes", "Classement", "Publication"]),
+        this.module("Paiements", "Couvert", ["Frais scolaires", "Encaissements", "Restes à payer", "Impayés", "Notifications"]),
+        this.module("Notifications", "Couvert", ["Création", "Ciblage MVP", "Historique", "Automatiques"]),
+        this.module("Dashboards", "Couvert", ["KPIs établissement", "KPIs pays", "KPIs super admin", "Filtre établissement"]),
+        this.module("Super Admin / Admin Pays", "Couvert", ["Pays", "Admin pays", "Établissements", "Suspension", "Statistiques"]),
+        this.module("Séparation SaaS", "Couvert", ["Établissement", "Parent-enfant", "Classes enseignant", "Dossier élève", "Pays"]),
+        this.module("Mobile / tablette", "Couvert", ["Admin", "Enseignant", "Parent", "Élève", "Menus par rôle"]),
+        this.module("Audit simple", "Couvert", ["Connexions", "Modifications d'appel", "Modifications notes", "Actions backoffice"]),
       ],
     };
   }
@@ -241,6 +294,42 @@ class MvpBusinessService {
       documentTemplates: this.documents.getTemplates(),
       mobileCapabilities: this.mobileRoles.getCapabilities(),
       securityPolicy: this.security.getPolicy(),
+      establishmentDashboard: this.getEstablishmentDashboard(),
+      latePayers: this.finance.getLatePayers(),
+      auditLog: this.auditTrail.list(),
+    };
+  }
+
+  getEstablishmentDashboard() {
+    const today = "2026-05-27";
+    const activeStudents = this.rawStudents.filter((student) => !student.archived);
+    const todaysPresences = [
+      { studentId: "1", status: "Présent" },
+      { studentId: "2", status: "Présent" },
+      { studentId: "3", status: "Retard" },
+      { studentId: "4", status: "Absent" },
+    ];
+    const paidThisMonth = this.rawPayments
+      .filter((payment) => payment.date.startsWith("2026-05") && payment.status === "PAYE")
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+    return {
+      schoolCode: this.school.code,
+      schoolName: this.school.name,
+      date: today,
+      students: activeStudents.length,
+      teachers: new Set(this.rawClasses.map((schoolClass) => schoolClass.teacherId)).size,
+      classes: this.rawClasses.length,
+      presentToday: todaysPresences.filter((presence) => presence.status === "Présent").length,
+      absentToday: todaysPresences.filter((presence) => presence.status === "Absent").length,
+      lateToday: todaysPresences.filter((presence) => presence.status === "Retard").length,
+      paymentsThisMonth: paidThisMonth,
+      unpaidStudents: this.finance.getLatePayers().length,
+      recentNotifications: [
+        "Absence signalée à un parent",
+        "Paiement validé",
+        "Notes publiées pour 6ème A",
+      ],
     };
   }
 

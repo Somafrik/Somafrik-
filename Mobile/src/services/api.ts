@@ -1,7 +1,17 @@
 import { UserRole } from "../navigation/AppNavigator";
 import { AuthResolver } from "../domain/auth/AuthResolver";
 
-export const API_BASE_URL = "http://192.168.1.141:5001/api";
+declare const process: {
+  env?: {
+    EXPO_PUBLIC_API_URL?: string;
+  };
+};
+
+const configuredApiUrl = process.env?.EXPO_PUBLIC_API_URL?.trim();
+
+export const API_BASE_URL = configuredApiUrl
+  ? `${configuredApiUrl.replace(/\/$/, "")}/api`
+  : "http://192.168.1.141:5001/api";
 
 export type StudentSummary = {
   id: string;
@@ -121,13 +131,7 @@ export function login(payload: LoginPayload) {
 
 export async function getSchoolByCode(code: string) {
   const normalizedCode = code.trim().toUpperCase();
-  const school = await request<SchoolInfo>("/school");
-
-  if (school.code !== normalizedCode) {
-    throw new Error("Code établissement invalide");
-  }
-
-  return school;
+  return request<SchoolInfo>(`/schools/${encodeURIComponent(normalizedCode)}`);
 }
 
 export async function identifyAccount(payload: { schoolCode: string; identifier: string }) {

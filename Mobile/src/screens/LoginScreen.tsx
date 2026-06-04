@@ -106,7 +106,7 @@ export default function LoginScreen({ navigation, route }: Props) {
       <Text style={styles.subtitle}>{school.city} • {school.code}</Text>
 
       <TextInput
-        placeholder="Identifiant local : ELE-0001, ENS-0001 ou téléphone parent"
+        placeholder="Identifiant : ELE-0001, ETU-0001, ENS-0001 ou téléphone parent"
         value={identifier}
         onChangeText={setIdentifier}
         autoCapitalize="none"

@@ -1200,17 +1200,21 @@ function generatePublicId(prefix: string, year: string, items: any[], size = 6) 
 function generateTeacherPublicId(schoolCode: string, teachersData: any[]) {
   const next = getNextSequence(
     teachersData,
-    new RegExp(`^${escapeRegExp(schoolCode)}-ENS-(\\d+)$`, "i")
+    new RegExp(`^(?:${escapeRegExp(schoolCode)}-)?ENS-(\\d+)$`, "i")
   );
-  return `${schoolCode}-ENS-${String(next).padStart(4, "0")}`;
+  return `ENS-${String(next).padStart(4, "0")}`;
 }
 
-function generateLearnerPublicId(schoolCode: string, studentsData: any[], profile: "ELE" | "ETU" = "ELE") {
+function generateLearnerPublicId(
+  schoolCode: string,
+  studentsData: any[],
+  profile: "ELE" | "ETU" = "ELE"
+) {
   const next = getNextSequence(
     studentsData,
-    new RegExp(`^${escapeRegExp(schoolCode)}-${profile}-(\\d+)$`, "i")
+    new RegExp(`^(?:${escapeRegExp(schoolCode)}-)?${profile}-(\\d+)$`, "i")
   );
-  return `${schoolCode}-${profile}-${String(next).padStart(4, "0")}`;
+  return `${profile}-${String(next).padStart(4, "0")}`;
 }
 
 function generateSchoolCode(country: string, year: string, schoolsData: any[]) {

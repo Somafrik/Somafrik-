@@ -153,13 +153,20 @@ class AuthService {
   }
 
   assertSchoolCanConnect(schoolCode) {
-    if (String(schoolCode).trim().toUpperCase() !== this.school.code) {
+    if (!this.matchesSchoolCode(schoolCode)) {
       throw new BusinessError(401, "Code etablissement invalide");
     }
 
     if (this.school.status === "Suspendu") {
       throw new BusinessError(403, "Etablissement suspendu. Connexion indisponible.");
     }
+  }
+
+  matchesSchoolCode(schoolCode) {
+    const normalizedCode = String(schoolCode).trim().toUpperCase();
+    return [this.school.code, this.school.publicId].some(
+      (value) => String(value ?? "").trim().toUpperCase() === normalizedCode
+    );
   }
 
   assertManagedUserCanUseMobile(user) {

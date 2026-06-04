@@ -67,6 +67,7 @@ app.get("/", (req, res) => {
       "/api/backoffice/notifications",
       "/api/mvp/readiness",
       "/api/mvp/snapshot",
+      "/api/mvp/dashboard",
     ],
   });
 });
@@ -80,7 +81,12 @@ app.get("/api/schools", (req, res) => {
 });
 
 app.get("/api/schools/:code", (req, res) => {
-  const foundSchool = platformSchools.find((item) => item.code === req.params.code.toUpperCase());
+  const requestedCode = req.params.code.toUpperCase();
+  const foundSchool = platformSchools.find((item) =>
+    [item.code, item.publicId].some(
+      (value) => String(value ?? "").trim().toUpperCase() === requestedCode
+    )
+  );
 
   if (!foundSchool) {
     return res.status(404).json({ message: "Code etablissement invalide" });
@@ -224,6 +230,10 @@ app.get("/api/mvp/readiness", (req, res) => {
 
 app.get("/api/mvp/snapshot", (req, res) => {
   res.json(mvpBusinessService.getSnapshot());
+});
+
+app.get("/api/mvp/dashboard", (req, res) => {
+  res.json(mvpBusinessService.getEstablishmentDashboard());
 });
 
 function handleBusinessResponse(res, action) {

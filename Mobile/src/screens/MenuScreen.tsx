@@ -24,24 +24,35 @@ const adminMenuItems: MenuItem[] = [
   { label: "⚙️ Statuts paiement", entity: "paymentStatuses" },
   { label: "💬 Messages parents", entity: "messages" },
   { label: "📢 Annonces", entity: "announcements" },
+  { label: "🗓️ Emplois du temps", route: "Timetable" },
+  { label: "📄 Bulletins", route: "ReportCards" },
+  { label: "📄 Documents scolaires", message: "Module à livrer : certificats, attestations et relevés administratifs." },
+  { label: "📊 Rapports", message: "Module à livrer : rapports académiques, financiers, présences et exports Excel/PDF." },
+  { label: "🔐 Audit et connexions", message: "Module à livrer : journal des actions, historique des modifications et connexions." },
   { label: "🆘 Support", message: "Le module support sera connecté au centre d'assistance de l'école." },
 ];
 
 const parentMenuItems: MenuItem[] = [
   { label: "👨‍👩‍👧 Compte parent", route: "Profil" },
   { label: "📚 Suivi scolaire", route: "Notes" },
+  { label: "📄 Bulletins PDF", route: "ReportCards" },
   { label: "💰 Situation des frais", route: "FraisEleve" },
+  { label: "📱 Paiement mobile", message: "Module à livrer : Mobile Money, carte bancaire, reçu automatique et historique des paiements." },
   { label: "💬 Messages école", route: "Messages" },
   { label: "📢 Annonces de l'école", route: "Announcements" },
+  { label: "🔄 Mode hors ligne", message: "Module à livrer : consultation locale, synchronisation et résolution des conflits." },
   { label: "🆘 Support", message: "Le module support sera connecté au secrétariat de l'école." },
 ];
 
 const studentMenuItems: MenuItem[] = [
   { label: "👤 Mon profil", route: "Profil" },
   { label: "📚 Mes notes", route: "Notes" },
+  { label: "📄 Mes bulletins", route: "ReportCards" },
   { label: "✅ Mes présences", route: "Presences" },
+  { label: "🗓️ Mon emploi du temps", route: "Timetable" },
   { label: "💰 Mes paiements", route: "FraisEleve" },
   { label: "📢 Annonces", route: "Announcements" },
+  { label: "🔄 Mode hors ligne", message: "Module à livrer : consultation des notes, présences et annonces sans réseau." },
 ];
 
 const teacherMenuItems: MenuItem[] = [
@@ -49,8 +60,11 @@ const teacherMenuItems: MenuItem[] = [
   { label: "📚 Mes classes", route: "Classes" },
   { label: "✅ Appel des présences", route: "TeacherAttendance" },
   { label: "📝 Gestion des notes", route: "TeacherGrades" },
+  { label: "📄 Bulletins", route: "ReportCards" },
+  { label: "🗓️ Mon emploi du temps", route: "Timetable" },
   { label: "💬 Messages parents", route: "Messages" },
   { label: "📢 Annonces de l'école", route: "Announcements" },
+  { label: "🔄 Synchronisation", message: "Module à livrer : saisie hors ligne des appels/notes puis synchronisation." },
   { label: "🆘 Support", message: "Le module support sera connecté à l'administration." },
 ];
 

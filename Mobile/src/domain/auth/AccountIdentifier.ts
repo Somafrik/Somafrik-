@@ -22,20 +22,14 @@ export class AccountIdentifier {
       return true;
     }
 
-    const localMatch = normalizedValue.match(/(?:^|-)(ELE|ETU|ENS)-(\d+)$/);
+    const localMatch = AccountIdentifier.parseLocalIdentifier(normalizedValue);
 
     if (!localMatch) {
       return false;
     }
 
-    const [, profile, sequence] = localMatch;
-    const normalizedSequence = AccountIdentifier.formatSequence(sequence, 4);
-    const extendedSequence = AccountIdentifier.formatSequence(sequence, 6);
-
-    return (
-      this.values.includes(`${profile}-${sequence}`) ||
-      this.values.includes(`${profile}-${normalizedSequence}`) ||
-      this.values.includes(`${profile}-${extendedSequence}`)
+    return AccountIdentifier.buildAliases(this.schoolCode, localMatch.profile, localMatch.sequence).some((alias) =>
+      this.values.includes(alias)
     );
   }
 
@@ -45,23 +39,59 @@ export class AccountIdentifier {
 
   private buildValues() {
     const values = new Set([this.raw, this.upper]);
-    const localMatch = this.upper.match(/^(ELE|ETU|ENS)-(\d+)$/);
+    const localMatch = AccountIdentifier.parseLocalIdentifier(this.upper);
 
     if (localMatch) {
-      const [, profile, sequence] = localMatch;
-      const normalizedSequence = AccountIdentifier.formatSequence(sequence, 4);
-      const extendedSequence = AccountIdentifier.formatSequence(sequence, 6);
-      const localIdentifier = `${profile}-${normalizedSequence}`;
-      const extendedLocalIdentifier = `${profile}-${extendedSequence}`;
-
-      values.add(localIdentifier);
-      values.add(extendedLocalIdentifier);
-      values.add(`${this.schoolCode}-${this.upper}`);
-      values.add(`${this.schoolCode}-${localIdentifier}`);
-      values.add(`${this.schoolCode}-${extendedLocalIdentifier}`);
+      AccountIdentifier.buildAliases(this.schoolCode, localMatch.profile, localMatch.sequence).forEach((alias) =>
+        values.add(alias)
+      );
     }
 
     return [...values];
+  }
+
+  private static parseLocalIdentifier(value: string) {
+    const match = value
+      .trim()
+      .toUpperCase()
+      .match(/(?:^|-)(ELE|ETU|ENS)-(\d+)$/);
+
+    if (!match) {
+      return null;
+    }
+
+    return { profile: match[1], sequence: match[2] };
+  }
+
+  private static buildAliases(schoolCode: string, profile: string, sequence: string) {
+    const profiles = AccountIdentifier.getProfileAliases(profile);
+    const sequences = [
+      String(Number(sequence)),
+      AccountIdentifier.formatSequence(sequence, 4),
+      AccountIdentifier.formatSequence(sequence, 5),
+      AccountIdentifier.formatSequence(sequence, 6),
+    ].filter((value, index, values) => values.indexOf(value) === index);
+    const aliases: string[] = [];
+
+    profiles.forEach((profileAlias) => {
+      sequences.forEach((formattedSequence) => {
+        const localIdentifier = `${profileAlias}-${formattedSequence}`;
+        aliases.push(localIdentifier);
+        aliases.push(`${schoolCode}-${localIdentifier}`);
+      });
+    });
+
+    return aliases;
+  }
+
+  private static getProfileAliases(profile: string) {
+    const normalizedProfile = profile.trim().toUpperCase();
+
+    if (["ELE", "ETU"].includes(normalizedProfile)) {
+      return ["ELE", "ETU"];
+    }
+
+    return ["ENS"];
   }
 
   private static formatSequence(sequence: string, size: number) {

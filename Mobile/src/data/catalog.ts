@@ -104,6 +104,30 @@ export type Announcement = {
   date: string;
 };
 
+export type TimetableItem = {
+  id: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+  className: string;
+  course: string;
+  teacherId: string;
+  room: string;
+};
+
+export type ReportCard = {
+  id: string;
+  studentId: string;
+  term: string;
+  average: number;
+  rank: number;
+  status: "Publié" | "Brouillon" | string;
+  publishedAt?: string;
+  pdfUrl?: string;
+  teacherComment: string;
+  principalComment: string;
+};
+
 export type SchoolMessage = {
   id: string;
   parentPhone: string;
@@ -385,7 +409,7 @@ export const userAccounts: UserAccount[] = [
 export const teachers: Teacher[] = [
   {
     id: "T1",
-    publicId: "CD-2026-0001-ENS-0001",
+    publicId: "ENS-0001",
     name: "Jean Kabeya",
     firstName: "Jean",
     gender: "Masculin",
@@ -400,7 +424,7 @@ export const teachers: Teacher[] = [
   },
   {
     id: "T2",
-    publicId: "CD-2026-0001-ENS-0002",
+    publicId: "ENS-0002",
     name: "Marie Mukendi",
     firstName: "Marie",
     gender: "Féminin",
@@ -414,7 +438,7 @@ export const teachers: Teacher[] = [
   },
   {
     id: "T3",
-    publicId: "CD-2026-0001-ENS-0003",
+    publicId: "ENS-0003",
     name: "Patrick Ilunga",
     firstName: "Patrick",
     gender: "Masculin",
@@ -428,7 +452,7 @@ export const teachers: Teacher[] = [
   },
   {
     id: "T4",
-    publicId: "CD-2026-0001-ENS-0004",
+    publicId: "ENS-0004",
     name: "Sarah Mbuyi",
     firstName: "Sarah",
     gender: "Féminin",
@@ -469,10 +493,10 @@ export const classes: SchoolClass[] = [
 ];
 
 export const students: Student[] = [
-  { id: "1", publicId: "CD-2026-0001-ELE-0001", name: "Jean Dupont", firstName: "Jean", matricule: "CD-2026-0001-ELE-0001", gender: "Masculin", birthDate: "12-04-2012", className: "6ème A", schoolCode: "CD-2026-0001", parentName: "Parent Dupont", parentPhone: "+243 820 000 001", parentEmail: "parent.dupont@example.com", archived: false },
-  { id: "2", publicId: "CD-2026-0001-ELE-0002", name: "Marie Martin", firstName: "Marie", matricule: "CD-2026-0001-ELE-0002", gender: "Féminin", birthDate: "18-09-2012", className: "6ème A", schoolCode: "CD-2026-0001", parentName: "Parent Martin", parentPhone: "+243 820 000 001", parentEmail: "parent.martin@example.com", archived: false },
-  { id: "3", publicId: "CD-2026-0001-ELE-0003", name: "Paul Bernard", firstName: "Paul", matricule: "CD-2026-0001-ELE-0003", gender: "Masculin", birthDate: "03-02-2011", className: "6ème B", schoolCode: "CD-2026-0001", parentName: "Parent Bernard", parentPhone: "+243 820 000 003", parentEmail: "parent.bernard@example.com", archived: false },
-  { id: "4", publicId: "CD-2026-0001-ELE-0004", name: "Sarah Mbala", firstName: "Sarah", matricule: "CD-2026-0001-ELE-0004", gender: "Féminin", birthDate: "21-07-2011", className: "5ème A", schoolCode: "CD-2026-0001", parentName: "Parent Mbala", parentPhone: "+243 820 000 004", parentEmail: "parent.mbala@example.com", archived: false },
+  { id: "1", publicId: "ELE-0001", name: "Jean Dupont", firstName: "Jean", matricule: "ELE-0001", gender: "Masculin", birthDate: "12-04-2012", className: "6ème A", schoolCode: "CD-2026-0001", parentName: "Parent Dupont", parentPhone: "+243 820 000 001", parentEmail: "parent.dupont@example.com", archived: false },
+  { id: "2", publicId: "ELE-0002", name: "Marie Martin", firstName: "Marie", matricule: "ELE-0002", gender: "Féminin", birthDate: "18-09-2012", className: "6ème A", schoolCode: "CD-2026-0001", parentName: "Parent Martin", parentPhone: "+243 820 000 001", parentEmail: "parent.martin@example.com", archived: false },
+  { id: "3", publicId: "ELE-0003", name: "Paul Bernard", firstName: "Paul", matricule: "ELE-0003", gender: "Masculin", birthDate: "03-02-2011", className: "6ème B", schoolCode: "CD-2026-0001", parentName: "Parent Bernard", parentPhone: "+243 820 000 003", parentEmail: "parent.bernard@example.com", archived: false },
+  { id: "4", publicId: "ELE-0004", name: "Sarah Mbala", firstName: "Sarah", matricule: "ELE-0004", gender: "Féminin", birthDate: "21-07-2011", className: "5ème A", schoolCode: "CD-2026-0001", parentName: "Parent Mbala", parentPhone: "+243 820 000 004", parentEmail: "parent.mbala@example.com", archived: false },
 ];
 
 export const notes: NoteItem[] = [
@@ -504,6 +528,40 @@ export const paymentStatuses: PaymentStatus[] = [
 export const announcements: Announcement[] = [
   { id: "A1", title: "Réunion des parents", message: "Réunion générale samedi à 10h00.", date: "30-05-2026" },
   { id: "A2", title: "Examens", message: "Les évaluations commencent le 10 juin.", date: "29-05-2026" },
+];
+
+export const timetable: TimetableItem[] = [
+  { id: "TT1", day: "Lundi", startTime: "08:00", endTime: "10:00", className: "6ème A", course: "Mathématiques", teacherId: "T1", room: "A101" },
+  { id: "TT2", day: "Lundi", startTime: "10:15", endTime: "12:15", className: "6ème A", course: "Français", teacherId: "T2", room: "A102" },
+  { id: "TT3", day: "Mardi", startTime: "08:00", endTime: "10:00", className: "6ème B", course: "Sciences", teacherId: "T3", room: "Labo 1" },
+  { id: "TT4", day: "Mercredi", startTime: "09:00", endTime: "11:00", className: "5ème A", course: "Histoire", teacherId: "T4", room: "B201" },
+];
+
+export const reportCards: ReportCard[] = [
+  {
+    id: "BUL-1-T1",
+    studentId: "1",
+    term: "Trimestre 1",
+    average: 14.2,
+    rank: 4,
+    status: "Publié",
+    publishedAt: "31-12-2025",
+    pdfUrl: "",
+    teacherComment: "Bon trimestre, poursuivre les efforts en français.",
+    principalComment: "Résultats satisfaisants.",
+  },
+  {
+    id: "BUL-2-T1",
+    studentId: "2",
+    term: "Trimestre 1",
+    average: 15.6,
+    rank: 2,
+    status: "Publié",
+    publishedAt: "31-12-2025",
+    pdfUrl: "",
+    teacherComment: "Très bon niveau et participation régulière.",
+    principalComment: "Encouragements du conseil.",
+  },
 ];
 
 export const messageThemes = [
@@ -573,6 +631,326 @@ export const schoolMessages: SchoolMessage[] = [
     audit: [{ action: "Création", actorId: "PARENT-+243 820 000 001", date: "31-05-2026 12:30" }],
   },
 ];
+
+const demoCountryTemplates = [
+  ["Sénégal", "SN", "+221", "XOF", "Africa/Dakar"],
+  ["Côte d'Ivoire", "CI", "+225", "XOF", "Africa/Abidjan"],
+  ["Cameroun", "CM", "+237", "XAF", "Africa/Douala"],
+  ["Gabon", "GA", "+241", "XAF", "Africa/Libreville"],
+  ["Bénin", "BJ", "+229", "XOF", "Africa/Porto-Novo"],
+  ["Togo", "TG", "+228", "XOF", "Africa/Lome"],
+  ["Mali", "ML", "+223", "XOF", "Africa/Bamako"],
+  ["Burkina Faso", "BF", "+226", "XOF", "Africa/Ouagadougou"],
+  ["Guinée", "GN", "+224", "GNF", "Africa/Conakry"],
+  ["Rwanda", "RW", "+250", "RWF", "Africa/Kigali"],
+];
+const demoCities = ["Kinshasa", "Lubumbashi", "Goma", "Mbuji-Mayi", "Kisangani", "Matadi", "Bukavu", "Kolwezi"];
+const demoFirstNames = ["Jean", "Marie", "Patrick", "Sarah", "Grace", "David", "Amina", "Joseph", "Chantal", "Moise"];
+const demoLastNames = ["Kabeya", "Mukendi", "Ilunga", "Mbuyi", "Kabasele", "Tshibangu", "Mabiala", "Ndaye", "Kalala", "Mbala"];
+const demoSubjects = ["Mathématiques", "Français", "Sciences", "Histoire", "Géographie", "Anglais", "Physique", "Chimie", "SVT", "Informatique"];
+const demoLevels = ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème"];
+const demoTracks = ["Générale", "Sciences", "Lettres", "Technique", "Commerciale"];
+const demoRoles = [
+  "Directeur adjoint",
+  "Préfet des études",
+  "Conseiller pédagogique",
+  "Responsable discipline",
+  "Bibliothécaire",
+  "Responsable transport",
+  "Responsable internat",
+  "Caissier",
+  "Agent support",
+  "Auditeur",
+  "Inspecteur académique",
+  "Coordinateur examens",
+  "Responsable documents",
+  "Gestionnaire bourses",
+  "Responsable sécurité",
+];
+
+demoRoles.forEach((role) => {
+  rolePermissions[role] = ["Voir tableau de bord", "Consulter rapports", "Créer demande", "Voir historique"];
+});
+
+while (Object.keys(rolePermissions).length < 50) {
+  const index = Object.keys(rolePermissions).length + 1;
+  rolePermissions[`Rôle métier démo ${String(index).padStart(2, "0")}`] = [
+    "Voir tableau de bord",
+    "Consulter données",
+    "Créer demande",
+    "Modifier selon périmètre",
+    "Voir historique",
+  ];
+}
+
+while (schools.length < 50) {
+  const index = schools.length + 1;
+  const country = demoCountryTemplates[index % demoCountryTemplates.length];
+  const code = `${country[1]}-2026-${String(index).padStart(4, "0")}`;
+
+  schools.push({
+    ...school,
+    id: `SCHOOL-${String(index).padStart(4, "0")}`,
+    publicId: code,
+    code,
+    name: `Établissement SchoolLink ${index}`,
+    type: ["École primaire", "Collège", "Lycée", "Université", "Institut"][index % 5],
+    city: demoCities[index % demoCities.length],
+    country: country[0],
+    phone: `${country[2]} 810 ${String(index).padStart(3, "0")} ${String(index + 100).padStart(3, "0")}`,
+    email: `contact-${index}@schoollink.demo`,
+    currency: country[3],
+    timezone: country[4],
+    status: index % 11 === 0 ? "Suspendu" : "Actif",
+    subscriptionPlan: ["Essentiel", "Standard", "Premium"][index % 3],
+    subscriptionEndDate: index % 8 === 0 ? "31-05-2026" : "31-08-2026",
+    maxStudents: 500 + index * 10,
+    maxTeachers: 40 + index,
+    createdAt: `${String((index % 27) + 1).padStart(2, "0")}-01-2026`,
+  });
+}
+
+while (teachers.length < 50) {
+  const index = teachers.length + 1;
+  const firstName = demoFirstNames[index % demoFirstNames.length];
+  const lastName = demoLastNames[index % demoLastNames.length];
+  const subject = demoSubjects[index % demoSubjects.length];
+
+  teachers.push({
+    id: `T${index}`,
+    publicId: `ENS-${String(index).padStart(4, "0")}`,
+    name: `${firstName} ${lastName}`,
+    firstName,
+    gender: index % 2 === 0 ? "Féminin" : "Masculin",
+    phone: `+243 810 100 ${String(index).padStart(3, "0")}`,
+    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${index}@schoollink.cd`,
+    mainSubject: subject,
+    assignments: [],
+  });
+}
+
+while (classes.length < 50) {
+  const index = classes.length + 1;
+  const level = demoLevels[index % demoLevels.length];
+  const suffix = String.fromCharCode(65 + (index % 5));
+
+  classes.push({
+    id: `C${index}`,
+    publicId: `CLS-2026-${String(index).padStart(6, "0")}`,
+    name: `${level} ${suffix}`,
+    level,
+    track: demoTracks[index % demoTracks.length],
+    teacherId: teachers[index % teachers.length].id,
+  });
+}
+
+while (courses.length < 50) {
+  const index = courses.length + 1;
+  const classItem = classes[index % classes.length];
+
+  courses.push({
+    id: `COURSE${index}`,
+    publicId: `COU-2026-${String(index).padStart(6, "0")}`,
+    className: classItem.name,
+    name: demoSubjects[index % demoSubjects.length],
+    coefficient: (index % 3) + 1,
+  });
+}
+
+courses.forEach((course, index) => {
+  const teacher = teachers[index % teachers.length];
+  const exists = (teacher.assignments ?? []).some(
+    (assignment) => assignment.className === course.className && assignment.course === course.name
+  );
+
+  if (!exists) {
+    const assignment = {
+      id: `${teacher.id}-ASSIGNMENT-${teacherAssignments.length + 1}`,
+      teacherId: teacher.id,
+      className: course.className,
+      course: course.name,
+    };
+    teacher.assignments = [...(teacher.assignments ?? []), assignment];
+    teacherAssignments.push(assignment);
+  }
+});
+
+while (students.length < 50) {
+  const index = students.length + 1;
+  const firstName = demoFirstNames[index % demoFirstNames.length];
+  const lastName = demoLastNames[(index + 3) % demoLastNames.length];
+  const classItem = classes[index % classes.length];
+
+  students.push({
+    id: String(index),
+    publicId: `ELE-${String(index).padStart(4, "0")}`,
+    name: `${firstName} ${lastName}`,
+    firstName,
+    matricule: `ELE-${String(index).padStart(4, "0")}`,
+    gender: index % 2 === 0 ? "Féminin" : "Masculin",
+    birthDate: `${String((index % 27) + 1).padStart(2, "0")}-${String((index % 12) + 1).padStart(2, "0")}-2012`,
+    className: classItem.name,
+    schoolCode: "CD-2026-0001",
+    parentName: `Parent ${lastName}`,
+    parentPhone: `+243 820 100 ${String(Math.ceil(index / 2)).padStart(3, "0")}`,
+    parentEmail: `parent-${index}@example.com`,
+    archived: index % 17 === 0,
+  });
+}
+
+while (notes.length < 50) {
+  const index = notes.length + 1;
+  const student = students[index % students.length];
+  const value = 8 + (index % 13);
+
+  notes.push({
+    id: `N${index}`,
+    studentId: student.id,
+    subject: demoSubjects[index % demoSubjects.length],
+    value,
+    coefficient: (index % 3) + 1,
+    date: `2026-05-${String((index % 27) + 1).padStart(2, "0")}`,
+    evaluationId: `EVAL${index}`,
+    scale: 20,
+    evaluationCoefficient: (index % 2) + 1,
+    authorId: teachers[index % teachers.length].id,
+    enteredAt: `${String((index % 27) + 1).padStart(2, "0")}-05-2026 09:00`,
+    audit: [{ authorId: teachers[index % teachers.length].id, newValue: value, date: `${String((index % 27) + 1).padStart(2, "0")}-05-2026 09:00` }],
+  });
+}
+
+while (presences.length < 50) {
+  const index = presences.length + 1;
+  const student = students[index % students.length];
+  const status = ["Présent", "Absent", "Retard", "Justifié"][index % 4];
+
+  presences.push({
+    id: `P${index}`,
+    publicId: `PRE-2026-${String(index).padStart(6, "0")}`,
+    studentId: student.id,
+    date: `2026-05-${String((index % 27) + 1).padStart(2, "0")}`,
+    present: status === "Présent" || status === "Justifié",
+    status,
+  });
+}
+
+while (payments.length < 50) {
+  const index = payments.length + 1;
+  const student = students[index % students.length];
+
+  payments.push({
+    id: `PAY${index}`,
+    publicId: `PAY-2026-${String(index).padStart(6, "0")}`,
+    studentId: student.id,
+    amount: 10000 + (index % 5) * 5000,
+    date: `${String((index % 27) + 1).padStart(2, "0")}-05-2026`,
+    status: index % 4 === 0 ? "EN_ATTENTE" : "PAYE",
+    method: ["Mobile Money", "Espèces", "Virement bancaire", "Carte bancaire"][index % 4],
+  });
+}
+
+while (announcements.length < 50) {
+  const index = announcements.length + 1;
+  announcements.push({
+    id: `A${index}`,
+    title: `Annonce SchoolLink ${index}`,
+    message: `Communication importante numéro ${index} pour les familles et le personnel.`,
+    date: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+  });
+}
+
+while (timetable.length < 50) {
+  const index = timetable.length + 1;
+  const classItem = classes[index % classes.length];
+  const teacher = teachers[index % teachers.length];
+  timetable.push({
+    id: `TT${index}`,
+    day: ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"][index % 5],
+    startTime: `${String(8 + (index % 5)).padStart(2, "0")}:00`,
+    endTime: `${String(10 + (index % 5)).padStart(2, "0")}:00`,
+    className: classItem.name,
+    course: demoSubjects[index % demoSubjects.length],
+    teacherId: teacher.id,
+    room: `Salle ${100 + index}`,
+  });
+}
+
+while (reportCards.length < 50) {
+  const index = reportCards.length + 1;
+  const student = students[index % students.length];
+  reportCards.push({
+    id: `BUL-${student.id}-${index}`,
+    studentId: student.id,
+    term: ["Trimestre 1", "Trimestre 2", "Trimestre 3"][index % 3],
+    average: Number((9 + (index % 10) + (index % 3) / 10).toFixed(1)),
+    rank: (index % 24) + 1,
+    status: index % 5 === 0 ? "Brouillon" : "Publié",
+    publishedAt: index % 5 === 0 ? "" : `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+    pdfUrl: "",
+    teacherComment: "Bulletin généré pour les tests SchoolLink.",
+    principalComment: index % 5 === 0 ? "En attente de validation." : "Bulletin validé par la direction.",
+  });
+}
+
+while (schoolMessages.length < 50) {
+  const index = schoolMessages.length + 1;
+  const student = students[index % students.length];
+  schoolMessages.push({
+    id: `MSG${index}`,
+    parentPhone: student.parentPhone,
+    studentId: student.id,
+    teacherId: teachers[index % teachers.length].id,
+    theme: messageThemes[index % messageThemes.length],
+    direction: index % 2 === 0 ? "École vers parent" : "Parent vers école",
+    message: `Message de test ${index} pour vérifier le flux communication.`,
+    status: ["Nouveau", "En cours", "Traité", "Lu"][index % 4],
+    priority: ["Faible", "Moyenne", "Haute", "Critique"][index % 4],
+    date: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+    sentAt: `${String((index % 27) + 1).padStart(2, "0")}-06-2026 09:00`,
+    audit: [{ action: "Création", actorId: "SYSTEM-DEMO", date: `${String((index % 27) + 1).padStart(2, "0")}-06-2026 09:00` }],
+  });
+}
+
+while (userAccounts.length < 50) {
+  const index = userAccounts.length + 1;
+  const roleNames = Object.keys(rolePermissions);
+  const role = roleNames[index % roleNames.length];
+  const schoolItem = schools[index % schools.length];
+  const isBackOffice = role === "Super Administrateur SchoolLink" || role === "Admin Pays" || index % 5 === 0;
+
+  userAccounts.push({
+    id: `USER-DEMO-${String(index).padStart(4, "0")}`,
+    publicId: role === "Admin Pays" ? `ADM-DEMO-2026-${String(index).padStart(4, "0")}` : `USR-2026-${String(index).padStart(6, "0")}`,
+    lastName: demoLastNames[index % demoLastNames.length],
+    firstName: demoFirstNames[index % demoFirstNames.length],
+    gender: index % 2 === 0 ? "Féminin" : "Masculin",
+    phone: `+243 830 000 ${String(index).padStart(3, "0")}`,
+    email: `user-${index}@schoollink.demo`,
+    role,
+    secondaryRoles: index % 6 === 0 ? ["Auditeur"] : [],
+    scopeLevel: role === "Super Administrateur SchoolLink" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+    countryScope: schoolItem.country,
+    schoolCode: isBackOffice ? "*" : schoolItem.code,
+    accessChannel: isBackOffice ? "BackOffice" : "Application",
+    identifier: isBackOffice
+      ? `demo-user-${index}`
+      : role === "Enseignant"
+        ? `ENS-${String(index).padStart(4, "0")}`
+        : role === "Élève / Étudiant"
+          ? `ETU-${String(index).padStart(4, "0")}`
+          : role === "Parent"
+            ? `+243 830 000 ${String(index).padStart(3, "0")}`
+            : `USR-${String(index).padStart(5, "0")}`,
+    status: index % 13 === 0 ? "Suspendu" : "Actif",
+    permissions: rolePermissions[role] ?? ["Voir tableau de bord"],
+    temporaryPassword: "1234",
+    photoUrl: "",
+    createdAt: `${String((index % 27) + 1).padStart(2, "0")}-01-2026`,
+    lastLoginAt: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+    createdBy: "Super Administrateur SchoolLink",
+    history: [`Compte démo ${index} créé automatiquement`],
+  });
+}
 
 export function getStudentById(studentId: string) {
   return students.find((student) => student.id === studentId);

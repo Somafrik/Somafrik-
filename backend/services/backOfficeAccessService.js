@@ -12,9 +12,9 @@ class BackOfficeAccessService {
     this.communicationService = new CommunicationService({ notifications });
   }
 
-  login({ identifier, password }) {
-    if (!identifier || !password) {
-      throw new BusinessError(400, "Identifiant et mot de passe obligatoires");
+  login({ schoolCode, identifier, password }) {
+    if (!schoolCode || !identifier || !password) {
+      throw new BusinessError(400, "Code établissement, identifiant et mot de passe obligatoires");
     }
 
     const user = this.userAccounts.find(
@@ -33,10 +33,14 @@ class BackOfficeAccessService {
       throw new BusinessError(403, "Ce compte n'a pas accès au BackOffice");
     }
 
+    const schoolContext = this.resolveSchoolContext(schoolCode);
+    this.assertScopeCanAccessSchool(user, schoolContext);
+
     const { password: _password, temporaryPassword: _temporaryPassword, ...safeUser } = user;
 
     return {
       user: safeUser,
+      schoolContext,
       scope: this.getScope(user),
       menus: this.getMenus(user),
       dashboard: this.getDashboard(user),
@@ -47,6 +51,46 @@ class BackOfficeAccessService {
       notifications: this.getScopedNotifications(user),
       unreadNotifications: this.communicationService.getUnreadCount(this.getScopedNotifications(user)),
     };
+  }
+
+  resolveSchoolContext(schoolCode) {
+    const normalizedCode = String(schoolCode).trim().toUpperCase();
+    const school = this.schools.find((item) =>
+      [item.code, item.publicId].some(
+        (value) => String(value ?? "").trim().toUpperCase() === normalizedCode
+      )
+    );
+
+    if (!school) {
+      throw new BusinessError(404, "Code établissement invalide");
+    }
+
+    if (school.status === "Suspendu") {
+      throw new BusinessError(403, "Établissement suspendu. Connexion indisponible.");
+    }
+
+    return school;
+  }
+
+  assertScopeCanAccessSchool(user, school) {
+    if (user.role === "Super Administrateur SchoolLink") {
+      return;
+    }
+
+    if (user.role === "Admin Pays") {
+      const countryCode = this.getCountryCode(user.countryScope);
+      const allowed = school.country === user.countryScope || school.code.startsWith(countryCode);
+
+      if (!allowed) {
+        throw new BusinessError(403, "Cet administrateur pays ne peut accéder qu'à son pays.");
+      }
+
+      return;
+    }
+
+    if (user.schoolCode !== school.code) {
+      throw new BusinessError(403, "Un établissement ne peut pas voir les données d'un autre établissement.");
+    }
   }
 
   getScopedSchools(user) {

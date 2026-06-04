@@ -324,7 +324,7 @@ const userAccounts = [
 const teachers = [
   {
     id: "T1",
-    publicId: "CD-2026-0001-ENS-0001",
+    publicId: "ENS-0001",
     name: "Jean Kabeya",
     firstName: "Jean",
     gender: "Masculin",
@@ -340,7 +340,7 @@ const teachers = [
   },
   {
     id: "T2",
-    publicId: "CD-2026-0001-ENS-0002",
+    publicId: "ENS-0002",
     name: "Marie Mukendi",
     firstName: "Marie",
     gender: "Féminin",
@@ -355,7 +355,7 @@ const teachers = [
   },
   {
     id: "T3",
-    publicId: "CD-2026-0001-ENS-0003",
+    publicId: "ENS-0003",
     name: "Patrick Ilunga",
     firstName: "Patrick",
     gender: "Masculin",
@@ -370,7 +370,7 @@ const teachers = [
   },
   {
     id: "T4",
-    publicId: "CD-2026-0001-ENS-0004",
+    publicId: "ENS-0004",
     name: "Sarah Mbuyi",
     firstName: "Sarah",
     gender: "Féminin",
@@ -404,10 +404,10 @@ const courses = [
 ];
 
 const students = [
-  { id: "1", publicId: "CD-2026-0001-ELE-0001", name: "Jean Dupont", firstName: "Jean", matricule: "CD-2026-0001-ELE-0001", gender: "Masculin", birthDate: "12-04-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Dupont", parentPhone: "+243 820 000 001", parentEmail: "parent.dupont@example.com", archived: false },
-  { id: "2", publicId: "CD-2026-0001-ELE-0002", name: "Marie Martin", firstName: "Marie", matricule: "CD-2026-0001-ELE-0002", gender: "Féminin", birthDate: "18-09-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Martin", parentPhone: "+243 820 000 001", parentEmail: "parent.martin@example.com", archived: false },
-  { id: "3", publicId: "CD-2026-0001-ELE-0003", name: "Paul Bernard", firstName: "Paul", matricule: "CD-2026-0001-ELE-0003", gender: "Masculin", birthDate: "03-02-2011", className: "6ème B", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Bernard", parentPhone: "+243 820 000 003", parentEmail: "parent.bernard@example.com", archived: false },
-  { id: "4", publicId: "CD-2026-0001-ELE-0004", name: "Sarah Mbala", firstName: "Sarah", matricule: "CD-2026-0001-ELE-0004", gender: "Féminin", birthDate: "21-07-2011", className: "5ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Mbala", parentPhone: "+243 820 000 004", parentEmail: "parent.mbala@example.com", archived: false },
+  { id: "1", publicId: "ELE-0001", name: "Jean Dupont", firstName: "Jean", matricule: "ELE-0001", gender: "Masculin", birthDate: "12-04-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Dupont", parentPhone: "+243 820 000 001", parentEmail: "parent.dupont@example.com", archived: false },
+  { id: "2", publicId: "ELE-0002", name: "Marie Martin", firstName: "Marie", matricule: "ELE-0002", gender: "Féminin", birthDate: "18-09-2012", className: "6ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Martin", parentPhone: "+243 820 000 001", parentEmail: "parent.martin@example.com", archived: false },
+  { id: "3", publicId: "ELE-0003", name: "Paul Bernard", firstName: "Paul", matricule: "ELE-0003", gender: "Masculin", birthDate: "03-02-2011", className: "6ème B", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Bernard", parentPhone: "+243 820 000 003", parentEmail: "parent.bernard@example.com", archived: false },
+  { id: "4", publicId: "ELE-0004", name: "Sarah Mbala", firstName: "Sarah", matricule: "ELE-0004", gender: "Féminin", birthDate: "21-07-2011", className: "5ème A", schoolCode: "CD-2026-0001", pin: "1234", parentName: "Parent Mbala", parentPhone: "+243 820 000 004", parentEmail: "parent.mbala@example.com", archived: false },
 ];
 
 const notes = [
@@ -558,7 +558,7 @@ while (teachers.length < 50) {
   const lastName = demoLastNames[index % demoLastNames.length];
   teachers.push({
     id: `T${index}`,
-    publicId: `CD-2026-0001-ENS-${String(index).padStart(4, "0")}`,
+    publicId: `ENS-${String(index).padStart(4, "0")}`,
     name: `${firstName} ${lastName}`,
     firstName,
     gender: index % 2 === 0 ? "Féminin" : "Masculin",
@@ -614,10 +614,10 @@ while (students.length < 50) {
   const classItem = classes[index % classes.length];
   students.push({
     id: String(index),
-    publicId: `CD-2026-0001-ELE-${String(index).padStart(4, "0")}`,
+    publicId: `ELE-${String(index).padStart(4, "0")}`,
     name: `${firstName} ${lastName}`,
     firstName,
-    matricule: `CD-2026-0001-ELE-${String(index).padStart(4, "0")}`,
+    matricule: `ELE-${String(index).padStart(4, "0")}`,
     gender: index % 2 === 0 ? "Féminin" : "Masculin",
     birthDate: `${String((index % 27) + 1).padStart(2, "0")}-${String((index % 12) + 1).padStart(2, "0")}-2012`,
     className: classItem.name,
@@ -728,7 +728,15 @@ while (userAccounts.length < 50) {
     countryScope: country.name.includes("République Démocratique") ? "RDC" : country.code,
     schoolCode: role === "Super Administrateur SchoolLink" || role === "Admin Pays" ? "*" : schoolItem.code,
     accessChannel: isBackOffice ? "BackOffice" : "Application",
-    identifier: isBackOffice ? `demo-user-${index}` : `APP-${String(index).padStart(4, "0")}`,
+    identifier: isBackOffice
+      ? `demo-user-${index}`
+      : role === "Enseignant"
+        ? `ENS-${String(index).padStart(4, "0")}`
+        : role === "Élève / Étudiant"
+          ? `ETU-${String(index).padStart(4, "0")}`
+          : role === "Parent"
+            ? `${country.phonePrefix} 830 000 ${String(index).padStart(3, "0")}`
+            : `USR-${String(index).padStart(5, "0")}`,
     password: isBackOffice ? "1234" : undefined,
     status: index % 13 === 0 ? "Suspendu" : "Actif",
     permissions: rolePermissions[role] ?? ["Voir tableau de bord"],
