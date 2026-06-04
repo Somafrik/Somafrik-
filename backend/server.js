@@ -21,10 +21,12 @@ const { AuthService, BusinessError } = require("./services/authService");
 const { BackOfficeAccessService } = require("./services/backOfficeAccessService");
 const { GradeBookService } = require("./services/gradeBookService");
 const { MvpBusinessService } = require("./services/mvpBusinessService");
+const { ReportPdfService } = require("./services/reportPdfService");
 
 const app = express();
 const authService = new AuthService({ school, teachers, students, userAccounts });
 const gradeBookService = new GradeBookService({ students, notes, courses });
+const reportPdfService = new ReportPdfService({ school });
 const mvpBusinessService = new MvpBusinessService({ school, students, classes, courses, notes, payments });
 const backOfficeAccessService = new BackOfficeAccessService({
   school,
@@ -56,6 +58,7 @@ app.get("/", (req, res) => {
       "/api/students/:id",
       "/api/students/:id/notes",
       "/api/students/:id/report",
+      "/api/students/:id/report.pdf",
       "/api/students/:id/presences",
       "/api/students/:id/payments",
       "/api/teachers",
@@ -166,6 +169,24 @@ app.get("/api/students/:id/report", (req, res) => {
   }
 
   res.json(gradeBookService.generateReport(req.params.id));
+});
+
+app.get("/api/students/:id/report.pdf", (req, res) => {
+  const student = students.find((item) => item.id === req.params.id);
+
+  if (!student) {
+    return res.status(404).json({ message: "Eleve introuvable" });
+  }
+
+  const period = req.query.period ? String(req.query.period) : "Trimestre 1";
+  const report = gradeBookService.generateReport(req.params.id, period, "Publié");
+  const pdf = reportPdfService.generateReportCardPdf(report);
+  const filename = `bulletin-${student.matricule}-${period.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+  res.setHeader("Content-Length", pdf.length);
+  res.send(pdf);
 });
 
 app.get("/api/students/:id/presences", (req, res) => {

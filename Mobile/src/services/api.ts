@@ -149,6 +149,10 @@ export function getHealth() {
   return request<{ status: string }>("/health");
 }
 
+export function getReportCardPdfUrl(studentId: string, period = "Trimestre 1") {
+  return `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/report.pdf?period=${encodeURIComponent(period)}`;
+}
+
 async function identifyAccountFromExistingEndpoints({
   schoolCode,
   identifier,

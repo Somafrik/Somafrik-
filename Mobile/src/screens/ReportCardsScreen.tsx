@@ -1,8 +1,9 @@
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { reportCards } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
+import { getReportCardPdfUrl } from "../services/api";
 
 export default function ReportCardsScreen() {
   const { session, selectedStudentId } = useAuth();
@@ -14,6 +15,26 @@ export default function ReportCardsScreen() {
         ? [selectedStudentId]
         : studentsData.map((student) => student.id);
   const rows = reportCards.filter((card) => visibleStudentIds.includes(card.studentId));
+
+  const openPdf = async (studentId: string, period: string) => {
+    const url = getReportCardPdfUrl(studentId, period);
+
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+
+      if (!canOpen) {
+        Alert.alert("Bulletin PDF", "Aucune application ne peut ouvrir ce PDF sur cet appareil.");
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert(
+        "Bulletin PDF",
+        error instanceof Error ? error.message : "Impossible d'ouvrir le bulletin PDF."
+      );
+    }
+  };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -47,12 +68,10 @@ export default function ReportCardsScreen() {
               activeOpacity={0.85}
               style={[styles.pdfButton, !isPublished && styles.pdfButtonDisabled]}
               disabled={!isPublished}
-              onPress={() =>
-                Alert.alert("Bulletin PDF", "Le générateur PDF sera connecté au backend documentaire.")
-              }
+              onPress={() => openPdf(card.studentId, card.term)}
             >
               <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.pdfText}>Télécharger PDF</Text>
+              <Text style={styles.pdfText}>Visionner le bulletin</Text>
             </TouchableOpacity>
           </View>
         );
