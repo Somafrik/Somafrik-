@@ -1,5 +1,6 @@
 const { BusinessError } = require("./authService");
 const { CommunicationService } = require("./communicationService");
+const { verifySecret } = require("./credentialService");
 
 class BackOfficeAccessService {
   constructor({ school, schools = [school], userAccounts, countries = [], subscriptions = [], notifications = [] }) {
@@ -17,11 +18,11 @@ class BackOfficeAccessService {
       throw new BusinessError(400, "Code établissement, identifiant et mot de passe obligatoires");
     }
 
-    const user = this.userAccounts.find(
-      (account) => account.identifier === identifier || account.phone === identifier
+    const user = this.userAccounts.find((account) =>
+      [account.identifier, account.email, account.phone, account.publicId].some((value) => value === identifier)
     );
 
-    if (!user || user.password !== password) {
+    if (!user || !this.verifyPassword(user, password)) {
       throw new BusinessError(401, "Identifiants BackOffice incorrects");
     }
 
@@ -51,6 +52,14 @@ class BackOfficeAccessService {
       notifications: this.getScopedNotifications(user),
       unreadNotifications: this.communicationService.getUnreadCount(this.getScopedNotifications(user)),
     };
+  }
+
+  verifyPassword(user, password) {
+    if (user.passwordHash) {
+      return verifySecret(password, user.passwordHash);
+    }
+
+    return user.password === password;
   }
 
   resolveSchoolContext(schoolCode) {

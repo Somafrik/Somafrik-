@@ -1,0 +1,38 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: schoollink-postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_DB: schoollink
+      POSTGRES_USER: schoollink
+      POSTGRES_PASSWORD: schoollink123
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+
+    container_name: schoollink-backend
+
+    restart: always
+
+    ports:
+      - "5000:5000"
+
+    depends_on:
+      - postgres
+
+    environment:
+      DATABASE_URL: postgresql://schoollink:schoollink123@postgres:5432/schoollink
+
+volumes:
+  postgres_data:

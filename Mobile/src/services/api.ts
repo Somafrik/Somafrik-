@@ -11,7 +11,7 @@ const configuredApiUrl = process.env?.EXPO_PUBLIC_API_URL?.trim();
 
 export const API_BASE_URL = configuredApiUrl
   ? `${configuredApiUrl.replace(/\/$/, "")}/api`
-  : "http://192.168.1.141:5001/api";
+  : "http://192.168.1.141:5000/api";
 
 export type StudentSummary = {
   id: string;

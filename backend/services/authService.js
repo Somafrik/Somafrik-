@@ -1,4 +1,5 @@
 const { AccountIdentifier } = require("./accountIdentifier");
+const { verifySecret } = require("./credentialService");
 
 class BusinessError extends Error {
   constructor(statusCode, message) {
@@ -52,7 +53,8 @@ class AuthService {
 
     this.assertManagedUserCanUseMobile(managedUser);
 
-    if (role === "school_admin" && accountIdentifier.isAdmin() && pin === "1234") {
+    const adminUser = this.findManagedUser(identifier, schoolCode);
+    if (role === "school_admin" && accountIdentifier.isAdmin() && this.verifyUserSecret(adminUser, pin)) {
       return { role, user: { id: "ADMIN1", name: "Administrateur" }, school: this.school };
     }
 
@@ -62,7 +64,7 @@ class AuthService {
       if (teacher) {
         const assignedClasses = [...new Set(teacher.assignments.map((item) => item.className))];
         const courses = [...new Set(teacher.assignments.map((item) => item.course))];
-        const { password: _password, ...safeTeacher } = teacher;
+        const { password: _password, passwordHash: _passwordHash, pinHash: _pinHash, ...safeTeacher } = teacher;
 
         return {
           role,
@@ -80,7 +82,7 @@ class AuthService {
       const student = this.findStudent(accountIdentifier, pin);
 
       if (student) {
-        const { pin: _pin, ...safeStudent } = student;
+        const { pin: _pin, pinHash: _pinHash, ...safeStudent } = student;
         return { role, user: safeStudent, school: this.school };
       }
     }
@@ -89,7 +91,7 @@ class AuthService {
       const matchedStudents = this.findParentStudents(accountIdentifier, pin);
 
       if (matchedStudents.length > 0) {
-        const children = matchedStudents.map(({ pin: _pin, ...safeStudent }) => safeStudent);
+        const children = matchedStudents.map(({ pin: _pin, pinHash: _pinHash, ...safeStudent }) => safeStudent);
         const firstStudent = children[0];
 
         return {
@@ -114,7 +116,7 @@ class AuthService {
         (accountIdentifier.matches(teacher.id) ||
           accountIdentifier.matches(teacher.publicId) ||
           accountIdentifier.matches(teacher.phone)) &&
-        (password === undefined || teacher.password === password)
+        (password === undefined || this.verifyUserSecret(teacher, password))
     );
   }
 
@@ -123,7 +125,7 @@ class AuthService {
       (student) =>
         student.schoolCode === accountIdentifier.schoolCode &&
         (accountIdentifier.matches(student.matricule) || accountIdentifier.matches(student.publicId)) &&
-        (pin === undefined || student.pin === pin)
+        (pin === undefined || this.verifyUserSecret(student, pin))
     );
   }
 
@@ -132,7 +134,7 @@ class AuthService {
       (student) =>
         student.schoolCode === accountIdentifier.schoolCode &&
         accountIdentifier.matches(student.parentPhone) &&
-        (pin === undefined || student.pin === pin)
+        (pin === undefined || this.verifyUserSecret(student, pin))
     );
   }
 
@@ -142,7 +144,7 @@ class AuthService {
     return this.userAccounts.find(
       (user) =>
         (user.schoolCode === "*" || user.schoolCode === normalizedSchoolCode) &&
-        (user.identifier === identifier || user.phone === identifier)
+        [user.identifier, user.email, user.phone, user.publicId].some((value) => value === identifier)
     );
   }
 
@@ -160,6 +162,18 @@ class AuthService {
     if (this.school.status === "Suspendu") {
       throw new BusinessError(403, "Etablissement suspendu. Connexion indisponible.");
     }
+  }
+
+  verifyUserSecret(user, secret) {
+    if (!user) {
+      return false;
+    }
+
+    if (user.passwordHash || user.pinHash) {
+      return verifySecret(secret, user.passwordHash) || verifySecret(secret, user.pinHash);
+    }
+
+    return user.password === secret || user.pin === secret;
   }
 
   matchesSchoolCode(schoolCode) {

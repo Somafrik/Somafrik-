@@ -42,8 +42,8 @@
           <button type="submit">Se connecter</button>
           <p class="error" id="loginError"></p>
           <div class="demo-box">
-            <button type="button" data-demo="superadmin">Super Admin demo</button>
-            <button type="button" data-demo="admin-rdc">Admin Pays demo</button>
+            <button type="button" data-demo="superadmin@schoollink.app">Super Admin demo</button>
+            <button type="button" data-demo="admin.rdc@schoollink.app">Admin Pays demo</button>
           </div>
         </form>
       </section>
@@ -64,6 +64,11 @@
             <button class="nav-item" data-view="subscriptions">Abonnements</button>
             <button class="nav-item" data-view="notifications">Notifications</button>
             <button class="nav-item" data-view="users">Utilisateurs</button>
+            <button class="nav-item" data-view="subjects">Matières</button>
+            <button class="nav-item" data-view="academicYears">Années</button>
+            <button class="nav-item" data-view="exams">Examens</button>
+            <button class="nav-item" data-view="documents">Documents</button>
+            <button class="nav-item" data-view="advancedReports">Rapports V2</button>
             <button class="nav-item" data-view="reports">Rapports</button>
             <button class="nav-item" data-view="permissions">Permissions</button>
           </nav>
@@ -219,6 +224,119 @@
                 <tbody id="usersTable"></tbody>
               </table>
             </div>
+          </section>
+
+          <section class="view hidden" id="subjectsView">
+            <div class="section-head">
+              <h3>Matières</h3>
+              <div class="section-actions">
+                <span id="subjectCount"></span>
+                <button class="action-button" type="button" data-action="add-subject-demo">Créer matière demo</button>
+                <button class="action-button" type="button" data-action="refresh-v2">Actualiser</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Matière</th>
+                    <th>Coefficient</th>
+                    <th>Niveau</th>
+                    <th>Affectations</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="subjectsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="academicYearsView">
+            <div class="section-head">
+              <h3>Années académiques</h3>
+              <div class="section-actions">
+                <span id="academicYearCount"></span>
+                <button class="action-button" type="button" data-action="refresh-v2">Actualiser</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Année</th>
+                    <th>Période</th>
+                    <th>Statut</th>
+                    <th>Élèves</th>
+                    <th>Notes</th>
+                    <th>Passages</th>
+                  </tr>
+                </thead>
+                <tbody id="academicYearsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="examsView">
+            <div class="section-head">
+              <h3>Examens</h3>
+              <div class="section-actions">
+                <span id="examCount"></span>
+                <button class="action-button" type="button" data-action="refresh-v2">Actualiser</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Examen</th>
+                    <th>Classe</th>
+                    <th>Matière</th>
+                    <th>Date</th>
+                    <th>Statut</th>
+                    <th>Stats</th>
+                  </tr>
+                </thead>
+                <tbody id="examsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="documentsView">
+            <div class="section-head">
+              <h3>Documents</h3>
+              <div class="section-actions">
+                <span id="documentCount"></span>
+                <button class="action-button" type="button" data-action="refresh-v2">Actualiser</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Document</th>
+                    <th>Élève</th>
+                    <th>Format</th>
+                    <th>Version</th>
+                    <th>Statut</th>
+                    <th>Généré le</th>
+                  </tr>
+                </thead>
+                <tbody id="documentsTable"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="view hidden" id="advancedReportsView">
+            <div class="section-head">
+              <h3>Rapports avancés</h3>
+              <div class="section-actions">
+                <span id="advancedReportSummary"></span>
+                <button class="action-button" type="button" data-action="refresh-v2">Actualiser</button>
+              </div>
+            </div>
+            <div class="coverage-grid" id="advancedReportKpis"></div>
+            <div class="roadmap-list" id="advancedReportList"></div>
           </section>
 
           <section class="view hidden" id="reportsView">

@@ -8,6 +8,11 @@ const state = {
   subscriptions: [],
   notifications: [],
   auditLog: [],
+  subjects: [],
+  academicYears: [],
+  exams: [],
+  documents: [],
+  advancedReports: null,
   schoolPage: 1,
   pageSize: 10,
 };
@@ -44,6 +49,17 @@ const coverageGrid = document.querySelector("#coverageGrid");
 const roadmapList = document.querySelector("#roadmapList");
 const permissionsList = document.querySelector("#permissionsList");
 const permissionCount = document.querySelector("#permissionCount");
+const subjectCount = document.querySelector("#subjectCount");
+const subjectsTable = document.querySelector("#subjectsTable");
+const academicYearCount = document.querySelector("#academicYearCount");
+const academicYearsTable = document.querySelector("#academicYearsTable");
+const examCount = document.querySelector("#examCount");
+const examsTable = document.querySelector("#examsTable");
+const documentCount = document.querySelector("#documentCount");
+const documentsTable = document.querySelector("#documentsTable");
+const advancedReportSummary = document.querySelector("#advancedReportSummary");
+const advancedReportKpis = document.querySelector("#advancedReportKpis");
+const advancedReportList = document.querySelector("#advancedReportList");
 const schoolSearch = document.querySelector("#schoolSearch");
 const schoolCountryFilter = document.querySelector("#schoolCountryFilter");
 const schoolTypeFilter = document.querySelector("#schoolTypeFilter");
@@ -146,6 +162,11 @@ logoutButton.addEventListener("click", () => {
   state.subscriptions = [];
   state.notifications = [];
   state.auditLog = [];
+  state.subjects = [];
+  state.academicYears = [];
+  state.exams = [];
+  state.documents = [];
+  state.advancedReports = null;
   loginPanel.classList.remove("hidden");
   appPanel.classList.add("hidden");
 });
@@ -235,6 +256,7 @@ function renderApp() {
   renderUsers();
   renderReports();
   renderPermissions();
+  loadV2Data();
   showView("overview");
 }
 
@@ -302,9 +324,23 @@ function renderMenus() {
     Support: "notifications",
     Rapports: "overview",
     "Conformité MVP": "reports",
+    Matières: "subjects",
+    "Années académiques": "academicYears",
+    Examens: "exams",
+    Documents: "documents",
+    "Rapports V2": "advancedReports",
     Paramètres: "permissions",
   };
-  const allowedViews = new Set(["overview", "reports", "permissions"]);
+  const allowedViews = new Set([
+    "overview",
+    "reports",
+    "permissions",
+    "subjects",
+    "academicYears",
+    "exams",
+    "documents",
+    "advancedReports",
+  ]);
 
   allowedMenus.forEach((menu) => {
     if (menuToView[menu]) {
@@ -565,6 +601,175 @@ function renderReports() {
     .join("");
 }
 
+async function loadV2Data() {
+  try {
+    const [subjects, academicYears, exams, documents, advancedReports] = await Promise.all([
+      request("/v2/subjects"),
+      request("/v2/academic-years"),
+      request("/v2/exams"),
+      request("/v2/documents"),
+      request("/v2/reports/advanced"),
+    ]);
+
+    state.subjects = subjects;
+    state.academicYears = academicYears;
+    state.exams = exams;
+    state.documents = documents;
+    state.advancedReports = advancedReports;
+    renderV2Views();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function renderV2Views() {
+  renderSubjects();
+  renderAcademicYears();
+  renderExams();
+  renderDocuments();
+  renderAdvancedReports();
+}
+
+function renderSubjects() {
+  subjectCount.textContent = `${state.subjects.length} matière(s)`;
+  subjectsTable.innerHTML = state.subjects
+    .map(
+      (subject) => `
+        <tr>
+          <td><strong>${escapeHtml(subject.name)}</strong><br><small>${escapeHtml(subject.code)} • ${escapeHtml(subject.description || "Description à compléter")}</small></td>
+          <td>${subject.coefficient}</td>
+          <td>${escapeHtml(subject.level)}</td>
+          <td>${subject.classCount} classe(s)<br><small>${subject.teacherCount} enseignant(s)</small></td>
+          <td><span class="status ${getCoverageClass(subject.status === "Active" ? "Couvert" : "Partiel")}">${subject.status}</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="icon-action" type="button" data-action="inspect-subject" data-id="${escapeHtml(subject.code)}">Voir</button>
+              <button class="icon-action danger" type="button" data-action="delete-subject" data-id="${escapeHtml(subject.code)}" ${subject.canDelete ? "" : "disabled"}>Supprimer</button>
+            </div>
+          </td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderAcademicYears() {
+  academicYearCount.textContent = `${state.academicYears.length} année(s)`;
+  academicYearsTable.innerHTML = state.academicYears
+    .map(
+      (year) => `
+        <tr>
+          <td><strong>${escapeHtml(year.name)}</strong><br><small>${year.isCurrent ? "Année courante unique" : "Historique"}</small></td>
+          <td>${year.startDate} → ${year.endDate}</td>
+          <td><span class="status ${year.notesLocked ? "status-warning" : ""}">${year.status}</span></td>
+          <td>${year.enrollmentCount}</td>
+          <td>${year.gradeCount}<br><small>${year.notesLocked ? "Notes verrouillées" : "Notes modifiables"}</small></td>
+          <td>${year.promotionDecisionCount}</td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderExams() {
+  examCount.textContent = `${state.exams.length} examen(s)`;
+  examsTable.innerHTML = state.exams
+    .map(
+      (exam) => `
+        <tr>
+          <td><strong>${escapeHtml(exam.name)}</strong><br><small>${escapeHtml(exam.code)} • ${escapeHtml(exam.type)}</small></td>
+          <td>${escapeHtml(exam.className)}</td>
+          <td>${escapeHtml(exam.subject)}</td>
+          <td>${exam.date}</td>
+          <td><span class="status ${exam.status === "Publié" ? "status-ok" : "status-warning"}">${exam.status}</span></td>
+          <td>${exam.resultCount} résultat(s)<br><small>Moy. ${exam.average}/20 • Réussite ${exam.successRate}%</small></td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderDocuments() {
+  documentCount.textContent = `${state.documents.length} document(s)`;
+  documentsTable.innerHTML = state.documents
+    .map(
+      (document) => `
+        <tr>
+          <td><strong>${escapeHtml(document.title)}</strong><br><small>${escapeHtml(document.code)} • ${escapeHtml(document.type)}</small></td>
+          <td>${escapeHtml(document.studentName || "-")}<br><small>${escapeHtml(document.studentCode || "Établissement")}</small></td>
+          <td>${escapeHtml(document.format)}</td>
+          <td>v${document.version}</td>
+          <td><span class="status">${escapeHtml(document.status)}</span></td>
+          <td>${document.generatedAt}</td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderAdvancedReports() {
+  const report = state.advancedReports;
+  if (!report) {
+    advancedReportSummary.textContent = "Chargement";
+    advancedReportKpis.innerHTML = "";
+    advancedReportList.innerHTML = "";
+    return;
+  }
+
+  advancedReportSummary.textContent = "Académique • financier • présences • examens";
+  advancedReportKpis.innerHTML = [
+    { label: "Pays", value: report.global.countries },
+    { label: "Établissements", value: report.global.schools },
+    { label: "Élèves", value: report.global.students },
+    { label: "Présence", value: `${report.attendance.rate}%` },
+    { label: "Encaissé", value: formatMetric(report.financial.paid, " CDF") },
+    { label: "Impayés", value: formatMetric(report.financial.unpaid, " CDF") },
+  ]
+    .map((item) => `<article class="coverage-card"><span>${item.label}</span><strong>${item.value}</strong></article>`)
+    .join("");
+
+  const academicRows = report.academic.map(
+    (row) => `<article class="roadmap-item"><div><strong>${escapeHtml(row.label)}</strong><p>Moyenne classe ${row.average}/20 • ${row.grades} note(s)</p></div><span class="status">Académique</span></article>`
+  );
+  const examRows = report.exams.map(
+    (row) => `<article class="roadmap-item"><div><strong>${escapeHtml(row.label)}</strong><p>Moyenne ${row.average}/20 • Réussite ${row.successRate}%</p></div><span class="status">Examen</span></article>`
+  );
+
+  advancedReportList.innerHTML = [...academicRows, ...examRows].join("");
+}
+
+async function createDemoSubject() {
+  const nextIndex = state.subjects.length + 1;
+  try {
+    await request("/v2/subjects", {
+      method: "POST",
+      body: JSON.stringify({
+        schoolCode: "CD-2026-0001",
+        name: `Matière V2 ${nextIndex}`,
+        code: `SUB-V2-${String(nextIndex).padStart(4, "0")}`,
+        coefficient: 1,
+        level: "Secondaire",
+        description: "Matière créée depuis le BackOffice V2.",
+        status: "Active",
+      }),
+    });
+    await loadV2Data();
+    showToast("Matière V2 créée.");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function deleteSubject(code) {
+  try {
+    await request(`/v2/subjects/${encodeURIComponent(code)}`, { method: "DELETE" });
+    await loadV2Data();
+    showToast("Matière supprimée.");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 function showView(viewName) {
   const titles = {
     overview: "Vue globale",
@@ -573,6 +778,11 @@ function showView(viewName) {
     subscriptions: "Abonnements",
     notifications: "Notifications",
     users: "Utilisateurs",
+    subjects: "Matières",
+    academicYears: "Années académiques",
+    exams: "Examens",
+    documents: "Documents",
+    advancedReports: "Rapports avancés",
     reports: "Rapports",
     permissions: "Permissions",
   };
@@ -595,6 +805,36 @@ function handleActionClick(event) {
     renderKpis();
     renderControls();
     showToast("Tableau de bord actualisé.");
+    return;
+  }
+
+  if (action === "refresh-v2") {
+    loadV2Data();
+    showToast("Données V2 actualisées.");
+    return;
+  }
+
+  if (action === "add-subject-demo") {
+    createDemoSubject();
+    return;
+  }
+
+  if (action === "delete-subject") {
+    deleteSubject(id);
+    return;
+  }
+
+  if (action === "inspect-subject") {
+    const subject = state.subjects.find((item) => item.code === id);
+    if (!subject) return;
+    openDetail("Matière", subject.name, `
+      <p><strong>Code :</strong> ${escapeHtml(subject.code)}</p>
+      <p><strong>Niveau :</strong> ${escapeHtml(subject.level)}</p>
+      <p><strong>Description :</strong> ${escapeHtml(subject.description || "Aucune description")}</p>
+      <p><strong>Classes :</strong> ${(subject.classes ?? []).map(escapeHtml).join(", ") || "Aucune"}</p>
+      <p><strong>Enseignants :</strong> ${(subject.teachers ?? []).map(escapeHtml).join(", ") || "Aucun"}</p>
+      <p><strong>Protection :</strong> ${subject.canDelete ? "Supprimable" : "Suppression bloquée car des notes existent"}</p>
+    `);
     return;
   }
 
@@ -1118,6 +1358,13 @@ function renderDetailItem(label, value) {
       <strong>${value}</strong>
     </article>
   `;
+}
+
+function openDetail(eyebrow, title, body) {
+  detailEyebrow.textContent = eyebrow;
+  detailTitle.textContent = title;
+  detailBody.innerHTML = body;
+  detailDrawer.classList.remove("hidden");
 }
 
 function closeDetail() {

@@ -1,0 +1,1296 @@
+const fs = require("fs");
+const path = require("path");
+const { Pool } = require("pg");
+const { hashSecret } = require("../services/credentialService");
+const seedData = require("../data");
+
+const roleToDb = {
+  "Super Administrateur SchoolLink": "SUPER_ADMIN",
+  "Admin Pays": "COUNTRY_ADMIN",
+  "Admin School": "SCHOOL_ADMIN",
+  Proviseur: "PROVISEUR",
+  Directeur: "PRINCIPAL",
+  "Préfet des études": "PREFET_ETUDES",
+  Enseignant: "TEACHER",
+  Secrétaire: "SECRETARY",
+  Comptable: "ACCOUNTANT",
+  Parent: "PARENT",
+  "Élève / Étudiant": "STUDENT",
+};
+
+const roleFromDb = Object.fromEntries(Object.entries(roleToDb).map(([label, code]) => [code, label]));
+
+class PostgresRepository {
+  constructor(databaseConfig) {
+    const poolConfig =
+      typeof databaseConfig === "string" ? { connectionString: databaseConfig } : databaseConfig;
+    this.pool = new Pool(poolConfig);
+    this.ready = false;
+    this.cachedDataset = null;
+  }
+
+  async init() {
+    if (this.ready) {
+      return;
+    }
+
+    const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
+    await this.pool.query(schema);
+    await this.seedIfEmpty();
+    await this.ensureStudentUsers();
+    await this.ensureV2Data();
+    this.ready = true;
+  }
+
+  async getDataset() {
+    await this.init();
+
+    if (this.cachedDataset) {
+      return this.cachedDataset;
+    }
+
+    const [
+      countryRows,
+      schoolRows,
+      subscriptionRows,
+      userRows,
+      classRows,
+      subjectRows,
+      teacherRows,
+      studentRows,
+      gradeRows,
+      attendanceRows,
+      paymentRows,
+      announcementRows,
+      notificationRows,
+    ] = await Promise.all([
+      this.all("SELECT * FROM countries ORDER BY created_at, iso_code"),
+      this.all(`
+        SELECT s.*, c.name AS country_name, c.iso_code, c.currency AS country_currency, c.phone_code
+        FROM schools s
+        JOIN countries c ON c.id = s.country_id
+        ORDER BY s.created_at, s.school_code
+      `),
+      this.all(`
+        SELECT sub.*, s.school_code, c.iso_code AS country_code, c.name AS country_name
+        FROM subscriptions sub
+        JOIN schools s ON s.id = sub.school_id
+        JOIN countries c ON c.id = s.country_id
+        ORDER BY sub.created_at
+      `),
+      this.all(`
+        SELECT u.*, s.school_code, c.name AS country_name
+        FROM users u
+        LEFT JOIN schools s ON s.id = u.school_id
+        LEFT JOIN countries c ON c.id = s.country_id
+        ORDER BY u.created_at, u.user_code
+      `),
+      this.all(`
+        SELECT cl.*, ay.name AS academic_year_name, u.first_name AS teacher_first_name, u.last_name AS teacher_last_name
+        FROM classes cl
+        JOIN academic_years ay ON ay.id = cl.academic_year_id
+        LEFT JOIN teacher_assignments ta ON ta.class_id = cl.id
+        LEFT JOIN teachers t ON t.id = ta.teacher_id
+        LEFT JOIN users u ON u.id = t.user_id
+        ORDER BY cl.created_at, cl.class_code
+      `),
+      this.all("SELECT * FROM subjects ORDER BY created_at, subject_code"),
+      this.all(`
+        SELECT t.*, s.school_code, u.first_name, u.last_name, u.email, u.phone, u.password_hash, u.pin_hash
+        FROM teachers t
+        JOIN schools s ON s.id = t.school_id
+        LEFT JOIN users u ON u.id = t.user_id
+        ORDER BY t.created_at, t.teacher_code
+      `),
+      this.all(`
+        SELECT st.*, s.school_code, e.class_id, cl.name AS class_name, u.pin_hash AS student_pin_hash
+        FROM students st
+        JOIN schools s ON s.id = st.school_id
+        LEFT JOIN users u ON u.school_id = st.school_id AND u.user_code = st.student_code
+        LEFT JOIN enrollments e ON e.student_id = st.id AND e.status = 'active'
+        LEFT JOIN classes cl ON cl.id = e.class_id
+        ORDER BY st.created_at, st.student_code
+      `),
+      this.all(`
+        SELECT g.*, st.student_code, cl.class_code, cl.name AS class_name, sub.name AS subject_name,
+               sub.coefficient AS subject_coefficient, t.teacher_code, term.name AS term_name
+        FROM grades g
+        JOIN students st ON st.id = g.student_id
+        JOIN classes cl ON cl.id = g.class_id
+        JOIN subjects sub ON sub.id = g.subject_id
+        JOIN teachers t ON t.id = g.teacher_id
+        JOIN terms term ON term.id = g.term_id
+        ORDER BY g.created_at
+      `),
+      this.all(`
+        SELECT a.*, st.student_code
+        FROM attendance a
+        JOIN students st ON st.id = a.student_id
+        ORDER BY a.attendance_date, a.created_at
+      `),
+      this.all(`
+        SELECT p.*, st.student_code
+        FROM payments p
+        JOIN students st ON st.id = p.student_id
+        ORDER BY p.payment_date, p.created_at
+      `),
+      this.all("SELECT * FROM announcements ORDER BY published_at DESC NULLS LAST, created_at DESC"),
+      this.all(`
+        SELECT n.*, s.school_code
+        FROM notifications n
+        LEFT JOIN schools s ON s.id = n.school_id
+        ORDER BY n.created_at DESC
+      `),
+    ]);
+
+    const schoolByCode = new Map(schoolRows.map((school) => [school.school_code, school]));
+    const students = studentRows.map((student) => this.mapStudent(student));
+    const classes = this.uniqueBy(
+      classRows.map((schoolClass) => ({
+        id: schoolClass.class_code,
+        publicId: schoolClass.class_code,
+        name: schoolClass.name,
+        level: schoolClass.level,
+        track: schoolClass.section,
+        teacherId: teacherRows.find((teacher) => teacher.school_id === schoolClass.school_id)?.teacher_code ?? "",
+      })),
+      "id"
+    );
+    const courses = this.buildCourses(classRows, subjectRows, gradeRows);
+    const teachers = teacherRows.map((teacher) => this.mapTeacher(teacher, gradeRows));
+    const notes = gradeRows.map((grade) => this.mapGrade(grade));
+    const payments = paymentRows.map((payment) => this.mapPayment(payment));
+    const primarySchoolRow = schoolRows.find((row) => row.school_code === seedData.school.code) ?? schoolRows[0];
+    const school = this.mapSchool(
+      primarySchoolRow,
+      subscriptionRows.find((sub) => sub.school_code === primarySchoolRow?.school_code)
+    );
+
+    this.cachedDataset = {
+      school,
+      platformSchools: schoolRows.map((row) => this.mapSchool(row, subscriptionRows.find((sub) => sub.school_code === row.school_code))),
+      countries: countryRows.map((country) => this.mapCountry(country)),
+      subscriptions: subscriptionRows.map((subscription) => this.mapSubscription(subscription)),
+      userAccounts: userRows.map((user) => this.mapUser(user, schoolByCode)),
+      teachers,
+      classes,
+      courses,
+      students,
+      notes,
+      presences: attendanceRows.map((attendance) => this.mapAttendance(attendance)),
+      payments,
+      announcements: announcementRows.map((announcement) => this.mapAnnouncement(announcement)),
+      platformNotifications: notificationRows.map((notification) => this.mapNotification(notification)),
+    };
+
+    return this.cachedDataset;
+  }
+
+  async all(sql, params = []) {
+    const result = await this.pool.query(sql, params);
+    return result.rows;
+  }
+
+  async one(sql, params = []) {
+    const result = await this.pool.query(sql, params);
+    return result.rows[0];
+  }
+
+  async close() {
+    await this.pool.end();
+  }
+
+  async seedIfEmpty() {
+    const existing = await this.one("SELECT COUNT(*)::int AS count FROM countries");
+
+    if (existing.count > 0) {
+      return;
+    }
+
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const maps = await this.seedReferenceData(client);
+      await this.seedAcademicData(client, maps);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async seedReferenceData(client) {
+    const countryIds = new Map();
+    const schoolIds = new Map();
+    const userIds = new Map();
+
+    for (const country of seedData.countries) {
+      const row = await this.insertOne(
+        client,
+        `INSERT INTO countries (name, iso_code, phone_code, currency, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+         ON CONFLICT (iso_code) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [country.name, country.code, country.phonePrefix, country.currency, country.status !== "Suspendu"]
+      );
+      countryIds.set(country.code, row.id);
+      if (country.name === "République Démocratique du Congo") {
+        countryIds.set("RDC", row.id);
+      }
+    }
+
+    for (const school of seedData.platformSchools) {
+      const countryId = countryIds.get(this.getCountryCodeForSchool(school)) ?? countryIds.get("CD") ?? [...countryIds.values()][0];
+      const row = await this.insertOne(
+        client,
+        `INSERT INTO schools (country_id, school_code, name, logo_url, address, city, phone, email, school_type, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+         ON CONFLICT (school_code) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [
+          countryId,
+          school.code,
+          school.name,
+          school.logoUrl ?? "",
+          school.address ?? "",
+          school.city ?? "",
+          school.phone ?? "",
+          school.email ?? "",
+          school.type ?? "Établissement",
+          this.toDbStatus(school.status),
+        ]
+      );
+      schoolIds.set(school.code, row.id);
+    }
+
+    for (const subscription of seedData.subscriptions) {
+      const schoolId = schoolIds.get(subscription.schoolCode);
+      if (!schoolId) continue;
+      await client.query(
+        `INSERT INTO subscriptions (school_id, plan_name, price_per_student, billing_currency, billing_cycle, status, start_date, end_date)
+         VALUES ($1, $2, $3, $4, 'monthly', $5, $6, $7)`,
+        [
+          schoolId,
+          subscription.plan,
+          subscription.monthlyPrice ?? 0,
+          subscription.currency,
+          this.toSubscriptionStatus(subscription.status, subscription.paymentStatus),
+          this.parseDate(subscription.startDate),
+          this.parseDate(subscription.endDate),
+        ]
+      );
+    }
+
+    for (const user of seedData.userAccounts) {
+      const schoolId = user.schoolCode === "*" ? null : schoolIds.get(user.schoolCode);
+      const row = await this.insertOne(
+        client,
+        `INSERT INTO users (school_id, user_code, first_name, last_name, email, phone, password_hash, pin_hash, role, status, last_login_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (user_code) DO UPDATE SET first_name = EXCLUDED.first_name
+         RETURNING id`,
+        [
+          schoolId,
+          user.publicId,
+          user.firstName,
+          user.lastName,
+          user.email ?? "",
+          user.phone ?? "",
+          hashSecret(user.password),
+          hashSecret(user.temporaryPassword || "1234"),
+          roleToDb[user.role] ?? user.role,
+          this.toDbStatus(user.status),
+          this.parseDate(user.lastLoginAt),
+        ]
+      );
+      userIds.set(user.id, row.id);
+      userIds.set(user.phone, row.id);
+    }
+
+    return { countryIds, schoolIds, userIds };
+  }
+
+  async seedAcademicData(client, maps) {
+    const schoolId = maps.schoolIds.get(seedData.school.code);
+    const academicYear = await this.insertOne(
+      client,
+      `INSERT INTO academic_years (school_id, name, start_date, end_date, is_current, status)
+       VALUES ($1, $2, $3, $4, TRUE, 'open')
+       ON CONFLICT (school_id, name) DO UPDATE SET is_current = TRUE
+       RETURNING id`,
+      [schoolId, seedData.school.schoolYear ?? "2025-2026", "2025-09-01", "2026-08-31"]
+    );
+    const term = await this.insertOne(
+      client,
+      `INSERT INTO terms (academic_year_id, name, start_date, end_date, status)
+       VALUES ($1, 'Trimestre 1', '2025-09-01', '2025-12-31', 'published')
+       ON CONFLICT (academic_year_id, name) DO UPDATE SET status = EXCLUDED.status
+       RETURNING id`,
+      [academicYear.id]
+    );
+    const classIds = new Map();
+    const subjectIds = new Map();
+    const teacherIds = new Map();
+    const studentIds = new Map();
+
+    for (const schoolClass of seedData.classes) {
+      const row = await this.insertOne(
+        client,
+        `INSERT INTO classes (school_id, academic_year_id, class_code, name, level, section, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'active')
+         ON CONFLICT (class_code) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [schoolId, academicYear.id, schoolClass.publicId, schoolClass.name, schoolClass.level, schoolClass.track]
+      );
+      classIds.set(schoolClass.name, row.id);
+      classIds.set(schoolClass.id, row.id);
+    }
+
+    for (const course of seedData.courses) {
+      const subjectCode = this.subjectCode(course.name);
+      if (subjectIds.has(subjectCode)) continue;
+      const row = await this.insertOne(
+        client,
+        `INSERT INTO subjects (school_id, subject_code, name, coefficient, status)
+         VALUES ($1, $2, $3, $4, 'active')
+         ON CONFLICT (subject_code) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [schoolId, subjectCode, course.name, course.coefficient ?? 1]
+      );
+      subjectIds.set(subjectCode, row.id);
+      subjectIds.set(course.name, row.id);
+    }
+
+    for (const teacher of seedData.teachers) {
+      const userId = maps.userIds.get(teacher.phone) ?? null;
+      const row = await this.insertOne(
+        client,
+        `INSERT INTO teachers (school_id, user_id, teacher_code, speciality, hire_date, status)
+         VALUES ($1, $2, $3, $4, $5, 'active')
+         ON CONFLICT (teacher_code) DO UPDATE SET speciality = EXCLUDED.speciality
+         RETURNING id`,
+        [schoolId, userId, teacher.publicId, teacher.mainSubject, "2025-09-01"]
+      );
+      teacherIds.set(teacher.id, row.id);
+      teacherIds.set(teacher.publicId, row.id);
+
+      if (!userId) {
+        const createdUser = await this.insertOne(
+          client,
+          `INSERT INTO users (school_id, user_code, first_name, last_name, email, phone, password_hash, pin_hash, role, status)
+           VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, 'TEACHER', 'active')
+           ON CONFLICT (user_code) DO UPDATE SET phone = EXCLUDED.phone
+           RETURNING id`,
+          [schoolId, `USR-${teacher.publicId}`, teacher.firstName, teacher.name.replace(teacher.firstName, "").trim() || teacher.name, teacher.email, teacher.phone, hashSecret(teacher.password)]
+        );
+        await client.query("UPDATE teachers SET user_id = $1 WHERE id = $2", [createdUser.id, row.id]);
+      }
+    }
+
+    for (const student of seedData.students) {
+      const [firstName, ...lastNameParts] = String(student.name).split(" ");
+      const row = await this.insertOne(
+        client,
+        `INSERT INTO students (school_id, student_code, first_name, last_name, gender, birth_date, birth_place, photo_url, parent_phone, parent_email, status)
+         VALUES ($1, $2, $3, $4, $5, $6, '', '', $7, $8, $9)
+         ON CONFLICT (student_code) DO UPDATE SET first_name = EXCLUDED.first_name
+         RETURNING id`,
+        [
+          schoolId,
+          student.matricule,
+          student.firstName ?? firstName,
+          lastNameParts.join(" ") || student.name,
+          student.gender,
+          this.parseDate(student.birthDate),
+          student.parentPhone,
+          student.parentEmail,
+          student.archived ? "archived" : "active",
+        ]
+      );
+      studentIds.set(student.id, row.id);
+      studentIds.set(student.matricule, row.id);
+
+      await client.query(
+        `INSERT INTO users (school_id, user_code, first_name, last_name, email, phone, password_hash, pin_hash, role, status)
+         VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, 'STUDENT', $8)
+         ON CONFLICT (user_code) DO UPDATE SET pin_hash = EXCLUDED.pin_hash`,
+        [
+          schoolId,
+          student.matricule,
+          student.firstName ?? firstName,
+          lastNameParts.join(" ") || student.name,
+          student.parentEmail,
+          student.parentPhone,
+          hashSecret(student.pin ?? "1234"),
+          student.archived ? "archived" : "active",
+        ]
+      );
+
+      const classId = classIds.get(student.className);
+      if (classId) {
+        await client.query(
+          `INSERT INTO enrollments (school_id, student_id, class_id, academic_year_id, enrollment_date, status)
+           VALUES ($1, $2, $3, $4, '2025-09-01', 'active')
+           ON CONFLICT (student_id, academic_year_id) DO UPDATE SET class_id = EXCLUDED.class_id`,
+          [schoolId, row.id, classId, academicYear.id]
+        );
+      }
+    }
+
+    for (const teacher of seedData.teachers) {
+      const teacherId = teacherIds.get(teacher.id);
+      for (const assignment of teacher.assignments ?? []) {
+        const classId = classIds.get(assignment.className);
+        const subjectId = subjectIds.get(assignment.course) ?? subjectIds.get(this.subjectCode(assignment.course));
+        if (!teacherId || !classId || !subjectId) continue;
+        await client.query(
+          `INSERT INTO teacher_assignments (school_id, teacher_id, class_id, subject_id, academic_year_id, assignment_role, status)
+           VALUES ($1, $2, $3, $4, $5, 'primary', 'active')
+           ON CONFLICT DO NOTHING`,
+          [schoolId, teacherId, classId, subjectId, academicYear.id]
+        );
+      }
+    }
+
+    for (const note of seedData.notes) {
+      const student = seedData.students.find((item) => item.id === note.studentId);
+      const studentId = studentIds.get(note.studentId);
+      const classId = student ? classIds.get(student.className) : null;
+      const subjectId = subjectIds.get(note.subject);
+      const teacherId = teacherIds.get(note.authorId) ?? [...teacherIds.values()][0];
+      if (!studentId || !classId || !subjectId || !teacherId) continue;
+      await client.query(
+        `INSERT INTO grades (school_id, student_id, class_id, subject_id, teacher_id, term_id, grade_type, score, max_score, coefficient, comment)
+         VALUES ($1, $2, $3, $4, $5, $6, 'devoir', $7, $8, $9, '')`,
+        [schoolId, studentId, classId, subjectId, teacherId, term.id, note.value, note.scale ?? 20, note.evaluationCoefficient ?? 1]
+      );
+    }
+
+    for (const presence of seedData.presences) {
+      const student = seedData.students.find((item) => item.id === presence.studentId);
+      const studentId = studentIds.get(presence.studentId);
+      const classId = student ? classIds.get(student.className) : null;
+      if (!studentId || !classId) continue;
+      await client.query(
+        `INSERT INTO attendance (school_id, student_id, class_id, teacher_id, attendance_date, status, reason)
+         VALUES ($1, $2, $3, NULL, $4, $5, '')`,
+        [schoolId, studentId, classId, presence.date, this.toAttendanceStatus(presence.status, presence.present)]
+      );
+    }
+
+    for (const payment of seedData.payments) {
+      const studentId = studentIds.get(payment.studentId);
+      if (!studentId) continue;
+      await client.query(
+        `INSERT INTO payments (school_id, student_id, payment_code, amount, currency, payment_method, payment_status, payment_date, description)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Frais scolaires')`,
+        [schoolId, studentId, payment.publicId, payment.amount, seedData.school.currency, this.toPaymentMethod(payment.method), this.toPaymentStatus(payment.status), payment.date]
+      );
+    }
+
+    for (const announcement of seedData.announcements) {
+      await client.query(
+        `INSERT INTO announcements (school_id, title, message, target_role, published_at, status)
+         VALUES ($1, $2, $3, 'ALL', $4, 'published')`,
+        [schoolId, announcement.title, announcement.message, this.parseDate(announcement.date)]
+      );
+    }
+
+    for (const notification of seedData.platformNotifications) {
+      await client.query(
+        `INSERT INTO notifications (school_id, title, message, type, channel, status, sent_at)
+         VALUES ($1, $2, $3, $4, 'app', $5, $6)`,
+        [schoolId, notification.title, notification.message, notification.type, notification.status === "Lu" ? "read" : "sent", this.parseDate(notification.date)]
+      );
+    }
+
+    await client.query(
+      `INSERT INTO audit_logs (school_id, action, entity_type, entity_id, new_value)
+       VALUES ($1, 'seed_database', 'system', 'postgres', $2)`,
+      [schoolId, JSON.stringify({ source: "backend/data.js", tables: "mvp" })]
+    );
+  }
+
+  insertOne(client, sql, params) {
+    return client.query(sql, params).then((result) => result.rows[0]);
+  }
+
+  async ensureStudentUsers() {
+    await this.pool.query(
+      `INSERT INTO users (school_id, user_code, first_name, last_name, email, phone, password_hash, pin_hash, role, status)
+       SELECT st.school_id, st.student_code, st.first_name, st.last_name, st.parent_email, st.parent_phone,
+              NULL, $1, 'STUDENT', st.status
+       FROM students st
+       LEFT JOIN users u ON u.school_id = st.school_id AND u.user_code = st.student_code
+       WHERE u.id IS NULL
+       ON CONFLICT (user_code) DO NOTHING`,
+      [hashSecret("1234")]
+    );
+  }
+
+  async ensureV2Data() {
+    const school = await this.one("SELECT id FROM schools WHERE school_code = $1", [seedData.school.code]);
+    if (!school) return;
+
+    const existingExam = await this.one("SELECT id FROM exams WHERE school_id = $1 LIMIT 1", [school.id]);
+    await this.ensureV2Roles(school.id);
+    await this.ensureSubjectScopes(school.id);
+
+    if (existingExam) {
+      return;
+    }
+
+    const year = await this.one(
+      "SELECT id FROM academic_years WHERE school_id = $1 AND is_current = TRUE ORDER BY created_at DESC LIMIT 1",
+      [school.id]
+    );
+    const term = year
+      ? await this.one("SELECT id FROM terms WHERE academic_year_id = $1 ORDER BY created_at LIMIT 1", [year.id])
+      : null;
+    const classes = await this.all("SELECT id, name FROM classes WHERE school_id = $1 ORDER BY created_at LIMIT 3", [school.id]);
+    const subjects = await this.all("SELECT id, name, subject_code FROM subjects WHERE school_id = $1 ORDER BY created_at LIMIT 3", [school.id]);
+    const students = await this.all("SELECT id, student_code FROM students WHERE school_id = $1 ORDER BY created_at LIMIT 8", [school.id]);
+    const adminUser = await this.one(
+      "SELECT id FROM users WHERE school_id = $1 AND role IN ('SCHOOL_ADMIN', 'PROVISEUR', 'PRINCIPAL') ORDER BY created_at LIMIT 1",
+      [school.id]
+    );
+
+    for (let index = 0; index < Math.min(classes.length, subjects.length); index += 1) {
+      const schoolClass = classes[index];
+      const subject = subjects[index];
+      const examCode = `EXA-2026-${String(index + 1).padStart(4, "0")}`;
+      const exam = await this.insertOne(
+        this.pool,
+        `INSERT INTO exams (school_id, class_id, subject_id, term_id, exam_code, name, exam_type, exam_date, status, created_by, published_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+         ON CONFLICT (exam_code) DO UPDATE SET status = EXCLUDED.status
+         RETURNING id`,
+        [
+          school.id,
+          schoolClass.id,
+          subject.id,
+          term?.id ?? null,
+          examCode,
+          `${["Interrogation", "Examen blanc", "Examen final"][index]} - ${subject.name}`,
+          ["Interrogation", "Examen blanc", "Examen final"][index],
+          `2026-06-${String(10 + index).padStart(2, "0")}`,
+          index === 0 ? "published" : "validated",
+          adminUser?.id ?? null,
+        ]
+      );
+
+      for (const [studentIndex, student] of students.slice(0, 5).entries()) {
+        const score = 10 + ((studentIndex + index) % 9);
+        await this.pool.query(
+          `INSERT INTO exam_results (school_id, exam_id, student_id, score, max_score, mention, observation, status, created_by)
+           VALUES ($1, $2, $3, $4, 20, $5, $6, 'published', $7)
+           ON CONFLICT (exam_id, student_id) DO UPDATE SET score = EXCLUDED.score, mention = EXCLUDED.mention`,
+          [
+            school.id,
+            exam.id,
+            student.id,
+            score,
+            this.mentionForScore(score),
+            score >= 10 ? "Résultat validé" : "Suivi pédagogique recommandé",
+            adminUser?.id ?? null,
+          ]
+        );
+      }
+    }
+
+    for (const [index, student] of students.slice(0, 5).entries()) {
+      const docs = [
+        ["CERTIFICAT_SCOLARITE", "Certificat de scolarité"],
+        ["BULLETIN", "Bulletin PDF"],
+        ["RELEVE_NOTES", "Relevé de notes"],
+      ];
+      for (const [docIndex, [type, title]] of docs.entries()) {
+        await this.pool.query(
+          `INSERT INTO student_documents (school_id, student_id, document_code, document_type, title, format, version, storage_key, generated_by, metadata)
+           VALUES ($1, $2, $3, $4, $5, 'PDF', 1, $6, $7, $8)
+           ON CONFLICT (document_code) DO NOTHING`,
+          [
+            school.id,
+            student.id,
+            `DOC-2026-${String(index + 1).padStart(4, "0")}-${docIndex + 1}`,
+            type,
+            `${title} - ${student.student_code}`,
+            `documents/${student.student_code}/${type.toLowerCase()}-v1.pdf`,
+            adminUser?.id ?? null,
+            JSON.stringify({ generatedBy: "SchoolLink V2", preservedHistory: true }),
+          ]
+        );
+      }
+    }
+
+    if (year && students[0]) {
+      await this.pool.query(
+        `INSERT INTO promotion_decisions (school_id, academic_year_id, student_id, decision, reason, decided_by, decided_at)
+         VALUES ($1, $2, $3, 'promoted', 'Moyenne suffisante', $4, NOW())
+         ON CONFLICT (academic_year_id, student_id) DO NOTHING`,
+        [school.id, year.id, students[0].id, adminUser?.id ?? null]
+      );
+    }
+  }
+
+  async ensureV2Roles(schoolId) {
+    const roles = [
+      ["USR-PROVISEUR-0001", "Amina", "Proviseur", "proviseur@schoollink.app", "PROVISEUR"],
+      ["USR-PREFET-0001", "Samuel", "Préfet", "prefet@schoollink.app", "PREFET_ETUDES"],
+    ];
+
+    for (const [code, firstName, lastName, email, role] of roles) {
+      await this.pool.query(
+        `INSERT INTO users (school_id, user_code, first_name, last_name, email, phone, password_hash, pin_hash, role, status)
+         VALUES ($1, $2, $3, $4, $5, NULL, $6, NULL, $7, 'active')
+         ON CONFLICT (user_code) DO UPDATE SET role = EXCLUDED.role, email = EXCLUDED.email`,
+        [schoolId, code, firstName, lastName, email, hashSecret("1234"), role]
+      );
+    }
+  }
+
+  async ensureSubjectScopes(schoolId) {
+    await this.pool.query(
+      `INSERT INTO subject_class_assignments (school_id, subject_id, class_id, level, status)
+       SELECT s.school_id, s.id, cl.id, NULL, 'active'
+       FROM subjects s
+       JOIN classes cl ON cl.school_id = s.school_id
+       WHERE s.school_id = $1
+       ON CONFLICT DO NOTHING`,
+      [schoolId]
+    );
+  }
+
+  async getSubjectsV2() {
+    await this.init();
+    const rows = await this.all(`
+      SELECT sub.*,
+             COUNT(DISTINCT sca.class_id) AS class_count,
+             COUNT(DISTINCT ta.teacher_id) AS teacher_count,
+             COUNT(DISTINCT g.id) AS grade_count,
+             COALESCE(json_agg(DISTINCT cl.name) FILTER (WHERE cl.name IS NOT NULL), '[]') AS classes,
+             COALESCE(json_agg(DISTINCT u.first_name || ' ' || u.last_name) FILTER (WHERE u.id IS NOT NULL), '[]') AS teachers
+      FROM subjects sub
+      LEFT JOIN subject_class_assignments sca ON sca.subject_id = sub.id
+      LEFT JOIN classes cl ON cl.id = sca.class_id
+      LEFT JOIN teacher_assignments ta ON ta.subject_id = sub.id
+      LEFT JOIN teachers t ON t.id = ta.teacher_id
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN grades g ON g.subject_id = sub.id
+      GROUP BY sub.id
+      ORDER BY sub.created_at, sub.subject_code
+    `);
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.subject_code,
+      name: row.name,
+      coefficient: Number(row.coefficient),
+      level: row.level ?? "Tous niveaux",
+      description: row.description ?? "",
+      status: this.fromAcademicStatus(row.status),
+      classCount: Number(row.class_count),
+      teacherCount: Number(row.teacher_count),
+      gradeCount: Number(row.grade_count),
+      classes: row.classes ?? [],
+      teachers: row.teachers ?? [],
+      canDelete: Number(row.grade_count) === 0,
+      createdAt: this.formatDate(row.created_at),
+    }));
+  }
+
+  async createSubject(payload) {
+    await this.init();
+    const school = await this.getSchoolByCode(payload.schoolCode ?? seedData.school.code);
+    if (!school) throw new Error("Établissement introuvable");
+    for (const field of ["name", "code", "coefficient", "level", "description", "status"]) {
+      if (!payload[field]) throw new Error(`Champ obligatoire: ${field}`);
+    }
+
+    const row = await this.one(
+      `INSERT INTO subjects (school_id, subject_code, name, coefficient, level, description, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (subject_code) DO UPDATE SET
+         name = EXCLUDED.name,
+         coefficient = EXCLUDED.coefficient,
+         level = EXCLUDED.level,
+         description = EXCLUDED.description,
+         status = EXCLUDED.status,
+         updated_at = NOW()
+       RETURNING id`,
+      [
+        school.id,
+        String(payload.code).trim().toUpperCase(),
+        String(payload.name).trim(),
+        Number(payload.coefficient),
+        String(payload.level).trim(),
+        String(payload.description).trim(),
+        this.toAcademicStatus(payload.status),
+      ]
+    );
+    this.cachedDataset = null;
+    return { id: row.id, message: "Matière enregistrée" };
+  }
+
+  async deleteSubject(subjectCode) {
+    await this.init();
+    const subject = await this.one("SELECT id, subject_code FROM subjects WHERE subject_code = $1", [subjectCode]);
+    if (!subject) throw new Error("Matière introuvable");
+    const usage = await this.one("SELECT COUNT(*)::int AS count FROM grades WHERE subject_id = $1", [subject.id]);
+    if (usage.count > 0) {
+      const error = new Error("Suppression refusée: la matière possède déjà des notes");
+      error.statusCode = 409;
+      throw error;
+    }
+    await this.pool.query("DELETE FROM subjects WHERE id = $1", [subject.id]);
+    this.cachedDataset = null;
+    return { message: "Matière supprimée" };
+  }
+
+  async getAcademicYearsV2() {
+    await this.init();
+    const rows = await this.all(`
+      SELECT ay.*,
+             COUNT(DISTINCT e.id) AS enrollment_count,
+             COUNT(DISTINCT g.id) AS grade_count,
+             COUNT(DISTINCT pd.id) AS decision_count
+      FROM academic_years ay
+      LEFT JOIN enrollments e ON e.academic_year_id = ay.id
+      LEFT JOIN terms tm ON tm.academic_year_id = ay.id
+      LEFT JOIN grades g ON g.term_id = tm.id
+      LEFT JOIN promotion_decisions pd ON pd.academic_year_id = ay.id
+      GROUP BY ay.id
+      ORDER BY ay.start_date DESC NULLS LAST, ay.created_at DESC
+    `);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      startDate: this.formatIsoDate(row.start_date),
+      endDate: this.formatIsoDate(row.end_date),
+      status: this.fromYearStatus(row.status),
+      isCurrent: row.is_current,
+      enrollmentCount: Number(row.enrollment_count),
+      gradeCount: Number(row.grade_count),
+      promotionDecisionCount: Number(row.decision_count),
+      notesLocked: row.status === "closed" || row.status === "archived",
+    }));
+  }
+
+  async getExamsV2() {
+    await this.init();
+    const rows = await this.all(`
+      SELECT ex.*, cl.name AS class_name, sub.name AS subject_name,
+             COUNT(er.id) AS result_count,
+             AVG(er.score) AS average_score,
+             AVG(CASE WHEN er.score >= er.max_score / 2 THEN 1 ELSE 0 END) * 100 AS success_rate
+      FROM exams ex
+      JOIN classes cl ON cl.id = ex.class_id
+      LEFT JOIN subjects sub ON sub.id = ex.subject_id
+      LEFT JOIN exam_results er ON er.exam_id = ex.id
+      GROUP BY ex.id, cl.name, sub.name
+      ORDER BY ex.exam_date DESC, ex.created_at DESC
+    `);
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.exam_code,
+      name: row.name,
+      type: row.exam_type,
+      className: row.class_name,
+      subject: row.subject_name ?? "Toutes matières",
+      date: this.formatIsoDate(row.exam_date),
+      status: this.fromExamStatus(row.status),
+      resultCount: Number(row.result_count),
+      average: Number(row.average_score ?? 0).toFixed(2),
+      successRate: Math.round(Number(row.success_rate ?? 0)),
+    }));
+  }
+
+  async getDocumentsV2() {
+    await this.init();
+    const rows = await this.all(`
+      SELECT doc.*, st.student_code, st.first_name, st.last_name
+      FROM student_documents doc
+      LEFT JOIN students st ON st.id = doc.student_id
+      ORDER BY doc.generated_at DESC, doc.document_code
+    `);
+    return rows.map((row) => ({
+      id: row.id,
+      code: row.document_code,
+      type: row.document_type,
+      title: row.title,
+      format: row.format,
+      version: row.version,
+      studentCode: row.student_code,
+      studentName: [row.first_name, row.last_name].filter(Boolean).join(" "),
+      status: row.status === "available" ? "Disponible" : "Archivé",
+      storageKey: row.storage_key,
+      generatedAt: this.formatDate(row.generated_at),
+    }));
+  }
+
+  async getAdvancedReportsV2() {
+    await this.init();
+    const [academic, financial, attendance, exams, global] = await Promise.all([
+      this.all(`
+        SELECT cl.name AS label, AVG(g.score / NULLIF(g.max_score, 0) * 20) AS value, COUNT(g.id) AS count
+        FROM grades g
+        JOIN classes cl ON cl.id = g.class_id
+        GROUP BY cl.name
+        ORDER BY value DESC NULLS LAST
+        LIMIT 10
+      `),
+      this.one(`
+        SELECT
+          COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount ELSE 0 END), 0) AS paid,
+          COALESCE(SUM(CASE WHEN payment_status <> 'paid' THEN amount ELSE 0 END), 0) AS unpaid,
+          COUNT(*) AS payments
+        FROM payments
+      `),
+      this.all(`
+        SELECT status AS label, COUNT(*) AS count
+        FROM attendance
+        GROUP BY status
+        ORDER BY count DESC
+      `),
+      this.all(`
+        SELECT ex.exam_type AS label,
+               AVG(er.score / NULLIF(er.max_score, 0) * 20) AS average,
+               AVG(CASE WHEN er.score >= er.max_score / 2 THEN 1 ELSE 0 END) * 100 AS success_rate
+        FROM exams ex
+        LEFT JOIN exam_results er ON er.exam_id = ex.id
+        GROUP BY ex.exam_type
+        ORDER BY ex.exam_type
+      `),
+      this.one(`
+        SELECT
+          (SELECT COUNT(*) FROM countries) AS countries,
+          (SELECT COUNT(*) FROM schools) AS schools,
+          (SELECT COUNT(*) FROM students) AS students,
+          (SELECT COUNT(*) FROM teachers) AS teachers,
+          (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') AS active_subscriptions
+      `),
+    ]);
+
+    const attendanceTotal = attendance.reduce((sum, row) => sum + Number(row.count), 0);
+    const presentTotal = attendance
+      .filter((row) => row.label === "present")
+      .reduce((sum, row) => sum + Number(row.count), 0);
+
+    return {
+      academic: academic.map((row) => ({
+        label: row.label,
+        average: Number(row.value ?? 0).toFixed(2),
+        grades: Number(row.count),
+      })),
+      financial: {
+        paid: Number(financial.paid),
+        unpaid: Number(financial.unpaid),
+        payments: Number(financial.payments),
+        forecast: Number(financial.paid) + Number(financial.unpaid),
+      },
+      attendance: {
+        rate: attendanceTotal ? Math.round((presentTotal / attendanceTotal) * 100) : 0,
+        total: attendanceTotal,
+        breakdown: attendance.map((row) => ({ label: this.fromAttendanceStatus(row.label), count: Number(row.count) })),
+      },
+      exams: exams.map((row) => ({
+        label: row.label,
+        average: Number(row.average ?? 0).toFixed(2),
+        successRate: Math.round(Number(row.success_rate ?? 0)),
+      })),
+      global: {
+        countries: Number(global.countries),
+        schools: Number(global.schools),
+        students: Number(global.students),
+        teachers: Number(global.teachers),
+        activeSubscriptions: Number(global.active_subscriptions),
+      },
+    };
+  }
+
+  mapCountry(country) {
+    return {
+      id: country.id,
+      name: country.name,
+      code: country.iso_code,
+      phonePrefix: country.phone_code,
+      currency: country.currency,
+      timezone: "UTC",
+      status: country.is_active ? "Actif" : "Suspendu",
+      administratorId: "",
+      createdAt: this.formatDate(country.created_at),
+    };
+  }
+
+  mapSchool(school, subscription) {
+    return {
+      id: school.id,
+      publicId: school.school_code,
+      code: school.school_code,
+      name: school.name,
+      type: school.school_type,
+      city: school.city,
+      country: school.country_name === "République Démocratique du Congo" ? "RDC" : school.country_name,
+      address: school.address,
+      phone: school.phone,
+      email: school.email,
+      website: "",
+      currency: school.country_currency,
+      slogan: "Excellence et Innovation",
+      status: this.fromDbStatus(school.status),
+      logoUrl: school.logo_url ?? "",
+      schoolYear: "2025-2026",
+      timezone: "Africa/Kinshasa",
+      language: "Français",
+      dateFormat: "JJ-MM-AAAA",
+      primaryColor: "#2563EB",
+      subscriptionPlan: subscription?.plan_name ?? "Essentiel",
+      subscriptionStartDate: this.formatDate(subscription?.start_date),
+      subscriptionEndDate: this.formatDate(subscription?.end_date),
+      subscriptionStatus: this.fromSubscriptionStatus(subscription?.status),
+      maxStudents: 1200,
+      maxTeachers: 120,
+      createdAt: this.formatDate(school.created_at),
+    };
+  }
+
+  mapSubscription(subscription) {
+    return {
+      id: subscription.id,
+      schoolCode: subscription.school_code,
+      countryCode: subscription.country_code,
+      country: subscription.country_name,
+      plan: subscription.plan_name,
+      monthlyPrice: Number(subscription.price_per_student ?? 0),
+      annualPrice: Number(subscription.price_per_student ?? 0) * 10,
+      currency: subscription.billing_currency,
+      status: this.fromDbStatus(subscription.status === "active" ? "active" : subscription.status),
+      paymentStatus: subscription.status === "active" ? "À jour" : "En retard",
+      startDate: this.formatDate(subscription.start_date),
+      endDate: this.formatDate(subscription.end_date),
+      lastPaymentDate: this.formatDate(subscription.updated_at),
+    };
+  }
+
+  mapUser(user, schoolByCode) {
+    const role = roleFromDb[user.role] ?? user.role;
+    const school = user.school_code ? schoolByCode.get(user.school_code) : null;
+
+    return {
+      id: user.id,
+      publicId: user.user_code,
+      lastName: user.last_name,
+      firstName: user.first_name,
+      gender: "",
+      phone: user.phone,
+      email: user.email,
+      role,
+      secondaryRoles: [],
+      scopeLevel: role === "Super Administrateur SchoolLink" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+      countryScope: school?.country_name === "République Démocratique du Congo" ? "RDC" : school?.country_name ?? "",
+      schoolCode: user.school_code ?? "*",
+      accessChannel: [
+        "SUPER_ADMIN",
+        "COUNTRY_ADMIN",
+        "SCHOOL_ADMIN",
+        "PROVISEUR",
+        "PRINCIPAL",
+        "PREFET_ETUDES",
+        "SECRETARY",
+        "ACCOUNTANT",
+      ].includes(user.role) ? "BackOffice" : "Application",
+      identifier: user.email || user.phone || user.user_code,
+      passwordHash: user.password_hash,
+      pinHash: user.pin_hash,
+      status: this.fromDbStatus(user.status),
+      permissions: seedData.rolePermissions[role] ?? ["Voir tableau de bord"],
+      temporaryPassword: "",
+      photoUrl: "",
+      createdAt: this.formatDate(user.created_at),
+      lastLoginAt: this.formatDate(user.last_login_at),
+      createdBy: "PostgreSQL",
+      history: ["Compte chargé depuis PostgreSQL"],
+    };
+  }
+
+  mapTeacher(teacher, gradeRows) {
+    const assignments = this.uniqueBy(
+      gradeRows
+        .filter((grade) => grade.teacher_code === teacher.teacher_code)
+        .map((grade) => ({ className: grade.class_name, course: grade.subject_name })),
+      "className",
+      "course"
+    );
+    return {
+      id: teacher.teacher_code,
+      publicId: teacher.teacher_code,
+      name: [teacher.first_name, teacher.last_name].filter(Boolean).join(" ") || teacher.teacher_code,
+      firstName: teacher.first_name,
+      gender: "",
+      phone: teacher.phone,
+      email: teacher.email,
+      mainSubject: teacher.speciality,
+      passwordHash: teacher.pin_hash ?? teacher.password_hash,
+      assignments,
+    };
+  }
+
+  mapStudent(student) {
+    return {
+      id: student.student_code,
+      publicId: student.student_code,
+      name: `${student.first_name} ${student.last_name}`.trim(),
+      firstName: student.first_name,
+      matricule: student.student_code,
+      gender: student.gender,
+      birthDate: this.formatDate(student.birth_date),
+      className: student.class_name,
+      schoolCode: student.school_code,
+      pinHash: student.student_pin_hash,
+      parentName: "Parent SchoolLink",
+      parentPhone: student.parent_phone,
+      parentEmail: student.parent_email,
+      archived: student.status === "archived",
+    };
+  }
+
+  mapGrade(grade) {
+    return {
+      id: grade.id,
+      studentId: grade.student_code,
+      subject: grade.subject_name,
+      value: Number(grade.score),
+      coefficient: Number(grade.subject_coefficient ?? 1),
+      date: this.formatDate(grade.created_at),
+      evaluationId: grade.id,
+      scale: Number(grade.max_score),
+      evaluationCoefficient: Number(grade.coefficient),
+      authorId: grade.teacher_code,
+      enteredAt: this.formatDate(grade.created_at),
+      audit: [{ authorId: grade.teacher_code, newValue: Number(grade.score), date: this.formatDate(grade.created_at) }],
+    };
+  }
+
+  mapAttendance(attendance) {
+    const status = this.fromAttendanceStatus(attendance.status);
+    return {
+      id: attendance.id,
+      publicId: attendance.id,
+      studentId: attendance.student_code,
+      date: this.formatIsoDate(attendance.attendance_date),
+      present: status === "Present",
+      status,
+    };
+  }
+
+  mapPayment(payment) {
+    return {
+      id: payment.id,
+      publicId: payment.payment_code,
+      studentId: payment.student_code,
+      amount: Number(payment.amount),
+      date: this.formatIsoDate(payment.payment_date),
+      status: payment.payment_status === "paid" ? "PAYE" : "EN_ATTENTE",
+      method: payment.payment_method,
+    };
+  }
+
+  mapAnnouncement(announcement) {
+    return {
+      id: announcement.id,
+      title: announcement.title,
+      message: announcement.message,
+      date: this.formatDate(announcement.published_at ?? announcement.created_at),
+    };
+  }
+
+  mapNotification(notification) {
+    return {
+      id: notification.id,
+      audience: "BackOffice",
+      countryCode: "*",
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      priority: "Moyenne",
+      channels: [notification.channel],
+      status: notification.status === "read" ? "Lu" : "Non lu",
+      date: this.formatDate(notification.sent_at ?? notification.created_at),
+      createdBy: "PostgreSQL",
+    };
+  }
+
+  buildCourses(classRows, subjectRows, gradeRows) {
+    const rows = [];
+    const seen = new Set();
+
+    gradeRows.forEach((grade) => {
+      const key = `${grade.class_name}-${grade.subject_name}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push({
+        id: `${grade.class_code}-${this.subjectCode(grade.subject_name)}`,
+        publicId: `${grade.class_code}-${this.subjectCode(grade.subject_name)}`,
+        className: grade.class_name,
+        name: grade.subject_name,
+        coefficient: Number(grade.subject_coefficient ?? 1),
+      });
+    });
+
+    if (!rows.length) {
+      classRows.forEach((schoolClass) => {
+        subjectRows.forEach((subject) => {
+          rows.push({
+            id: `${schoolClass.class_code}-${subject.subject_code}`,
+            publicId: `${schoolClass.class_code}-${subject.subject_code}`,
+            className: schoolClass.name,
+            name: subject.name,
+            coefficient: Number(subject.coefficient ?? 1),
+          });
+        });
+      });
+    }
+
+    return rows;
+  }
+
+  uniqueBy(rows, ...keys) {
+    const seen = new Set();
+    return rows.filter((row) => {
+      const key = keys.map((field) => row[field]).join("|");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  getCountryCodeForSchool(school) {
+    if (school.country === "RDC") return "CD";
+    return String(school.code ?? "").slice(0, 2);
+  }
+
+  subjectCode(name) {
+    return `SUB-${String(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toUpperCase()}`;
+  }
+
+  getSchoolByCode(code) {
+    return this.one("SELECT * FROM schools WHERE school_code = $1", [String(code ?? "").trim().toUpperCase()]);
+  }
+
+  mentionForScore(score) {
+    if (score >= 16) return "Très bien";
+    if (score >= 14) return "Bien";
+    if (score >= 12) return "Assez bien";
+    if (score >= 10) return "Passable";
+    return "Insuffisant";
+  }
+
+  toAcademicStatus(status) {
+    const normalized = String(status ?? "").trim().toLowerCase();
+    if (["inactive", "inactif", "inactive"].includes(normalized)) return "inactive";
+    if (["archive", "archivé", "archived"].includes(normalized)) return "archived";
+    return "active";
+  }
+
+  fromAcademicStatus(status) {
+    if (status === "inactive") return "Inactive";
+    if (status === "archived") return "Archivée";
+    return "Active";
+  }
+
+  fromYearStatus(status) {
+    if (status === "preparation") return "Préparation";
+    if (status === "closed") return "Clôturée";
+    if (status === "archived") return "Archivée";
+    return "Ouverte";
+  }
+
+  fromExamStatus(status) {
+    if (status === "draft") return "Brouillon";
+    if (status === "validated") return "Validé";
+    if (status === "published") return "Publié";
+    return status;
+  }
+
+  parseDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+    const match = text.match(/^(\d{2})-(\d{2})-(\d{4})/);
+    if (match) return `${match[3]}-${match[2]}-${match[1]}`;
+    return null;
+  }
+
+  formatDate(value) {
+    if (!value) return "";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+  }
+
+  formatIsoDate(value) {
+    if (!value) return "";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString().slice(0, 10);
+  }
+
+  toDbStatus(status) {
+    if (status === "Suspendu") return "suspended";
+    if (status === "Désactivé") return "inactive";
+    if (status === "Archivé") return "archived";
+    return "active";
+  }
+
+  fromDbStatus(status) {
+    if (status === "suspended") return "Suspendu";
+    if (status === "inactive") return "Désactivé";
+    if (status === "archived") return "Archivé";
+    return "Actif";
+  }
+
+  toSubscriptionStatus(status, paymentStatus) {
+    if (status === "Suspendu") return "suspended";
+    if (paymentStatus === "En retard") return "expired";
+    return "active";
+  }
+
+  fromSubscriptionStatus(status) {
+    if (status === "active") return "À jour";
+    if (status === "suspended") return "Suspendu";
+    if (status === "expired") return "En retard";
+    return "À contrôler";
+  }
+
+  toAttendanceStatus(status, present) {
+    if (status === "Absent") return "absent";
+    if (status === "Retard") return "late";
+    if (status === "Justifié") return "excused";
+    return present ? "present" : "absent";
+  }
+
+  fromAttendanceStatus(status) {
+    if (status === "absent") return "Absent";
+    if (status === "late") return "Retard";
+    if (status === "excused") return "Justifié";
+    return "Present";
+  }
+
+  toPaymentMethod(method) {
+    if (String(method).toLowerCase().includes("mobile")) return "mobile_money";
+    if (String(method).toLowerCase().includes("virement")) return "bank_transfer";
+    if (String(method).toLowerCase().includes("carte")) return "card";
+    return "cash";
+  }
+
+  toPaymentStatus(status) {
+    if (status === "PAYE") return "paid";
+    if (status === "PARTIEL") return "partial";
+    return "pending";
+  }
+}
+
+module.exports = { PostgresRepository };
