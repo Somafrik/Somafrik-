@@ -8,13 +8,14 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { getPresenceRate, presences } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
+import { getPaymentStats, getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
+import { canMutateEntity } from "../domain/security/permissions";
 
 export default function StudentsScreen({ route, navigation }: any) {
   const { session } = useAuth();
-  const { studentsData, paymentsData } = useAdminData();
+  const { studentsData, paymentsData, presencesData } = useAdminData();
   const className = route?.params?.className ?? "Toutes les classes";
   const [query, setQuery] = useState("");
   const assignedClasses = session?.role === "teacher" ? session.user.assignedClasses ?? [] : [];
@@ -41,12 +42,10 @@ export default function StudentsScreen({ route, navigation }: any) {
     );
   });
 
-  const presenceRate = getPresenceRate(classStudents.map((student) => student.id));
   const classStudentIds = classStudents.map((student) => student.id);
-  const paymentRows = paymentsData.filter((payment) => classStudentIds.includes(payment.studentId));
-  const paymentRate = paymentRows.length
-    ? Math.round((paymentRows.filter((payment) => payment.status === "PAYE").length / paymentRows.length) * 100)
-    : 0;
+  const presenceStats = getPresenceStats(presencesData, classStudentIds);
+  const paymentStats = getPaymentStats(paymentsData, classStudentIds);
+  const canCreateStudent = canMutateEntity(session, "students", "CREATE");
   const classGroups = filteredStudents.reduce<Record<string, typeof filteredStudents>>(
     (groups, student) => {
       const key = student.className;
@@ -81,7 +80,7 @@ export default function StudentsScreen({ route, navigation }: any) {
             </Text>
           </View>
 
-          {session?.role === "school_admin" && (
+          {canCreateStudent && (
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.addButton}
@@ -112,14 +111,14 @@ export default function StudentsScreen({ route, navigation }: any) {
           <View style={styles.summaryDivider} />
 
           <View>
-            <Text style={styles.summaryValue}>{presenceRate}%</Text>
+            <Text style={styles.summaryValue}>{presenceStats.rate}%</Text>
             <Text style={styles.summaryLabel}>Présence</Text>
           </View>
 
           <View style={styles.summaryDivider} />
 
           <View>
-            <Text style={styles.summaryValue}>{paymentRate}%</Text>
+            <Text style={styles.summaryValue}>{paymentStats.rate}%</Text>
             <Text style={styles.summaryLabel}>Paiements</Text>
           </View>
         </View>
@@ -136,11 +135,12 @@ export default function StudentsScreen({ route, navigation }: any) {
             </View>
 
             {classGroups[groupName].map((student, index) => {
-              const lastPresence = [...presences]
+              const lastPresence = [...presencesData]
                 .reverse()
                 .find((presence) => presence.studentId === student.id);
-              const isPresent = lastPresence?.present ?? false;
-              const status = isPresent ? "P" : "A";
+              const lastStatus = normalizePresenceStatus(lastPresence);
+              const isPresent = lastStatus === "Présent" || lastStatus === "Retard";
+              const status = lastStatus === "Retard" ? "R" : lastStatus === "Justifié" ? "J" : isPresent ? "P" : "A";
 
               return (
                 <TouchableOpacity

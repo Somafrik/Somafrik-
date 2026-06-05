@@ -18,16 +18,23 @@ import { useAuth } from "../context/AuthContext";
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 
 export default function LoginScreen({ navigation, route }: Props) {
-  const { school } = route.params;
-  const [identifier, setIdentifier] = useState("");
+  const { school, accessIdentifier, accessRole, accessRoleLabel } = route.params;
+  const [identifier, setIdentifier] = useState(accessIdentifier ?? "");
   const [password, setPassword] = useState("");
-  const [identity, setIdentity] = useState<IdentifyResponse | null>(null);
+  const [identity, setIdentity] = useState<IdentifyResponse | null>(
+    accessRole ? { role: accessRole, roleLabel: accessRoleLabel ?? "Administrateur" } : null
+  );
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { setSession } = useAuth();
 
   useEffect(() => {
     const normalizedIdentifier = identifier.trim();
+    if (accessRole) {
+      setIdentity({ role: accessRole, roleLabel: accessRoleLabel ?? "Administrateur" });
+      return;
+    }
+
     setIdentity(null);
 
     if (normalizedIdentifier.length < 3) {
@@ -51,7 +58,7 @@ export default function LoginScreen({ navigation, route }: Props) {
     }, 450);
 
     return () => clearTimeout(timeout);
-  }, [identifier, school.code]);
+  }, [accessRole, accessRoleLabel, identifier, school.code]);
 
   const handleLogin = async () => {
     if (!identifier.trim() || !password.trim()) {
@@ -88,8 +95,20 @@ export default function LoginScreen({ navigation, route }: Props) {
     }
   };
 
-  const fillDemo = () => {
-    setIdentifier("ENS-0001");
+  const fillDemo = (demo: "country_admin" | "school_admin" | "prefet" | "secretary" | "teacher" = "teacher") => {
+    if (!accessRole) {
+      setIdentifier(
+        demo === "country_admin"
+          ? "admin-rdc"
+          : demo === "school_admin"
+            ? "admin"
+            : demo === "prefet"
+              ? "prefet"
+              : demo === "secretary"
+                ? "secretaire"
+                : "ENS-0001"
+      );
+    }
     setPassword("1234");
   };
 
@@ -106,11 +125,12 @@ export default function LoginScreen({ navigation, route }: Props) {
       <Text style={styles.subtitle}>{school.city} • {school.code}</Text>
 
       <TextInput
-        placeholder="Identifiant : ELE-0001, ETU-0001, ENS-0001 ou téléphone parent"
+        placeholder="Téléphone, email ou identifiant unique"
         value={identifier}
         onChangeText={setIdentifier}
         autoCapitalize="none"
         style={styles.input}
+        editable={!accessRole}
       />
 
       <View style={styles.roleRow}>
@@ -126,7 +146,7 @@ export default function LoginScreen({ navigation, route }: Props) {
 
       {identity && (
         <TextInput
-          placeholder="Mot de passe"
+          placeholder={identity.role === "parent_student" || identity.role === "student" ? "PIN" : "Mot de passe"}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -146,8 +166,20 @@ export default function LoginScreen({ navigation, route }: Props) {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.demoButton} onPress={fillDemo}>
+      <TouchableOpacity style={styles.demoButton} onPress={() => fillDemo("teacher")}>
         <Text style={styles.demoButtonText}>Remplir un compte enseignant demo</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.demoButton} onPress={() => fillDemo("school_admin")}>
+        <Text style={styles.demoButtonText}>Remplir admin établissement demo</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.demoButton} onPress={() => fillDemo("prefet")}>
+        <Text style={styles.demoButtonText}>Remplir préfet des études demo</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.demoButton} onPress={() => fillDemo("secretary")}>
+        <Text style={styles.demoButtonText}>Remplir secrétaire demo</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.demoButton} onPress={() => fillDemo("country_admin")}>
+        <Text style={styles.demoButtonText}>Remplir admin pays demo</Text>
       </TouchableOpacity>
     </View>
   );

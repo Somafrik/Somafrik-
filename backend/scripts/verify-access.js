@@ -29,7 +29,7 @@ const routes = [
   { method: "GET", path: "/school", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
   { method: "GET", path: "/classes", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
   { method: "GET", path: "/students?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
-  { method: "GET", path: "/teachers?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
+  { method: "GET", path: "/teachers?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher"] },
   { method: "GET", path: "/users?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
   { method: "GET", path: "/payments?page=1&limit=5", allow: ["superadmin", "countryAdmin", "parent", "student"] },
   { method: "GET", path: "/backoffice/countries", allow: ["superadmin", "countryAdmin"] },
@@ -37,10 +37,10 @@ const routes = [
   { method: "GET", path: "/backoffice/notifications?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
   { method: "GET", path: "/audit?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
   { method: "GET", path: "/v2/subjects?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher"] },
-  { method: "GET", path: "/v2/academic-years?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
-  { method: "GET", path: "/v2/exams?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
-  { method: "GET", path: "/v2/documents?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
-  { method: "GET", path: "/v2/reports/advanced", allow: ["superadmin", "countryAdmin"] },
+  { method: "GET", path: "/v2/academic-years?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher"] },
+  { method: "GET", path: "/v2/exams?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher"] },
+  { method: "GET", path: "/v2/documents?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
+  { method: "GET", path: "/v2/reports/advanced", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
 ];
 
 async function request(path, { method = "GET", token, body } = {}) {

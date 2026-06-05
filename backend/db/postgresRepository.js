@@ -37,6 +37,7 @@ class PostgresRepository {
     const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
     await this.pool.query(schema);
     await this.seedIfEmpty();
+    await this.ensurePlatformReferenceData();
     await this.ensureStudentUsers();
     await this.ensureV2Data();
     this.ready = true;
@@ -628,6 +629,66 @@ class PostgresRepository {
     return client.query(sql, params).then((result) => result.rows[0]);
   }
 
+  async ensurePlatformReferenceData() {
+    for (const country of seedData.countries) {
+      await this.pool.query(
+        `INSERT INTO countries (name, iso_code, phone_code, currency, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+         ON CONFLICT (iso_code) DO UPDATE SET
+           name = EXCLUDED.name,
+           phone_code = EXCLUDED.phone_code,
+           currency = EXCLUDED.currency,
+           is_active = EXCLUDED.is_active,
+           updated_at = NOW()`,
+        [country.name, country.code, country.phonePrefix, country.currency, country.status !== "Suspendu"]
+      );
+    }
+
+    const schoolRows = await this.all("SELECT school_code, id FROM schools");
+    const schoolIds = new Map(schoolRows.map((school) => [school.school_code, school.id]));
+    const platformRoles = new Set([
+      "Super Administrateur SchoolLink",
+      "Admin Pays",
+      "Admin School",
+      "Proviseur",
+      "Directeur",
+      "Préfet des études",
+      "Secrétaire",
+    ]);
+
+    for (const user of seedData.userAccounts.filter((item) => platformRoles.has(item.role))) {
+      const schoolId = user.schoolCode === "*" ? null : schoolIds.get(user.schoolCode);
+      await this.pool.query(
+        `INSERT INTO users (school_id, user_code, first_name, last_name, email, phone, password_hash, pin_hash, role, status, last_login_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (user_code) DO UPDATE SET
+           school_id = EXCLUDED.school_id,
+           first_name = EXCLUDED.first_name,
+           last_name = EXCLUDED.last_name,
+           email = EXCLUDED.email,
+           phone = EXCLUDED.phone,
+           password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash),
+           pin_hash = COALESCE(EXCLUDED.pin_hash, users.pin_hash),
+           role = EXCLUDED.role,
+           status = EXCLUDED.status,
+           last_login_at = COALESCE(users.last_login_at, EXCLUDED.last_login_at)`,
+        [
+          schoolId,
+          user.publicId,
+          user.firstName,
+          user.lastName,
+          user.email ?? "",
+          user.phone ?? "",
+          hashSecret(user.password),
+          hashSecret(user.temporaryPassword || "1234"),
+          roleToDb[user.role] ?? user.role,
+          this.toDbStatus(user.status),
+          this.parseDate(user.lastLoginAt),
+        ]
+      );
+    }
+  }
+
   async ensureStudentUsers() {
     await this.pool.query(
       `INSERT INTO users (school_id, user_code, first_name, last_name, email, phone, password_hash, pin_hash, role, status)
@@ -1141,16 +1202,7 @@ class PostgresRepository {
       countryScope,
       countryCode,
       schoolCode: user.school_code ?? "*",
-      accessChannel: [
-        "SUPER_ADMIN",
-        "COUNTRY_ADMIN",
-        "SCHOOL_ADMIN",
-        "PROVISEUR",
-        "PRINCIPAL",
-        "PREFET_ETUDES",
-        "SECRETARY",
-        "ACCOUNTANT",
-      ].includes(user.role) ? "BackOffice" : "Application",
+      accessChannel: "Application",
       identifier,
       passwordHash: user.password_hash,
       pinHash: user.pin_hash,
@@ -1191,10 +1243,17 @@ class PostgresRepository {
       "USR-2026-000001": "admin",
       "USR-2026-000002": "superadmin",
       "ADM-CD-2026-0001": "admin-rdc",
+      "USR-PREFET-0001": "prefet",
+      "USR-SECRETARY-0001": "secretaire",
     };
 
     if (aliases[user.user_code]) {
       return aliases[user.user_code];
+    }
+
+    if (role === "Admin Pays") {
+      const match = String(user.user_code ?? "").match(/^ADM-([A-Z]{2})-/i);
+      if (match) return `admin-${match[1].toLowerCase()}`;
     }
 
     if (role === "Enseignant" && /^ENS-\d+$/i.test(String(user.user_code))) {
@@ -1276,7 +1335,7 @@ class PostgresRepository {
       publicId: attendance.id,
       studentId: attendance.student_code,
       date: this.formatIsoDate(attendance.attendance_date),
-      present: status === "Present",
+      present: status === "Présent" || status === "Retard",
       status,
     };
   }
@@ -1477,7 +1536,7 @@ class PostgresRepository {
     if (status === "absent") return "Absent";
     if (status === "late") return "Retard";
     if (status === "excused") return "Justifié";
-    return "Present";
+    return "Présent";
   }
 
   toPaymentMethod(method) {

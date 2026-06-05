@@ -84,10 +84,17 @@ export type LoginResponse = {
   permissions?: string[];
   user: {
     id: string;
+    publicId?: string;
     name: string;
+    firstName?: string;
+    lastName?: string;
     matricule?: string;
     className?: string;
     schoolCode?: string;
+    scopeLevel?: string;
+    countryScope?: string;
+    countryCode?: string;
+    permissions?: string[];
     parentPhone?: string;
     children?: StudentSummary[];
     phone?: string;
@@ -137,6 +144,16 @@ export function login(payload: LoginPayload) {
     accessToken = session.accessToken ?? null;
     return session;
   });
+}
+
+export async function logout() {
+  try {
+    await request<{ message: string }>("/auth/logout", {
+      method: "POST",
+    });
+  } finally {
+    accessToken = null;
+  }
 }
 
 export async function getSchoolByCode(code: string) {

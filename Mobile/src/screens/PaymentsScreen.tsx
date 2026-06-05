@@ -1,15 +1,11 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useAdminData } from "../context/AdminDataContext";
+import { getPaymentStats } from "../domain/metrics/schoolMetrics";
 
 export default function PaymentsScreen({ navigation }: any) {
   const { paymentsData, studentsData } = useAdminData();
-  const paidPayments = paymentsData.filter((payment) => payment.status === "PAYE");
-  const pendingPayments = paymentsData.filter((payment) => payment.status === "EN_ATTENTE");
-  const totalPaid = paidPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const paymentRate = paymentsData.length
-    ? Math.round((paidPayments.length / paymentsData.length) * 100)
-    : 0;
+  const paymentStats = getPaymentStats(paymentsData);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -21,8 +17,8 @@ export default function PaymentsScreen({ navigation }: any) {
         onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
       >
         <Text style={styles.summaryLabel}>Montant encaissé ce mois</Text>
-        <Text style={styles.summaryAmount}>{totalPaid.toLocaleString()} FC</Text>
-        <Text style={styles.summarySub}>{paymentRate}% des paiements réglés</Text>
+        <Text style={styles.summaryAmount}>{paymentStats.paidAmount.toLocaleString()} FC</Text>
+        <Text style={styles.summarySub}>{paymentStats.rate}% des paiements réglés</Text>
       </TouchableOpacity>
 
       <View style={styles.row}>
@@ -31,7 +27,7 @@ export default function PaymentsScreen({ navigation }: any) {
           style={styles.smallCard}
           onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
         >
-          <Text style={styles.smallNumber}>{paidPayments.length}</Text>
+          <Text style={styles.smallNumber}>{paymentStats.paid}</Text>
           <Text style={styles.smallLabel}>Payés</Text>
         </TouchableOpacity>
 
@@ -40,7 +36,7 @@ export default function PaymentsScreen({ navigation }: any) {
           style={styles.smallCard}
           onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
         >
-          <Text style={styles.smallNumber}>{pendingPayments.length}</Text>
+          <Text style={styles.smallNumber}>{paymentStats.pending}</Text>
           <Text style={styles.smallLabel}>Impayés</Text>
         </TouchableOpacity>
       </View>

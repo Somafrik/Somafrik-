@@ -7,6 +7,7 @@ import StudentsScreen from "../screens/StudentsScreen";
 import TeachersScreen from "../screens/TeachersScreen";
 import PaymentsScreen from "../screens/PaymentsScreen";
 import MenuScreen from "../screens/MenuScreen";
+import MessagesScreen from "../screens/MessagesScreen";
 import StudentDetailScreen from "../screens/StudentDetailScreen";
 import StudentNotesScreen from "../screens/StudentNotesScreen";
 import StudentPresencesScreen from "../screens/StudentPresencesScreen";
@@ -96,6 +97,9 @@ export default function BottomTabsNavigator() {
   const { session } = useAuth();
   const isParentStudent = session?.role === "parent_student" || session?.role === "student";
   const isTeacher = session?.role === "teacher";
+  const isGlobalAdmin = session?.role === "super_admin" || session?.role === "country_admin";
+  const isPedagogicalStaff = session?.role === "principal" || session?.role === "prefet";
+  const isSecretary = session?.role === "secretary";
 
   return (
     <Tab.Navigator
@@ -168,6 +172,34 @@ export default function BottomTabsNavigator() {
           <Tab.Screen name="TeacherStudents" component={StudentsScreen} />
           <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />
           <Tab.Screen name="TeacherGrades" component={TeacherGradesScreen} />
+        </>
+      ) : isPedagogicalStaff ? (
+        <>
+          <Tab.Screen name="Classes" component={ClassesScreen} />
+          <Tab.Screen name="TeacherStudents" component={StudentsScreen} />
+          <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />
+          <Tab.Screen name="TeacherGrades" component={TeacherGradesScreen} />
+        </>
+      ) : isSecretary ? (
+        <>
+          <Tab.Screen name="TeacherStudents" component={StudentsScreen} />
+          <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />
+          <Tab.Screen name="Paiements" component={PaymentsScreen} />
+          <Tab.Screen name="Messages" component={MessagesScreen} />
+        </>
+      ) : isGlobalAdmin ? (
+        <>
+          <Tab.Screen name="Classes" component={ClassesScreen} />
+          <Tab.Screen name="Enseignants" component={TeachersScreen} />
+          <Tab.Screen name="Paiements" component={PaymentsScreen} />
+          <Tab.Screen
+            name="Students"
+            component={StudentsScreen}
+            options={{
+              tabBarButton: () => null,
+              tabBarItemStyle: { display: "none" },
+            }}
+          />
         </>
       ) : (
         <>

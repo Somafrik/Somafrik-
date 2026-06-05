@@ -2,6 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import RoleSelectionScreen from "../screens/RoleSelectionScreen";
+import WelcomeScreen from "../screens/WelcomeScreen";
 import LoginScreen from "../screens/LoginScreen";
 import BottomTabsNavigator from "./BottomTabsNavigator";
 
@@ -22,9 +23,19 @@ import ReportCardsScreen from "../screens/ReportCardsScreen";
 import { AdminEntity } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
 
-export type UserRole = "school_admin" | "teacher" | "parent_student" | "student";
+export type UserRole =
+  | "super_admin"
+  | "country_admin"
+  | "school_admin"
+  | "principal"
+  | "prefet"
+  | "secretary"
+  | "teacher"
+  | "parent_student"
+  | "student";
 
 export type RootStackParamList = {
+  Welcome: undefined;
   RoleSelection: undefined;
   Login: {
     school: {
@@ -36,6 +47,9 @@ export type RootStackParamList = {
       slogan: string;
       logoUrl?: string;
     };
+    accessIdentifier?: string;
+    accessRole?: UserRole;
+    accessRoleLabel?: string;
   };
   Home: {
     role: UserRole;
@@ -77,19 +91,31 @@ function HomeTabs() {
 export default function AppNavigator() {
   const { session } = useAuth();
   const role = session?.role;
-  const isAdmin = role === "school_admin";
+  const isSuperAdmin = role === "super_admin";
+  const isCountryAdmin = role === "country_admin";
+  const isSchoolAdmin = role === "school_admin";
+  const isAdmin = isSuperAdmin || isCountryAdmin || isSchoolAdmin;
+  const isPedagogicalStaff = role === "principal" || role === "prefet";
+  const isSecretary = role === "secretary";
+  const canOpenAdminCrud = isAdmin || isPedagogicalStaff || isSecretary;
   const isTeacher = role === "teacher";
   const isParent = role === "parent_student";
   const isStudent = role === "student";
-  const canOpenStudentScreens = isAdmin || isTeacher || isParent || isStudent;
+  const canOpenStudentScreens = isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent;
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="RoleSelection">
+      <Stack.Navigator initialRouteName="Welcome">
+        <Stack.Screen
+          name="Welcome"
+          component={WelcomeScreen}
+          options={{ headerShown: false }}
+        />
+
         <Stack.Screen
           name="RoleSelection"
           component={RoleSelectionScreen}
-          options={{ title: "SchoolLink" }}
+          options={{ title: "Se connecter à l'établissement" }}
         />
 
         <Stack.Screen
@@ -104,16 +130,16 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
 
-        {isAdmin && (
+        {canOpenAdminCrud && (
           <>
-            <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />
-            <Stack.Screen name="Teachers" component={TeachersScreen} />
-            <Stack.Screen name="Payments" component={PaymentsScreen} />
+            {isAdmin && <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />}
+            {(isAdmin || isPedagogicalStaff || isSecretary) && <Stack.Screen name="Teachers" component={TeachersScreen} />}
+            {(isAdmin || isPedagogicalStaff || isSecretary) && <Stack.Screen name="Payments" component={PaymentsScreen} />}
             <Stack.Screen name="AdminCrud" component={AdminCrudScreen} options={{ title: "Administration" }} />
           </>
         )}
 
-        {(isAdmin || isTeacher) && (
+        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher) && (
           <>
             <Stack.Screen name="Classes" component={ClassesScreen} />
             <Stack.Screen name="Students" component={StudentsScreen} options={{ title: "Élèves" }} />
@@ -128,19 +154,19 @@ export default function AppNavigator() {
           </>
         )}
 
-        {(isAdmin || isParent || isStudent) && (
+        {(isAdmin || isPedagogicalStaff || isSecretary || isParent || isStudent) && (
           <Stack.Screen name="StudentPayments" component={StudentPaymentsScreen} options={{ title: "Paiements" }} />
         )}
 
-        {(isAdmin || isTeacher || isParent || isStudent) && (
+        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent) && (
           <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
         )}
 
-        {(isAdmin || isTeacher || isParent) && (
+        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent) && (
           <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages" }} />
         )}
 
-        {(isAdmin || isTeacher || isParent || isStudent) && (
+        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent) && (
           <>
             <Stack.Screen name="Timetable" component={TimetableScreen} options={{ title: "Emploi du temps" }} />
             <Stack.Screen name="ReportCards" component={ReportCardsScreen} options={{ title: "Bulletins" }} />

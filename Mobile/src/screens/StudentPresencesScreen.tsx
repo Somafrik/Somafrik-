@@ -1,24 +1,24 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { getStudentById, presences } from "../data/catalog";
+import { getStudentById } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
+import { getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
+import { useAdminData } from "../context/AdminDataContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPresences">;
 
 export default function StudentPresencesScreen({ route, navigation }: Partial<Props>) {
   const { selectedStudentId } = useAuth();
+  const { presencesData } = useAdminData();
   const studentId = selectedStudentId ?? route?.params?.studentId;
   const student = studentId ? getStudentById(studentId) : undefined;
 
-  const presencesEleve = presences.filter(
+  const presencesEleve = presencesData.filter(
     (presence) => presence.studentId === studentId
   );
-  const presentCount = presencesEleve.filter((presence) => getPresenceStatus(presence) === "Présent").length;
-  const rate = presencesEleve.length
-    ? Math.round((presentCount / presencesEleve.length) * 100)
-    : 0;
+  const presenceStats = getPresenceStats(presencesEleve);
 
   return (
     <View style={styles.container}>
@@ -32,7 +32,10 @@ export default function StudentPresencesScreen({ route, navigation }: Partial<Pr
         onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
       >
         <Text style={styles.summaryLabel}>Taux de présence</Text>
-        <Text style={styles.summaryValue}>{rate}%</Text>
+        <Text style={styles.summaryValue}>{presenceStats.rate}%</Text>
+        <Text style={styles.summaryMeta}>
+          {presenceStats.attended}/{presenceStats.total} présent(s), {presenceStats.justified} justifié(s)
+        </Text>
       </TouchableOpacity>
 
       <FlatList
@@ -46,18 +49,14 @@ export default function StudentPresencesScreen({ route, navigation }: Partial<Pr
             onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
           >
             <Text style={styles.name}>{item.date}</Text>
-            <Text style={[styles.badge, getPresenceStyle(getPresenceStatus(item))]}>
-              {getPresenceStatus(item)}
+            <Text style={[styles.badge, getPresenceStyle(normalizePresenceStatus(item))]}>
+              {normalizePresenceStatus(item)}
             </Text>
           </TouchableOpacity>
         )}
       />
     </View>
   );
-}
-
-function getPresenceStatus(item: any) {
-  return item.status ?? (item.present ? "Présent" : "Absent");
 }
 
 function getPresenceStyle(status: string) {
@@ -79,6 +78,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { color: "#CBD5E1", fontWeight: "700" },
   summaryValue: { color: "#FFFFFF", fontSize: 34, fontWeight: "900", marginTop: 6 },
+  summaryMeta: { color: "#CBD5E1", fontWeight: "700", marginTop: 6 },
   card: {
     backgroundColor: "#fff",
     padding: 15,

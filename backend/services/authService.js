@@ -1,6 +1,20 @@
 const { AccountIdentifier } = require("./accountIdentifier");
 const { verifySecret } = require("./credentialService");
 
+const failedLoginAttempts = new Map();
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000;
+
+const managedMobileRoles = {
+  "Super Administrateur SchoolLink": { role: "super_admin", roleLabel: "Super Administrateur" },
+  "Admin Pays": { role: "country_admin", roleLabel: "Admin Pays" },
+  "Admin School": { role: "school_admin", roleLabel: "Admin Établissement" },
+  Proviseur: { role: "principal", roleLabel: "Proviseur" },
+  Directeur: { role: "principal", roleLabel: "Proviseur" },
+  "Préfet des études": { role: "prefet", roleLabel: "Préfet des études" },
+  Secrétaire: { role: "secretary", roleLabel: "Secrétaire" },
+};
+
 class BusinessError extends Error {
   constructor(statusCode, message) {
     super(message);
@@ -25,8 +39,13 @@ class AuthService {
 
     this.assertManagedUserCanUseMobile(managedUser);
 
+    const managedMobileRole = this.getManagedMobileRole(managedUser);
+    if (managedMobileRole) {
+      return managedMobileRole;
+    }
+
     if (accountIdentifier.isAdmin()) {
-      return { role: "school_admin", roleLabel: "Administrateur" };
+      return { role: "school_admin", roleLabel: "Admin Établissement" };
     }
 
     if (this.findTeacher(accountIdentifier)) {
@@ -48,14 +67,22 @@ class AuthService {
     this.assertRequiredFields({ role, schoolCode, identifier, pin }, "Champs manquants");
     this.assertSchoolCanConnect(schoolCode);
 
+    const loginKey = this.getLoginAttemptKey(schoolCode, identifier);
+    this.assertLoginNotLocked(loginKey);
+
     const accountIdentifier = new AccountIdentifier(schoolCode, identifier);
     const managedUser = this.findManagedUser(identifier, schoolCode);
 
     this.assertManagedUserCanUseMobile(managedUser);
 
-    const adminUser = this.findManagedUser(identifier, schoolCode);
-    if (role === "school_admin" && accountIdentifier.isAdmin() && this.verifyUserSecret(adminUser, pin)) {
-      return { role, user: { id: "ADMIN1", name: "Administrateur" }, school: this.school };
+    const managedMobileRole = this.getManagedMobileRole(managedUser);
+    if (managedMobileRole?.role === role && this.verifyUserSecret(managedUser, pin)) {
+      this.clearFailedLoginAttempts(loginKey);
+      return {
+        role,
+        user: this.buildManagedMobileUser(managedUser),
+        school: this.school,
+      };
     }
 
     if (role === "teacher") {
@@ -66,6 +93,7 @@ class AuthService {
         const courses = [...new Set(teacher.assignments.map((item) => item.course))];
         const { password: _password, passwordHash: _passwordHash, pinHash: _pinHash, ...safeTeacher } = teacher;
 
+        this.clearFailedLoginAttempts(loginKey);
         return {
           role,
           user: {
@@ -83,6 +111,7 @@ class AuthService {
 
       if (student) {
         const { pin: _pin, pinHash: _pinHash, ...safeStudent } = student;
+        this.clearFailedLoginAttempts(loginKey);
         return { role, user: safeStudent, school: this.school };
       }
     }
@@ -94,6 +123,7 @@ class AuthService {
         const children = matchedStudents.map(({ pin: _pin, pinHash: _pinHash, ...safeStudent }) => safeStudent);
         const firstStudent = children[0];
 
+        this.clearFailedLoginAttempts(loginKey);
         return {
           role,
           user: {
@@ -107,6 +137,7 @@ class AuthService {
       }
     }
 
+    this.recordFailedLoginAttempt(loginKey);
     throw new BusinessError(401, "Identifiants incorrects");
   }
 
@@ -140,12 +171,37 @@ class AuthService {
 
   findManagedUser(identifier, schoolCode) {
     const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
+    const normalizedIdentifier = String(identifier).trim().toLowerCase();
 
     return this.userAccounts.find(
       (user) =>
         (user.schoolCode === "*" || user.schoolCode === normalizedSchoolCode) &&
-        [user.identifier, user.email, user.phone, user.publicId].some((value) => value === identifier)
+        [user.identifier, user.email, user.phone, user.publicId].some(
+          (value) => String(value ?? "").trim().toLowerCase() === normalizedIdentifier
+        )
     );
+  }
+
+  buildManagedMobileUser(user) {
+    return {
+      id: user.id,
+      publicId: user.publicId,
+      name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.identifier,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      email: user.email,
+      role: user.role,
+      scopeLevel: user.scopeLevel,
+      countryScope: user.countryScope,
+      countryCode: user.countryCode,
+      schoolCode: user.schoolCode,
+      permissions: user.permissions,
+    };
+  }
+
+  getManagedMobileRole(user) {
+    return user ? managedMobileRoles[user.role] : null;
   }
 
   assertRequiredFields(fields, message) {
@@ -176,6 +232,38 @@ class AuthService {
     return user.password === secret || user.pin === secret;
   }
 
+  getLoginAttemptKey(schoolCode, identifier) {
+    return `${String(schoolCode).trim().toUpperCase()}:${String(identifier).trim().toLowerCase()}`;
+  }
+
+  assertLoginNotLocked(key) {
+    const current = failedLoginAttempts.get(key);
+
+    if (!current?.lockedUntil) {
+      return;
+    }
+
+    if (current.lockedUntil <= Date.now()) {
+      failedLoginAttempts.delete(key);
+      return;
+    }
+
+    throw new BusinessError(423, "Compte temporairement verrouille apres plusieurs tentatives. Reessayez dans 15 minutes.");
+  }
+
+  recordFailedLoginAttempt(key) {
+    const current = failedLoginAttempts.get(key) ?? { count: 0, lockedUntil: null };
+    const count = current.count + 1;
+    failedLoginAttempts.set(key, {
+      count,
+      lockedUntil: count >= MAX_FAILED_LOGIN_ATTEMPTS ? Date.now() + LOGIN_LOCK_DURATION_MS : null,
+    });
+  }
+
+  clearFailedLoginAttempts(key) {
+    failedLoginAttempts.delete(key);
+  }
+
   matchesSchoolCode(schoolCode) {
     const normalizedCode = String(schoolCode).trim().toUpperCase();
     return [this.school.code, this.school.publicId].some(
@@ -188,7 +276,10 @@ class AuthService {
       throw new BusinessError(403, "Compte suspendu ou desactive. Connexion indisponible.");
     }
 
-    if (user?.accessChannel === "BackOffice") {
+    if (
+      user?.accessChannel === "BackOffice" &&
+      !["Super Administrateur SchoolLink", "Admin Pays", "Admin School"].includes(user.role)
+    ) {
       throw new BusinessError(
         403,
         "Ce compte est reserve au BackOffice SchoolLink. Utilisez le portail PC/tablette/web."

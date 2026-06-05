@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { getPresenceRate } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
+import { canMutateEntity } from "../domain/security/permissions";
 
 export default function ClassesScreen({ navigation }: any) {
   const { session } = useAuth();
@@ -24,6 +25,7 @@ export default function ClassesScreen({ navigation }: any) {
       ? studentsData.filter((student) => assignedClasses.includes(student.className))
       : studentsData;
   const totalStudents = visibleStudents.length;
+  const canCreateClass = canMutateEntity(session, "classes", "CREATE");
 
   return (
     <View style={styles.screen}>
@@ -37,7 +39,7 @@ export default function ClassesScreen({ navigation }: any) {
             <Text style={styles.subtitle}>Gérez les classes et les élèves</Text>
           </View>
 
-          {session?.role === "school_admin" && (
+          {canCreateClass && (
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.addButton}

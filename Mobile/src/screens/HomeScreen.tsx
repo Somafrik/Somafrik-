@@ -9,26 +9,23 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import {
   getStudentById,
-  getPresenceRate,
+  courses,
   notes,
-  payments,
-  presences,
   school,
 } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { useAdminData } from "../context/AdminDataContext";
+import { getPaymentStats, getPresenceStats, getStudentAcademicSummary } from "../domain/metrics/schoolMetrics";
+import { canReadEntity, canReadRoute } from "../domain/security/permissions";
 
 export default function HomeScreen({ navigation }: any) {
   const { session, selectedStudentId } = useAuth();
-  const { studentsData, teachersData, paymentsData, announcementsData, messagesData, schoolsData, usersData } = useAdminData();
+  const { studentsData, paymentsData, presencesData, announcementsData, messagesData, schoolsData, usersData } = useAdminData();
   const currentSchool = schoolsData[0] ?? school;
   const studentIds = studentsData.map((student) => student.id);
-  const presenceRate = getPresenceRate(studentIds);
-  const paymentRows = paymentsData.filter((payment) => studentIds.includes(payment.studentId));
-  const paymentRate = paymentRows.length
-    ? Math.round((paymentRows.filter((payment) => payment.status === "PAYE").length / paymentRows.length) * 100)
-    : 0;
+  const presenceStats = getPresenceStats(presencesData, studentIds);
+  const paymentStats = getPaymentStats(paymentsData, studentIds);
   const userName = session?.user.name ?? "Administrateur";
   const unreadMessages = getUnreadMessagesCount(session, messagesData, studentsData);
 
@@ -37,7 +34,7 @@ export default function HomeScreen({ navigation }: any) {
     const courses = session.user.courses ?? [];
     const teacherStudents = studentsData.filter((student) => assignedClasses.includes(student.className));
     const teacherStudentIds = teacherStudents.map((student) => student.id);
-    const teacherPresenceRate = getPresenceRate(teacherStudentIds);
+    const teacherPresenceStats = getPresenceStats(presencesData, teacherStudentIds);
     const teacherNotes = notes.filter(
       (note) => teacherStudentIds.includes(note.studentId) && courses.includes(note.subject)
     );
@@ -105,7 +102,7 @@ export default function HomeScreen({ navigation }: any) {
             />
             <StatCard
               icon="checkmark-circle-outline"
-              value={`${teacherPresenceRate}%`}
+              value={`${teacherPresenceStats.rate}%`}
               label="Présence"
               color="#16A34A"
               bg="#ECFDF5"
@@ -170,14 +167,11 @@ export default function HomeScreen({ navigation }: any) {
   if ((session?.role === "parent_student" || session?.role === "student") && selectedStudentId) {
     const student = studentsData.find((item) => item.id === selectedStudentId) ?? getStudentById(selectedStudentId);
     const studentNotes = notes.filter((note) => note.studentId === selectedStudentId);
-    const studentPresences = presences.filter((presence) => presence.studentId === selectedStudentId);
-    const studentPayments = payments.filter((payment) => payment.studentId === selectedStudentId);
-    const average =
-      studentNotes.length === 0
-        ? 0
-        : studentNotes.reduce((sum, note) => sum + note.value, 0) / studentNotes.length;
-    const presentCount = studentPresences.filter((presence) => presence.present).length;
-    const paidCount = studentPayments.filter((payment) => payment.status === "PAYE").length;
+    const studentPresences = presencesData.filter((presence) => presence.studentId === selectedStudentId);
+    const studentPayments = paymentsData.filter((payment) => payment.studentId === selectedStudentId);
+    const academicSummary = getStudentAcademicSummary(selectedStudentId, studentsData, notes, courses);
+    const studentPresenceStats = getPresenceStats(studentPresences);
+    const studentPaymentStats = getPaymentStats(studentPayments);
     const latestAnnouncement = announcementsData[0];
 
     return (
@@ -231,7 +225,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.statsGrid}>
             <StatCard
               icon="school-outline"
-              value={average.toFixed(1)}
+              value={academicSummary.average.toFixed(1)}
               label="Moyenne"
               color="#2563EB"
               bg="#EFF6FF"
@@ -240,7 +234,7 @@ export default function HomeScreen({ navigation }: any) {
 
             <StatCard
               icon="checkmark-circle-outline"
-              value={`${presentCount}/${studentPresences.length}`}
+              value={`${studentPresenceStats.attended}/${studentPresenceStats.total}`}
               label="Présences"
               color="#16A34A"
               bg="#ECFDF5"
@@ -258,7 +252,7 @@ export default function HomeScreen({ navigation }: any) {
 
             <StatCard
               icon="card-outline"
-              value={`${paidCount}/${studentPayments.length}`}
+              value={`${studentPaymentStats.paid}/${studentPaymentStats.total}`}
               label="Paiements"
               color="#EA580C"
               bg="#FFF7ED"
@@ -322,6 +316,79 @@ export default function HomeScreen({ navigation }: any) {
               color="#7C3AED"
               onPress={() => navigation.navigate("Announcements")}
             />
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (session?.role === "principal" || session?.role === "prefet" || session?.role === "secretary") {
+    const isSecretary = session.role === "secretary";
+    const title = isSecretary ? "Espace secrétariat" : session.role === "prefet" ? "Espace préfet des études" : "Espace proviseur";
+    const description = isSecretary
+      ? "Suivi des élèves, présences, paiements et messages administratifs."
+      : "Pilotage pédagogique, présences, notes, bulletins et rapports.";
+
+    return (
+      <View style={styles.screen}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <TouchableOpacity activeOpacity={0.85} style={styles.schoolCard} onPress={() => navigation.navigate("Classes")}>
+            <View style={styles.schoolIconBox}>
+              <Ionicons name={isSecretary ? "briefcase-outline" : "analytics-outline"} size={28} color="#2563EB" />
+            </View>
+            <View style={styles.schoolInfo}>
+              <Text style={styles.schoolName}>{userName}</Text>
+              <Text style={styles.schoolCity}>{currentSchool.name}</Text>
+              <Text style={styles.schoolTagline}>{title}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.welcomeCard}
+            onPress={() => navigation.navigate(isSecretary ? "TeacherStudents" : "TeacherAttendance")}
+          >
+            <View>
+              <Text style={styles.welcomeTitle}>{title}</Text>
+              <Text style={styles.welcomeText}>{description}</Text>
+            </View>
+            <View style={styles.welcomeIcon}>
+              <Ionicons name={isSecretary ? "people-outline" : "school-outline"} size={28} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Vue métier</Text>
+            <Text style={styles.sectionLink}>Matrice sécurité</Text>
+          </View>
+
+          <View style={styles.statsGrid}>
+            {canReadEntity(session, "classes") && (
+              <StatCard icon="grid-outline" value={String(studentsData.length ? new Set(studentsData.map((student) => student.className)).size : 0)} label="Classes" color="#2563EB" bg="#EFF6FF" onPress={() => navigation.navigate("Classes")} />
+            )}
+            {canReadEntity(session, "students") && (
+              <StatCard icon="people-outline" value={String(studentsData.length)} label="Élèves" color="#7C3AED" bg="#F5F3FF" onPress={() => navigation.navigate("TeacherStudents")} />
+            )}
+            {canReadRoute(session, "TeacherAttendance") && (
+              <StatCard icon="checkmark-circle-outline" value={`${presenceStats.rate}%`} label="Présence" color="#16A34A" bg="#ECFDF5" onPress={() => navigation.navigate("TeacherAttendance")} />
+            )}
+            {canReadEntity(session, "payments") && (
+              <StatCard icon="card-outline" value={`${paymentStats.rate}%`} label="Paiements" color="#EA580C" bg="#FFF7ED" onPress={() => navigation.navigate("Payments")} />
+            )}
+          </View>
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Actions rapides</Text>
+          </View>
+
+          <View style={styles.actionsGrid}>
+            {canReadEntity(session, "students") && <QuickAction icon="people-outline" label="Élèves" onPress={() => navigation.navigate("TeacherStudents")} />}
+            {canReadRoute(session, "TeacherAttendance") && <QuickAction icon="checkbox-outline" label="Présences" onPress={() => navigation.navigate("TeacherAttendance")} />}
+            {canReadRoute(session, "TeacherGrades") && <QuickAction icon="reader-outline" label="Notes" onPress={() => navigation.navigate("TeacherGrades")} />}
+            {canReadRoute(session, "ReportCards") && <QuickAction icon="document-text-outline" label="Bulletins" onPress={() => navigation.navigate("ReportCards")} />}
+            {canReadEntity(session, "payments") && <QuickAction icon="card-outline" label="Paiements" onPress={() => navigation.navigate("Payments")} />}
+            {canReadRoute(session, "Messages") && <QuickAction icon="chatbubbles-outline" label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"} onPress={() => navigation.navigate("Messages")} />}
+            {canReadRoute(session, "Announcements") && <QuickAction icon="megaphone-outline" label="Annonces" onPress={() => navigation.navigate("Announcements")} />}
           </View>
         </ScrollView>
       </View>
@@ -409,7 +476,7 @@ export default function HomeScreen({ navigation }: any) {
 
           <StatCard
             icon="checkmark-circle-outline"
-            value={`${presenceRate}%`}
+            value={`${presenceStats.rate}%`}
             label="Présence"
             color="#16A34A"
             bg="#ECFDF5"
@@ -418,7 +485,7 @@ export default function HomeScreen({ navigation }: any) {
 
           <StatCard
             icon="card-outline"
-            value={`${paymentRate}%`}
+            value={`${paymentStats.rate}%`}
             label="Paiements"
             color="#EA580C"
             bg="#FFF7ED"
@@ -543,7 +610,14 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 function getUnreadMessagesCount(session: any, messagesData: any[], studentsData: any[]) {
-  if (session?.role === "school_admin") {
+  if (
+    session?.role === "super_admin" ||
+    session?.role === "school_admin" ||
+    session?.role === "country_admin" ||
+    session?.role === "principal" ||
+    session?.role === "prefet" ||
+    session?.role === "secretary"
+  ) {
     return messagesData.filter(
       (message) => message.status === "Nouveau" && message.direction === "Parent vers école"
     ).length;

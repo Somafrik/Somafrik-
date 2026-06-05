@@ -14,6 +14,8 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
 import { messageThemes, rolePermissions } from "../data/catalog";
+import { useAuth } from "../context/AuthContext";
+import { canMutateEntity } from "../domain/security/permissions";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
 
@@ -69,6 +71,19 @@ const configs: Record<
       { key: "teacherId", label: "Responsable", placeholder: "Choisir un enseignant", type: "select" },
     ],
   },
+  countries: {
+    title: "Gestion des pays",
+    addLabel: "Ajouter un pays",
+    fields: [
+      { key: "name", label: "Pays", placeholder: "République Démocratique du Congo" },
+      { key: "code", label: "Code ISO", placeholder: "CD" },
+      { key: "phonePrefix", label: "Indicatif", placeholder: "+243" },
+      { key: "currency", label: "Devise", placeholder: "CDF" },
+      { key: "timezone", label: "Fuseau horaire", placeholder: "Africa/Kinshasa" },
+      { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
+      { key: "administratorId", label: "Admin pays", placeholder: "Choisir un utilisateur", type: "select" },
+    ],
+  },
   courses: {
     title: "Gestion des cours",
     addLabel: "Ajouter un cours",
@@ -96,6 +111,24 @@ const configs: Record<
       { key: "date", label: "Date", placeholder: "JJ-MM-AAAA", type: "date" },
       { key: "status", label: "Statut", placeholder: "Choisir un statut", type: "select" },
       { key: "method", label: "Mode de paiement", placeholder: "Choisir un mode", type: "select" },
+    ],
+  },
+  subscriptions: {
+    title: "Gestion des abonnements",
+    addLabel: "Ajouter un abonnement",
+    fields: [
+      { key: "schoolCode", label: "Établissement", placeholder: "Choisir l'établissement", type: "select" },
+      { key: "countryCode", label: "Code pays", placeholder: "CD" },
+      { key: "country", label: "Pays", placeholder: "RDC" },
+      { key: "plan", label: "Offre", placeholder: "Choisir le plan", type: "select" },
+      { key: "monthlyPrice", label: "Mensuel", placeholder: "120", keyboardType: "numeric" },
+      { key: "annualPrice", label: "Annuel", placeholder: "1200", keyboardType: "numeric" },
+      { key: "currency", label: "Devise", placeholder: "USD" },
+      { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
+      { key: "paymentStatus", label: "Paiement", placeholder: "Choisir le statut", type: "select" },
+      { key: "startDate", label: "Début", placeholder: "JJ-MM-AAAA", type: "date" },
+      { key: "endDate", label: "Fin", placeholder: "JJ-MM-AAAA", type: "date" },
+      { key: "lastPaymentDate", label: "Dernier paiement", placeholder: "JJ-MM-AAAA", type: "date" },
     ],
   },
   paymentStatuses: {
@@ -182,6 +215,7 @@ const configs: Record<
 
 export default function AdminCrudScreen({ route }: Props) {
   const { entity } = route.params;
+  const { session } = useAuth();
   const {
     getItems,
     createItem,
@@ -192,10 +226,12 @@ export default function AdminCrudScreen({ route }: Props) {
     classesData,
     coursesData,
     assignmentsData,
+    countriesData,
     paymentStatusesData,
     schoolsData,
     usersData,
     paymentsData,
+    subscriptionsData,
   } = useAdminData();
   const config = configs[entity];
   const items = getItems(entity);
@@ -212,6 +248,9 @@ export default function AdminCrudScreen({ route }: Props) {
   const [userStatusFilter, setUserStatusFilter] = useState("Tous");
   const [dateField, setDateField] = useState<Field | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const canCreate = canMutateEntity(session, entity, "CREATE");
+  const canUpdate = canMutateEntity(session, entity, "UPDATE");
+  const canDelete = canMutateEntity(session, entity, "DELETE");
 
   useEffect(() => {
     if (entity === "courses" && !selectedCourseClass && classesData.length > 0) {
@@ -303,6 +342,8 @@ export default function AdminCrudScreen({ route }: Props) {
       paymentsData,
       schoolsData,
       usersData,
+      countriesData,
+      subscriptionsData,
     });
 
     if (!nextItem) {
@@ -321,6 +362,8 @@ export default function AdminCrudScreen({ route }: Props) {
       schoolsData,
       studentsData,
       usersData,
+      countriesData,
+      subscriptionsData,
     });
 
     if (businessError) {
@@ -378,10 +421,12 @@ export default function AdminCrudScreen({ route }: Props) {
             <Text style={styles.title}>{config.title}</Text>
             <Text style={styles.subtitle}>{statsLabel}</Text>
           </View>
-          <TouchableOpacity style={styles.addButton} onPress={openCreate} activeOpacity={0.85}>
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.addButtonText}>Ajouter</Text>
-          </TouchableOpacity>
+          {canCreate && (
+            <TouchableOpacity style={styles.addButton} onPress={openCreate} activeOpacity={0.85}>
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Ajouter</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {entity === "schools" && (
@@ -534,17 +579,21 @@ export default function AdminCrudScreen({ route }: Props) {
               <Text style={styles.cardTitle}>{getPrimaryText(entity, item)}</Text>
               <Text style={styles.cardMeta}>{getSecondaryText(entity, item)}</Text>
             </View>
-            <TouchableOpacity style={styles.iconButton} onPress={() => openEdit(item)}>
-              <Ionicons name="create-outline" size={20} color="#2563EB" />
-            </TouchableOpacity>
-            {entity === "users" && (
+            {canUpdate && (
+              <TouchableOpacity style={styles.iconButton} onPress={() => openEdit(item)}>
+                <Ionicons name="create-outline" size={20} color="#2563EB" />
+              </TouchableOpacity>
+            )}
+            {entity === "users" && canUpdate && (
               <TouchableOpacity style={styles.iconButtonWarning} onPress={() => resetUserPassword(item)}>
                 <Ionicons name="key-outline" size={20} color="#B45309" />
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.iconButtonDanger} onPress={() => confirmDelete(item)}>
-              <Ionicons name="trash-outline" size={20} color="#DC2626" />
-            </TouchableOpacity>
+            {canDelete && (
+              <TouchableOpacity style={styles.iconButtonDanger} onPress={() => confirmDelete(item)}>
+                <Ionicons name="trash-outline" size={20} color="#DC2626" />
+              </TouchableOpacity>
+            )}
           </View>
         ))}
 
@@ -644,6 +693,8 @@ export default function AdminCrudScreen({ route }: Props) {
                 coursesData,
                 paymentStatusesData,
                 schoolsData,
+                usersData,
+                countriesData,
                 form
               ).map((option) => (
                 <TouchableOpacity
@@ -809,6 +860,23 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     };
   }
 
+  if (entity === "countries") {
+    if (!form.name || !form.code || !form.phonePrefix || !form.currency) return null;
+    const code = form.code.trim().toUpperCase();
+
+    return {
+      id: id ?? `COUNTRY-${code}`,
+      name: form.name,
+      code,
+      phonePrefix: form.phonePrefix,
+      currency: form.currency.trim().toUpperCase(),
+      timezone: form.timezone || "Africa/Kinshasa",
+      status: form.status || "Actif",
+      administratorId: form.administratorId ?? "",
+      createdAt: form.createdAt || formatDate(new Date()),
+    };
+  }
+
   if (entity === "courses") {
     if (!form.className || !form.name) return null;
     return {
@@ -840,6 +908,30 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       date: form.date || formatDate(new Date()),
       status: form.status || "PAYE",
       method: form.method || "Mobile Money",
+    };
+  }
+
+  if (entity === "subscriptions") {
+    if (!form.schoolCode || !form.plan) return null;
+    const school = (context?.schoolsData ?? []).find((item: any) => item.code === form.schoolCode);
+    const country = form.country || school?.country || "";
+    const countryCode = form.countryCode || getCountryCode(country);
+    const currency = form.currency || school?.currency || "USD";
+
+    return {
+      id: id ?? `SUB-${form.schoolCode}`,
+      schoolCode: form.schoolCode,
+      countryCode,
+      country,
+      plan: form.plan,
+      monthlyPrice: Number(form.monthlyPrice) || 0,
+      annualPrice: Number(form.annualPrice) || 0,
+      currency,
+      status: form.status || "Actif",
+      paymentStatus: form.paymentStatus || "À jour",
+      startDate: form.startDate || formatDate(new Date()),
+      endDate: form.endDate || formatDate(addMonths(new Date(), 12)),
+      lastPaymentDate: form.lastPaymentDate || "",
     };
   }
 
@@ -904,7 +996,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       !form.gender ||
       !form.phone ||
       !form.role ||
-      (!isBackOfficeRole(form.role) && !form.schoolCode) ||
+      (!isGlobalOrCountryRole(form.role) && !form.schoolCode) ||
       !form.identifier
     ) {
       return null;
@@ -977,6 +1069,8 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
 }
 
 function getPrimaryText(entity: AdminEntity, item: any) {
+  if (entity === "countries") return `${item.name} • ${item.code}`;
+  if (entity === "subscriptions") return `${item.schoolCode} • ${item.plan}`;
   if (entity === "payments") return `${item.amount?.toLocaleString?.() ?? item.amount} FC`;
   if (entity === "paymentStatuses") return item.label;
   if (entity === "schools") return `${item.name} • ${item.publicId ?? item.code}`;
@@ -993,8 +1087,10 @@ function getSecondaryText(entity: AdminEntity, item: any) {
     return `ID : ${item.publicId ?? item.id} • ${item.mainSubject ?? "Matière non renseignée"} • ${item.phone}`;
   }
   if (entity === "classes") return `${item.publicId ?? item.id} • ${item.level ?? "Niveau non renseigné"} • ${item.track ?? "Filière non renseignée"} • Responsable : ${item.teacherId || "Non assigné"}`;
+  if (entity === "countries") return `${item.phonePrefix} • ${item.currency} • ${item.timezone} • ${item.status}`;
   if (entity === "courses") return `${item.publicId ?? item.id} • ${item.className} • Coefficient : ${item.coefficient}`;
   if (entity === "assignments") return `Enseignant : ${item.teacherId}`;
+  if (entity === "subscriptions") return `${item.country} • ${item.monthlyPrice} ${item.currency}/mois • ${item.paymentStatus} • fin ${item.endDate}`;
   if (entity === "paymentStatuses") return `Code : ${item.value}`;
   if (entity === "schools") {
     return `${item.type} • ${item.city}, ${item.country} • ${item.status} • ${item.maxStudents} élèves / ${item.maxTeachers} enseignants`;
@@ -1020,6 +1116,8 @@ type BusinessValidationInput = {
   schoolsData: any[];
   studentsData: any[];
   usersData: any[];
+  countriesData: any[];
+  subscriptionsData: any[];
 };
 
 function validateBusinessRules({
@@ -1033,11 +1131,12 @@ function validateBusinessRules({
   schoolsData,
   studentsData,
   usersData,
+  countriesData,
+  subscriptionsData,
 }: BusinessValidationInput) {
   if (entity === "users") {
     const identifier = normalize(item.identifier);
     const phone = normalize(item.phone);
-    const isBackOffice = item.accessChannel === "BackOffice";
     const schoolExists = schoolsData.some((schoolItem) => normalize(schoolItem.code) === normalize(item.schoolCode));
     const duplicateIdentifier = usersData.find(
       (user) =>
@@ -1052,15 +1151,11 @@ function validateBusinessRules({
         normalize(user.phone) === phone
     );
 
-    if (isBackOfficeRole(item.role) && item.accessChannel !== "BackOffice") {
-      return "Utilisateur impossible : Super Admin et Admin Pays doivent utiliser le BackOffice.";
-    }
-
     if (item.role === "Admin Pays" && !item.countryScope) {
       return "Utilisateur impossible : un Admin Pays doit être rattaché à un pays.";
     }
 
-    if (!isBackOffice && !schoolExists) {
+    if (!isGlobalOrCountryRole(item.role) && !schoolExists) {
       return "Utilisateur impossible : l'établissement sélectionné n'existe pas.";
     }
 
@@ -1074,6 +1169,41 @@ function validateBusinessRules({
 
     if (item.photoUrl && !/^https?:\/\//i.test(item.photoUrl)) {
       return "Photo impossible : veuillez saisir une URL valide.";
+    }
+
+    return null;
+  }
+
+  if (entity === "countries") {
+    const duplicateCountry = countriesData.find(
+      (country) => country.id !== editingId && normalize(country.code) === normalize(item.code)
+    );
+
+    if (duplicateCountry) {
+      return "Création impossible : ce code pays existe déjà.";
+    }
+
+    return null;
+  }
+
+  if (entity === "subscriptions") {
+    const duplicateSubscription = subscriptionsData.find(
+      (subscription) =>
+        subscription.id !== editingId && normalize(subscription.schoolCode) === normalize(item.schoolCode)
+    );
+
+    if (duplicateSubscription) {
+      return "Abonnement impossible : cet établissement possède déjà un abonnement.";
+    }
+
+    if (!schoolsData.some((schoolItem) => normalize(schoolItem.code) === normalize(item.schoolCode))) {
+      return "Abonnement impossible : l'établissement sélectionné n'existe pas.";
+    }
+
+    const endDate = parseDisplayDate(item.endDate);
+
+    if (endDate && endDate.getTime() < Date.now() && item.status === "Actif") {
+      return "Abonnement impossible : un abonnement actif doit avoir une date de fin future.";
     }
 
     return null;
@@ -1261,17 +1391,17 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function isBackOfficeRole(role?: string) {
+function isGlobalOrCountryRole(role?: string) {
   return role === "Super Administrateur SchoolLink" || role === "Admin Pays";
 }
 
 function getRoleDefaults(role?: string) {
   if (role === "Super Administrateur SchoolLink") {
-    return { scopeLevel: "Global", schoolCode: "*", accessChannel: "BackOffice" };
+    return { scopeLevel: "Global", schoolCode: "*", accessChannel: "Application" };
   }
 
   if (role === "Admin Pays") {
-    return { scopeLevel: "Pays", schoolCode: "*", accessChannel: "BackOffice" };
+    return { scopeLevel: "Pays", schoolCode: "*", accessChannel: "Application" };
   }
 
   return { scopeLevel: "Établissement", schoolCode: "", accessChannel: "Application" };
@@ -1290,6 +1420,8 @@ function getSelectOptions(
   coursesData: any[],
   paymentStatusesData: any[],
   schoolsData: any[],
+  usersData: any[],
+  countriesData: any[],
   form: Record<string, string>
 ) {
   if (key === "gender") {
@@ -1332,7 +1464,16 @@ function getSelectOptions(
   }
 
   if (key === "schoolCode") {
-    return ["*", ...schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean)];
+    return entity === "subscriptions"
+      ? schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean)
+      : ["*", ...schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean)];
+  }
+
+  if (key === "administratorId") {
+    return usersData
+      .filter((user) => user.role === "Admin Pays")
+      .map((user) => user.publicId ?? user.identifier ?? user.id)
+      .filter(Boolean);
   }
 
   if (key === "scopeLevel") {
@@ -1359,8 +1500,12 @@ function getSelectOptions(
     return ["JJ-MM-AAAA", "AAAA-MM-JJ"];
   }
 
-  if (key === "subscriptionPlan") {
+  if (key === "subscriptionPlan" || key === "plan") {
     return ["Essentiel", "Standard", "Premium"];
+  }
+
+  if (key === "paymentStatus") {
+    return ["À jour", "En retard", "En attente"];
   }
 
   if (key === "className") {
@@ -1382,6 +1527,14 @@ function getSelectOptions(
 
     if (entity === "schools") {
       return ["Actif", "Suspendu"];
+    }
+
+    if (entity === "countries") {
+      return ["Actif", "Suspendu"];
+    }
+
+    if (entity === "subscriptions") {
+      return ["Actif", "Suspendu", "Expiré"];
     }
 
     if (entity === "messages") {

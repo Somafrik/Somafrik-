@@ -1,23 +1,24 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { getStudentById, payments } from "../data/catalog";
+import { getStudentById } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
+import { getPaymentStats } from "../domain/metrics/schoolMetrics";
+import { useAdminData } from "../context/AdminDataContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPayments">;
 
 export default function StudentPaymentsScreen({ route, navigation }: Partial<Props>) {
   const { selectedStudentId } = useAuth();
+  const { paymentsData } = useAdminData();
   const studentId = selectedStudentId ?? route?.params?.studentId;
   const student = studentId ? getStudentById(studentId) : undefined;
 
-  const paiementsEleve = payments.filter(
+  const paiementsEleve = paymentsData.filter(
     (paiement) => paiement.studentId === studentId
   );
-  const totalPaid = paiementsEleve
-    .filter((paiement) => paiement.status === "PAYE")
-    .reduce((sum, paiement) => sum + paiement.amount, 0);
+  const paymentStats = getPaymentStats(paiementsEleve);
 
   return (
     <View style={styles.container}>
@@ -31,7 +32,10 @@ export default function StudentPaymentsScreen({ route, navigation }: Partial<Pro
         onPress={() => studentId && navigation?.navigate("StudentDetail", { studentId })}
       >
         <Text style={styles.summaryLabel}>Total payé</Text>
-        <Text style={styles.summaryValue}>{totalPaid.toLocaleString()} FC</Text>
+        <Text style={styles.summaryValue}>{paymentStats.paidAmount.toLocaleString()} FC</Text>
+        <Text style={styles.summaryMeta}>
+          Reste estimé : {paymentStats.pendingAmount.toLocaleString()} FC
+        </Text>
       </TouchableOpacity>
 
       <FlatList
@@ -70,6 +74,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { color: "#DBEAFE", fontWeight: "700" },
   summaryValue: { color: "#FFFFFF", fontSize: 32, fontWeight: "900", marginTop: 6 },
+  summaryMeta: { color: "#DBEAFE", fontWeight: "700", marginTop: 6 },
   card: {
     backgroundColor: "#fff",
     padding: 15,

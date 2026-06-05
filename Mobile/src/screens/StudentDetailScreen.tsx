@@ -23,7 +23,15 @@ export default function StudentDetailScreen({
 }: Partial<Props>) {
   const { session, selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
-  const canSeePayments = session?.role === "school_admin" || session?.role === "parent_student" || session?.role === "student";
+  const canSeePayments =
+    session?.role === "super_admin" ||
+    session?.role === "school_admin" ||
+    session?.role === "country_admin" ||
+    session?.role === "principal" ||
+    session?.role === "prefet" ||
+    session?.role === "secretary" ||
+    session?.role === "parent_student" ||
+    session?.role === "student";
 
   const student = studentId ? getStudentById(studentId) : undefined;
 

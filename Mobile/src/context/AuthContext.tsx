@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { LoginResponse } from "../services/api";
+import { LoginResponse, logout as logoutSession } from "../services/api";
 
 type AuthContextValue = {
   session: LoginResponse | null;
@@ -26,7 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       selectedStudentId,
       setSession: saveSession,
       setSelectedStudentId,
-      logout: () => saveSession(null),
+      logout: () => {
+        logoutSession().catch(() => undefined);
+        saveSession(null);
+      },
     }),
     [session, selectedStudentId]
   );

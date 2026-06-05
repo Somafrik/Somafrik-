@@ -2,8 +2,8 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { presences } from "../data/catalog";
 import { useAdminData } from "../context/AdminDataContext";
+import { getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
 
 type AttendanceStatus = "Présent" | "Absent" | "Retard" | "Justifié";
 
@@ -28,8 +28,11 @@ type SavedCall = {
 
 export default function TeacherAttendanceScreen({ navigation }: any) {
   const { session } = useAuth();
-  const { studentsData } = useAdminData();
-  const assignedClasses = session?.user.assignedClasses ?? [];
+  const { studentsData, classesData, presencesData, upsertPresenceItems } = useAdminData();
+  const assignedClasses =
+    session?.role === "teacher"
+      ? session?.user.assignedClasses ?? []
+      : classesData.map((schoolClass) => schoolClass.name);
   const assignments = session?.user.assignments ?? [];
   const classStudents = studentsData.filter((student) => assignedClasses.includes(student.className));
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
@@ -38,13 +41,13 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
   const [attendance, setAttendance] = useState<Record<string, AttendanceEntry>>(() =>
     Object.fromEntries(
       classStudents.map((student) => {
-        const latest = [...presences]
+        const latest = [...presencesData]
           .reverse()
           .find((presence) => presence.studentId === student.id);
         return [
           student.id,
           {
-            status: (latest?.status ?? (latest?.present ? "Présent" : "Présent")) as AttendanceStatus,
+            status: normalizePresenceStatus(latest) as AttendanceStatus,
           },
         ];
       })
@@ -58,14 +61,16 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
     : [];
 
   const dailyStats = useMemo(() => {
-    const entries = selectedRows.map((student) => attendance[student.id]?.status ?? "Présent");
-    const present = entries.filter((status) => status === "Présent").length;
-    const absent = entries.filter((status) => status === "Absent").length;
-    const late = entries.filter((status) => status === "Retard").length;
-    const justified = entries.filter((status) => status === "Justifié").length;
-    const rate = entries.length ? Math.round((present / entries.length) * 100) : 0;
-
-    return { present, absent, late, justified, rate };
+    return getPresenceStats(
+      selectedRows.map((student) => ({
+        id: `CURRENT-${student.id}`,
+        publicId: `CURRENT-${student.id}`,
+        studentId: student.id,
+        date: todayLabel,
+        present: false,
+        status: attendance[student.id]?.status ?? "Présent",
+      }))
+    );
   }, [attendance, selectedRows]);
 
   const cycleAttendance = (studentId: string) => {
@@ -118,6 +123,19 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
       },
       ...current,
     ]);
+    upsertPresenceItems(
+      rows.map((student) => {
+        const entry = entries[student.id] ?? { status: "Présent" };
+        return {
+          id: `PRE-${todayLabel}-${student.id}`,
+          publicId: `PRE-${todayLabel}-${student.id}`,
+          studentId: student.id,
+          date: todayLabel,
+          present: entry.status === "Présent" || entry.status === "Retard",
+          status: entry.status,
+        };
+      })
+    );
 
     Alert.alert(
       "Appel enregistré",
@@ -187,9 +205,16 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
         const classCourses = assignments
           .filter((assignment) => assignment.className === className)
           .map((assignment) => assignment.course);
-        const presentCount = rows.filter((student) => attendance[student.id]?.status === "Présent").length;
-        const lateCount = rows.filter((student) => attendance[student.id]?.status === "Retard").length;
-        const absentCount = rows.filter((student) => attendance[student.id]?.status === "Absent").length;
+        const classStats = getPresenceStats(
+          rows.map((student) => ({
+            id: `CURRENT-${student.id}`,
+            publicId: `CURRENT-${student.id}`,
+            studentId: student.id,
+            date: todayLabel,
+            present: false,
+            status: attendance[student.id]?.status ?? "Présent",
+          }))
+        );
 
         return (
           <View key={className} style={styles.classCard}>
@@ -202,7 +227,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
                 <Text style={styles.className}>{className}</Text>
                 <Text style={styles.meta}>{classCourses.join(", ") || "Cours non renseignés"}</Text>
                 <Text style={styles.meta}>
-                  {presentCount}/{rows.length} présent(s) • {absentCount} absent(s) • {lateCount} retard(s)
+                  {classStats.attended}/{rows.length} présent(s) • {classStats.absent} absent(s) • {classStats.late} retard(s)
                 </Text>
               </View>
               <Ionicons name="checkbox-outline" size={24} color="#16A34A" />

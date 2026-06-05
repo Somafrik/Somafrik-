@@ -27,7 +27,18 @@ const auditService = new AuditService(repository);
 
 app.use(cors());
 app.use(express.json());
-app.use("/backoffice", express.static(path.join(__dirname, "..", "BackOffice")));
+app.use(
+  "/backoffice",
+  express.static(path.join(__dirname, "..", "BackOffice"), {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    },
+  }),
+);
 
 app.get("/", asyncHandler(async (_req, res) => {
   res.json({
@@ -161,7 +172,7 @@ app.get("/api/classes", requireAuth, asyncHandler(async (req, res) => {
     const classPresences = presences.filter((presence) =>
       classStudents.some((student) => student.id === presence.studentId)
     );
-    const presentCount = classPresences.filter((presence) => presence.present).length;
+    const presentCount = classPresences.filter((presence) => presence.present || presence.status === "Retard").length;
     const presenceRate = classPresences.length
       ? Math.round((presentCount / classPresences.length) * 100)
       : 0;
@@ -247,7 +258,7 @@ app.get("/api/students/:id/payments", requireAuth, asyncHandler(async (req, res)
   res.json(student ? payments.filter((payment) => payment.studentId === student.id) : []);
 }));
 
-app.get("/api/teachers", requireAuth, asyncHandler(async (req, res) => {
+app.get("/api/teachers", requireAuth, requirePermission("GET /api/teachers"), asyncHandler(async (req, res) => {
   const { teachers } = await getRuntime();
   const result = tenantScopeService.filterRows(teachers, req.principal).map(({ password, passwordHash, pinHash, ...teacher }) => ({
       ...teacher,
@@ -515,7 +526,12 @@ function getPrincipalStudentIds(response) {
 }
 
 function roleLabelFromMobileRole(role) {
+  if (role === "super_admin") return "Super Administrateur SchoolLink";
+  if (role === "country_admin") return "Admin Pays";
   if (role === "school_admin") return "Admin School";
+  if (role === "principal") return "Proviseur";
+  if (role === "prefet") return "Préfet des études";
+  if (role === "secretary") return "Secrétaire";
   if (role === "teacher") return "Enseignant";
   if (role === "student") return "Élève / Étudiant";
   if (role === "parent_student") return "Parent";

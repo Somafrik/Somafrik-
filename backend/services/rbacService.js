@@ -1,22 +1,27 @@
 const seedData = require("../data");
 
 const roleAliases = {
+  super_admin: "Super Administrateur SchoolLink",
+  country_admin: "Admin Pays",
   school_admin: "Admin School",
+  prefet: "Préfet des études",
+  secretary: "Secrétaire",
   teacher: "Enseignant",
   student: "Élève / Étudiant",
   parent_student: "Parent",
 };
 
 const routePermissions = {
-  "GET /api/users": ["Gérer utilisateurs", "Auditer utilisateurs pays", "ALL_PRIVILEGES"],
-  "GET /api/payments": ["Gérer paiements", "Voir paiements", "Voir rapports financiers", "Suivre abonnements pays", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
-  "GET /api/v2/subjects": ["Gérer cours", "Voir classes", "Modifier notes", "Organiser examens", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
-  "POST /api/v2/subjects": ["Gérer cours", "ALL_PRIVILEGES"],
-  "DELETE /api/v2/subjects/:code": ["Gérer cours", "ALL_PRIVILEGES"],
-  "GET /api/v2/academic-years": ["Valider années académiques", "Gérer planning académique", "Gérer classes", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
-  "GET /api/v2/exams": ["Valider examens", "Organiser examens", "Gérer cours", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
-  "GET /api/v2/documents": ["Valider bulletins", "Voir rapports", "Gérer élèves", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
-  "GET /api/v2/reports/advanced": ["Voir rapports globaux", "Voir rapports pays", "Voir rapports", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
+  "GET /api/users": ["Utilisateurs:READ", "Gérer utilisateurs", "Auditer utilisateurs pays", "ALL_PRIVILEGES"],
+  "GET /api/teachers": ["Enseignants:READ", "Voir enseignants", "Gérer enseignants", "ALL_PRIVILEGES"],
+  "GET /api/payments": ["Paiements:READ", "Gérer paiements", "Voir paiements", "Voir rapports financiers", "Suivre abonnements pays", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
+  "GET /api/v2/subjects": ["Matières:READ", "Gérer cours", "Voir classes", "Modifier notes", "Organiser examens", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
+  "POST /api/v2/subjects": ["Matières:CREATE", "Gérer cours", "ALL_PRIVILEGES"],
+  "DELETE /api/v2/subjects/:code": ["Matières:DELETE", "Gérer cours", "ALL_PRIVILEGES"],
+  "GET /api/v2/academic-years": ["Années Académiques:READ", "Valider années académiques", "Gérer planning académique", "Gérer classes", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
+  "GET /api/v2/exams": ["Examens:READ", "Valider examens", "Organiser examens", "Gérer cours", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
+  "GET /api/v2/documents": ["Documents:READ", "Valider bulletins", "Voir rapports", "Gérer élèves", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
+  "GET /api/v2/reports/advanced": ["Rapports:READ", "Voir rapports globaux", "Voir rapports pays", "Voir rapports", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
   "GET /api/backoffice/countries": ["Contrôler tous les pays", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
   "GET /api/backoffice/subscriptions": ["Gérer abonnements", "Suivre abonnements pays", "ALL_PRIVILEGES"],
   "GET /api/backoffice/notifications": ["ALL_PRIVILEGES", "COUNTRY_PRIVILEGES"],

@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
+import { canReadEntity, canReadRoute } from "../domain/security/permissions";
 
 type MenuItem = {
   label: string;
@@ -13,7 +14,9 @@ type MenuItem = {
 };
 
 const adminMenuItems: MenuItem[] = [
+  { label: "🌍 Pays", entity: "countries" },
   { label: "🏫 Établissements", entity: "schools" },
+  { label: "📦 Abonnements", entity: "subscriptions" },
   { label: "👤 Utilisateurs", entity: "users" },
   { label: "👥 Élèves", entity: "students" },
   { label: "👨‍🏫 Enseignants", entity: "teachers" },
@@ -82,13 +85,17 @@ export default function MenuScreen() {
     ? parentMenuItems
     : isTeacher
       ? teacherMenuItems
-      : adminMenuItems;
+      : adminMenuItems.filter((item) => {
+        if (item.entity) return canReadEntity(session, item.entity);
+        if (item.route) return canReadRoute(session, item.route);
+        return true;
+      });
 
   const handleLogout = () => {
     logout();
     navigation.reset({
       index: 0,
-      routes: [{ name: "RoleSelection" }],
+      routes: [{ name: "Welcome" }],
     });
   };
 
@@ -148,7 +155,14 @@ export default function MenuScreen() {
 }
 
 function getUnreadMessagesCount(session: any, messagesData: any[], studentsData: any[]) {
-  if (session?.role === "school_admin") {
+  if (
+    session?.role === "super_admin" ||
+    session?.role === "school_admin" ||
+    session?.role === "country_admin" ||
+    session?.role === "principal" ||
+    session?.role === "prefet" ||
+    session?.role === "secretary"
+  ) {
     return messagesData.filter(
       (message) => message.status === "Nouveau" && message.direction === "Parent vers école"
     ).length;

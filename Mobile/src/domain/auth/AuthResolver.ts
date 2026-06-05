@@ -20,7 +20,7 @@ export class AuthResolver {
     const accountIdentifier = new AccountIdentifier(schoolCode, identifier);
 
     if (accountIdentifier.isAdmin()) {
-      return this.toRole("school_admin", "Administrateur");
+      return this.toRole("school_admin", "Admin Établissement");
     }
 
     if (this.findTeacher(accountIdentifier)) {

@@ -16,20 +16,43 @@ import { SchoolInfo, getSchoolByCode } from "../services/api";
 type Props = NativeStackScreenProps<RootStackParamList, "RoleSelection">;
 
 export default function RoleSelectionScreen({ navigation }: Props) {
-  const [schoolCode, setSchoolCode] = useState("CD-2026-0001");
+  const [accessCode, setAccessCode] = useState("CD-2026-0001");
   const [school, setSchool] = useState<SchoolInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const verifySchool = async () => {
-    if (!schoolCode.trim()) {
-      Alert.alert("Code établissement", "Veuillez saisir le code de votre établissement.");
+  const verifyAccess = async () => {
+    const normalizedAccess = accessCode.trim().toUpperCase();
+
+    if (!normalizedAccess) {
+      Alert.alert("Accès SchoolLink", "Veuillez saisir un code établissement ou un identifiant admin.");
+      return;
+    }
+
+    if (normalizedAccess === "SUPERADMIN" || normalizedAccess === "SUPERADMIN-SCHOOLLINK") {
+      navigation.navigate("Login", {
+        school: getPlatformSchool("Global"),
+        accessIdentifier: "superadmin",
+        accessRole: "super_admin",
+        accessRoleLabel: "Super Administrateur",
+      });
+      return;
+    }
+
+    if (normalizedAccess.startsWith("ADMINPAYS-")) {
+      const countryCode = normalizedAccess.replace("ADMINPAYS-", "");
+      navigation.navigate("Login", {
+        school: getPlatformSchool(countryCode),
+        accessIdentifier: countryCode === "CD" ? "admin-rdc" : `admin-${countryCode.toLowerCase()}`,
+        accessRole: "country_admin",
+        accessRoleLabel: "Admin Pays",
+      });
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const result = await getSchoolByCode(schoolCode);
+      const result = await getSchoolByCode(accessCode);
       setSchool(result);
     } catch (error) {
       setSchool(null);
@@ -45,13 +68,13 @@ export default function RoleSelectionScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.brand}>SchoolLink</Text>
-      <Text style={styles.title}>Identification de l'établissement</Text>
+      <Text style={styles.title}>Se connecter à l'établissement</Text>
 
       <TextInput
-        placeholder="Code établissement"
-        value={schoolCode}
+        placeholder="Code établissement / Identifiant organisation"
+        value={accessCode}
         onChangeText={(value) => {
-          setSchoolCode(value);
+          setAccessCode(value);
           setSchool(null);
         }}
         autoCapitalize="characters"
@@ -61,7 +84,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
       <TouchableOpacity
         activeOpacity={0.85}
         style={[styles.primaryButton, isLoading && styles.disabledButton]}
-        onPress={verifySchool}
+        onPress={verifyAccess}
         disabled={isLoading}
       >
         {isLoading ? (
@@ -90,6 +113,19 @@ export default function RoleSelectionScreen({ navigation }: Props) {
       )}
     </View>
   );
+}
+
+function getPlatformSchool(scope: string): SchoolInfo {
+  return {
+    id: `PLATFORM-${scope}`,
+    publicId: scope,
+    code: "CD-2026-0001",
+    name: scope === "Global" ? "SchoolLink Global" : `SchoolLink ${scope}`,
+    city: scope === "Global" ? "Plateforme" : scope,
+    country: scope,
+    slogan: "Pilotage mobile et tablette",
+    status: "Actif",
+  };
 }
 
 const styles = StyleSheet.create({

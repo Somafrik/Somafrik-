@@ -30,7 +30,7 @@ class BackOfficeAccessService {
       throw new BusinessError(403, "Compte suspendu ou desactive");
     }
 
-    if (user.accessChannel !== "BackOffice") {
+    if (user.accessChannel !== "BackOffice" && !this.isPlatformAdmin(user)) {
       throw new BusinessError(403, "Ce compte n'a pas accès au BackOffice");
     }
 
@@ -60,6 +60,10 @@ class BackOfficeAccessService {
     }
 
     return user.password === password;
+  }
+
+  isPlatformAdmin(user) {
+    return user.role === "Super Administrateur SchoolLink" || user.role === "Admin Pays";
   }
 
   resolveSchoolContext(schoolCode) {

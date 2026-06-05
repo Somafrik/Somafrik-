@@ -1,13 +1,18 @@
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
-import { courses, notes, students } from "../data/catalog";
+import { notes } from "../data/catalog";
 import { GradeBookService } from "../domain/academics/GradeBookService";
+import { useAdminData } from "../context/AdminDataContext";
 
 export default function TeacherGradesScreen({ navigation }: any) {
   const { session } = useAuth();
-  const assignments = session?.user.assignments ?? [];
-  const gradeBook = new GradeBookService(students, notes, courses);
+  const { studentsData, coursesData } = useAdminData();
+  const assignments =
+    session?.role === "teacher"
+      ? session?.user.assignments ?? []
+      : coursesData.map((course) => ({ className: course.className, course: course.name }));
+  const gradeBook = new GradeBookService(studentsData, notes, coursesData);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -15,7 +20,7 @@ export default function TeacherGradesScreen({ navigation }: any) {
       <Text style={styles.subtitle}>Vos cours par classe</Text>
 
       {assignments.map((assignment) => {
-        const classStudents = students.filter((student) => student.className === assignment.className);
+        const classStudents = studentsData.filter((student) => student.className === assignment.className);
         const classStats = gradeBook.getClassStatistics(assignment.className);
 
         return (

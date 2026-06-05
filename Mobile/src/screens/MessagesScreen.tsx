@@ -14,6 +14,7 @@ import { useAdminData } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { MessagePriority, MessageService } from "../domain/communication/MessageService";
+import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
 
 const messageService = new MessageService();
 const priorities: MessagePriority[] = ["Faible", "Moyenne", "Haute", "Critique"];
@@ -60,15 +61,16 @@ export default function MessagesScreen({ navigation }: any) {
       );
     }
 
-    if (role === "school_admin") {
+    if (canReadEntity(session, "messages") && role !== "parent_student") {
       return messagesData;
     }
 
     return messagesData.filter((item) => item.parentPhone === parentPhone);
-  }, [messagesData, parentPhone, role, session?.user.id, teacherStudents]);
+  }, [messagesData, parentPhone, role, session, teacherStudents]);
 
   const visibleMessages = useMemo(() => messageService.search(roleMessages, query), [query, roleMessages]);
   const unreadCount = getUnreadMessagesCount(role, session, visibleMessages);
+  const canManageMessages = canMutateEntity(session, "messages", "UPDATE");
 
   const sendMessage = () => {
     if (!message.trim()) {
@@ -144,7 +146,7 @@ export default function MessagesScreen({ navigation }: any) {
               {unreadCount} non lu(s) • école, parents et enseignants
             </Text>
           </View>
-          {role === "school_admin" && (
+          {canManageMessages && (
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.adminButton}

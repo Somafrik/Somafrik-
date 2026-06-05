@@ -78,7 +78,7 @@ export type PresenceItem = {
   studentId: string;
   date: string;
   present: boolean;
-  status?: "Présent" | "Absent" | "Retard" | string;
+  status?: "Présent" | "Absent" | "Retard" | "Justifié" | "Present" | string;
 };
 
 export type PaymentItem = {
@@ -209,6 +209,34 @@ export type SchoolProfile = {
   createdAt: string;
 };
 
+export type CountryProfile = {
+  id: string;
+  name: string;
+  code: string;
+  phonePrefix: string;
+  currency: string;
+  timezone: string;
+  status: "Actif" | "Suspendu" | string;
+  administratorId?: string;
+  createdAt: string;
+};
+
+export type SubscriptionItem = {
+  id: string;
+  schoolCode: string;
+  countryCode: string;
+  country: string;
+  plan: string;
+  monthlyPrice: number;
+  annualPrice: number;
+  currency: string;
+  status: "Actif" | "Suspendu" | string;
+  paymentStatus: "À jour" | "En retard" | string;
+  startDate: string;
+  endDate: string;
+  lastPaymentDate: string;
+};
+
 export const school: SchoolProfile = {
   id: "550e8400-e29b-41d4-a716-446655440001",
   publicId: "CD-2026-0001",
@@ -240,33 +268,175 @@ export const school: SchoolProfile = {
 
 export const schools: SchoolProfile[] = [school];
 
+export const countries: CountryProfile[] = [
+  {
+    id: "COUNTRY-RDC",
+    name: "République Démocratique du Congo",
+    code: "CD",
+    phonePrefix: "+243",
+    currency: "CDF",
+    timezone: "Africa/Kinshasa",
+    status: "Actif",
+    administratorId: "USER-COUNTRY-RDC",
+    createdAt: "01-09-2025",
+  },
+  {
+    id: "COUNTRY-CG",
+    name: "République du Congo",
+    code: "CG",
+    phonePrefix: "+242",
+    currency: "XAF",
+    timezone: "Africa/Brazzaville",
+    status: "Suspendu",
+    administratorId: "",
+    createdAt: "15-05-2026",
+  },
+  {
+    id: "COUNTRY-BI",
+    name: "Burundi",
+    code: "BI",
+    phonePrefix: "+257",
+    currency: "BIF",
+    timezone: "Africa/Bujumbura",
+    status: "Actif",
+    administratorId: "USER-COUNTRY-BI",
+    createdAt: "15-05-2026",
+  },
+];
+
+export const subscriptions: SubscriptionItem[] = [
+  {
+    id: "SUB-CD-2026-0001",
+    schoolCode: "CD-2026-0001",
+    countryCode: "CD",
+    country: "RDC",
+    plan: "Premium",
+    monthlyPrice: 120,
+    annualPrice: 1200,
+    currency: "USD",
+    status: "Actif",
+    paymentStatus: "À jour",
+    startDate: "01-09-2025",
+    endDate: "31-08-2026",
+    lastPaymentDate: "01-06-2026",
+  },
+  {
+    id: "SUB-CG-2026-0001",
+    schoolCode: "CG-2026-0001",
+    countryCode: "CG",
+    country: "République du Congo",
+    plan: "Standard",
+    monthlyPrice: 80,
+    annualPrice: 800,
+    currency: "USD",
+    status: "Suspendu",
+    paymentStatus: "En retard",
+    startDate: "01-01-2026",
+    endDate: "31-05-2026",
+    lastPaymentDate: "01-04-2026",
+  },
+];
+
 export const rolePermissions: Record<string, string[]> = {
   "Super Administrateur SchoolLink": [
+    "ALL_PRIVILEGES",
     "Contrôler tous les pays",
+    "Créer un pays",
+    "Modifier un pays",
+    "Suspendre un pays",
+    "Réactiver un pays",
+    "Supprimer un pays",
+    "Affecter un administrateur pays",
     "Contrôler tous les établissements",
     "Gérer administrateurs pays",
     "Gérer administrateurs écoles",
     "Gérer abonnements",
+    "Modifier tarifs par pays",
     "Gérer utilisateurs",
     "Voir rapports globaux",
     "Auditer connexions",
   ],
   "Admin Pays": [
+    "COUNTRY_PRIVILEGES",
     "Gérer établissements du pays",
+    "Créer un établissement",
+    "Modifier un établissement",
+    "Suspendre un établissement",
+    "Réactiver un établissement",
+    "Valider une inscription",
+    "Refuser une inscription",
+    "Demander pièces complémentaires",
     "Gérer admins écoles du pays",
     "Voir rapports pays",
     "Suivre abonnements pays",
+    "Relancer établissements en retard",
     "Auditer utilisateurs pays",
+    "Voir élèves",
+    "Gérer élèves",
+    "Voir enseignants",
+    "Gérer enseignants",
+    "Voir classes",
+    "Gérer classes",
+    "Gérer cours",
+    "Voir notes",
+    "Modifier notes",
+    "Voir présences",
+    "Modifier présences",
+    "Gérer paiements",
+    "Gérer utilisateurs",
+    "Gérer annonces",
+    "Publier communications",
+    "Valider bulletins",
+    "Voir rapports",
+    "Voir rapports financiers",
   ],
   "Admin School": [
     "Voir élèves",
     "Gérer élèves",
+    "Voir enseignants",
     "Gérer enseignants",
+    "Voir classes",
     "Gérer classes",
     "Gérer cours",
+    "Voir notes",
+    "Modifier notes",
+    "Voir présences",
+    "Modifier présences",
+    "Faire appel",
     "Gérer paiements",
     "Gérer utilisateurs",
     "Gérer annonces",
+    "Messages parents",
+    "Publier communications",
+    "Valider bulletins",
+    "Valider examens",
+    "Valider années académiques",
+    "Voir rapports",
+    "Voir rapports financiers",
+    "Gérer planning académique",
+    "Créer rapports disciplinaires",
+  ],
+  Proviseur: [
+    "Voir élèves",
+    "Voir enseignants",
+    "Voir classes",
+    "Valider bulletins",
+    "Valider examens",
+    "Valider années académiques",
+    "Voir rapports",
+    "Voir rapports financiers",
+    "Publier communications",
+  ],
+  "Préfet des études": [
+    "Voir élèves",
+    "Voir enseignants",
+    "Voir classes",
+    "Voir notes",
+    "Voir présences",
+    "Organiser examens",
+    "Modifier présences",
+    "Gérer planning académique",
+    "Créer rapports disciplinaires",
   ],
   Directeur: [
     "Voir élèves",
@@ -282,6 +452,44 @@ export const rolePermissions: Record<string, string[]> = {
   Comptable: ["Gérer paiements", "Voir rapports financiers"],
   Surveillant: ["Voir élèves", "Gérer appels", "Gérer discipline"],
 };
+
+const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
+  "Établissements": { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "R", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Utilisateurs: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Classes: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
+  Élèves: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Enseignants: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
+  Présences: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Notes: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "R", "Élève / Étudiant": "R" },
+  Bulletins: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
+  Paiements: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "R", Enseignant: "-", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Notifications: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Messages: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "CRUD", "Élève / Étudiant": "CRUD" },
+  Documents: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Rapports: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
+  "Paramètres Établissement": { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  "Années Académiques": { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Matières: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Examens: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+};
+
+function permissionsFromSecurityMatrix(role: string) {
+  const matrixRole = role === "Proviseur" || role === "Directeur" ? "Préfet des études" : role;
+  return Object.entries(securityMatrix).flatMap(([feature, grants]) => {
+    const access = grants[matrixRole] ?? "-";
+    if (access === "-") return [];
+    const actions = access === "CRUD" ? ["READ", "CREATE", "UPDATE", "DELETE"] : ["READ"];
+    return actions.map((action) => `${feature}:${action}`);
+  });
+}
+
+for (const role of Object.keys(rolePermissions)) {
+  rolePermissions[role] = [...new Set([...(rolePermissions[role] ?? []), ...permissionsFromSecurityMatrix(role)])];
+}
+
+rolePermissions["Super Administrateur SchoolLink"] = [
+  ...new Set(Object.values(rolePermissions).flat()),
+];
 
 export const userAccounts: UserAccount[] = [
   {
@@ -301,7 +509,7 @@ export const userAccounts: UserAccount[] = [
     identifier: "admin",
     status: "Actif",
     permissions: rolePermissions["Admin School"],
-    temporaryPassword: "",
+    temporaryPassword: "1234",
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
@@ -321,11 +529,11 @@ export const userAccounts: UserAccount[] = [
     scopeLevel: "Global",
     countryScope: "",
     schoolCode: "*",
-    accessChannel: "BackOffice",
+    accessChannel: "Application",
     identifier: "superadmin",
     status: "Actif",
     permissions: rolePermissions["Super Administrateur SchoolLink"],
-    temporaryPassword: "",
+    temporaryPassword: "1234",
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
@@ -345,16 +553,88 @@ export const userAccounts: UserAccount[] = [
     scopeLevel: "Pays",
     countryScope: "RDC",
     schoolCode: "*",
-    accessChannel: "BackOffice",
+    accessChannel: "Application",
     identifier: "admin-rdc",
     status: "Actif",
     permissions: rolePermissions["Admin Pays"],
-    temporaryPassword: "",
+    temporaryPassword: "1234",
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
     createdBy: "Super Administrateur SchoolLink",
     history: ["Compte admin pays RDC créé le 01-09-2025"],
+  },
+  {
+    id: "USER-COUNTRY-BI",
+    publicId: "ADM-BI-2026-0001",
+    lastName: "Admin",
+    firstName: "Burundi",
+    gender: "Masculin",
+    phone: "+257 710 000 901",
+    email: "admin.bi@schoollink.app",
+    role: "Admin Pays",
+    secondaryRoles: [],
+    scopeLevel: "Pays",
+    countryScope: "BI",
+    schoolCode: "*",
+    accessChannel: "Application",
+    identifier: "admin-bi",
+    status: "Actif",
+    permissions: rolePermissions["Admin Pays"],
+    temporaryPassword: "1234",
+    photoUrl: "",
+    createdAt: "15-05-2026",
+    lastLoginAt: "",
+    createdBy: "Super Administrateur SchoolLink",
+    history: ["Compte admin pays Burundi créé le 15-05-2026"],
+  },
+  {
+    id: "USER-PREFET-0001",
+    publicId: "USR-PREFET-0001",
+    lastName: "Préfet",
+    firstName: "Samuel",
+    gender: "Masculin",
+    phone: "+243 810 000 902",
+    email: "prefet@schoollink.app",
+    role: "Préfet des études",
+    secondaryRoles: [],
+    scopeLevel: "Établissement",
+    countryScope: "RDC",
+    schoolCode: "CD-2026-0001",
+    accessChannel: "Application",
+    identifier: "prefet",
+    status: "Actif",
+    permissions: rolePermissions["Préfet des études"],
+    temporaryPassword: "1234",
+    photoUrl: "",
+    createdAt: "01-09-2025",
+    lastLoginAt: "",
+    createdBy: "Admin School",
+    history: ["Compte préfet créé le 01-09-2025"],
+  },
+  {
+    id: "USER-SECRETARY-0001",
+    publicId: "USR-SECRETARY-0001",
+    lastName: "Secrétaire",
+    firstName: "Amina",
+    gender: "Féminin",
+    phone: "+243 810 000 903",
+    email: "secretaire@schoollink.app",
+    role: "Secrétaire",
+    secondaryRoles: [],
+    scopeLevel: "Établissement",
+    countryScope: "RDC",
+    schoolCode: "CD-2026-0001",
+    accessChannel: "Application",
+    identifier: "secretaire",
+    status: "Actif",
+    permissions: rolePermissions.Secrétaire,
+    temporaryPassword: "1234",
+    photoUrl: "",
+    createdAt: "01-09-2025",
+    lastLoginAt: "",
+    createdBy: "Admin School",
+    history: ["Compte secrétaire créé le 01-09-2025"],
   },
   {
     id: "USER-T1",
@@ -669,7 +949,9 @@ const demoRoles = [
 ];
 
 demoRoles.forEach((role) => {
-  rolePermissions[role] = ["Voir tableau de bord", "Consulter rapports", "Créer demande", "Voir historique"];
+  if (!rolePermissions[role]) {
+    rolePermissions[role] = ["Voir tableau de bord", "Consulter rapports", "Créer demande", "Voir historique"];
+  }
 });
 
 while (Object.keys(rolePermissions).length < 50) {
@@ -916,7 +1198,7 @@ while (userAccounts.length < 50) {
   const roleNames = Object.keys(rolePermissions);
   const role = roleNames[index % roleNames.length];
   const schoolItem = schools[index % schools.length];
-  const isBackOffice = role === "Super Administrateur SchoolLink" || role === "Admin Pays" || index % 5 === 0;
+  const isBackOffice = index % 5 === 0;
 
   userAccounts.push({
     id: `USER-DEMO-${String(index).padStart(4, "0")}`,
@@ -975,7 +1257,12 @@ export function getPresenceRate(studentIds: string[]) {
     return 0;
   }
 
-  return Math.round((rows.filter((presence) => presence.present).length / rows.length) * 100);
+  const attended = rows.filter((presence) => {
+    const status = presence.status === "Present" ? "Présent" : presence.status;
+    return status ? status === "Présent" || status === "Retard" : presence.present;
+  }).length;
+
+  return Math.round((attended / rows.length) * 100);
 }
 
 export function getPaymentRate(studentIds: string[]) {
