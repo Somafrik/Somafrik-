@@ -8,6 +8,7 @@ declare const process: {
 };
 
 const configuredApiUrl = process.env?.EXPO_PUBLIC_API_URL?.trim();
+let accessToken: string | null = null;
 
 export const API_BASE_URL = configuredApiUrl
   ? `${configuredApiUrl.replace(/\/$/, "")}/api`
@@ -76,6 +77,11 @@ export type IdentifyResponse = {
 
 export type LoginResponse = {
   role: UserRole;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenType?: string;
+  expiresIn?: number;
+  permissions?: string[];
   user: {
     id: string;
     name: string;
@@ -102,6 +108,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options?.headers,
     },
     ...options,
@@ -112,7 +119,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    throw new Error(data?.message ?? "L'API SchoolLink ne répond pas correctement. Vérifiez que le backend est lancé sur le port 5001.");
+    throw new Error(data?.message ?? "L'API SchoolLink ne répond pas correctement. Vérifiez que le backend est lancé sur le port 5000.");
   }
 
   if (!isJson) {
@@ -126,6 +133,9 @@ export function login(payload: LoginPayload) {
   return request<LoginResponse>("/login", {
     method: "POST",
     body: JSON.stringify(payload),
+  }).then((session) => {
+    accessToken = session.accessToken ?? null;
+    return session;
   });
 }
 
@@ -150,7 +160,8 @@ export function getHealth() {
 }
 
 export function getReportCardPdfUrl(studentId: string, period = "Trimestre 1") {
-  return `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/report.pdf?period=${encodeURIComponent(period)}`;
+  const tokenQuery = accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : "";
+  return `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/report.pdf?period=${encodeURIComponent(period)}${tokenQuery}`;
 }
 
 async function identifyAccountFromExistingEndpoints({

@@ -112,9 +112,10 @@ class PostgresRepository {
         ORDER BY st.created_at, st.student_code
       `),
       this.all(`
-        SELECT g.*, st.student_code, cl.class_code, cl.name AS class_name, sub.name AS subject_name,
+        SELECT g.*, st.student_code, s.school_code, cl.class_code, cl.name AS class_name, sub.name AS subject_name,
                sub.coefficient AS subject_coefficient, t.teacher_code, term.name AS term_name
         FROM grades g
+        JOIN schools s ON s.id = g.school_id
         JOIN students st ON st.id = g.student_id
         JOIN classes cl ON cl.id = g.class_id
         JOIN subjects sub ON sub.id = g.subject_id
@@ -123,14 +124,16 @@ class PostgresRepository {
         ORDER BY g.created_at
       `),
       this.all(`
-        SELECT a.*, st.student_code
+        SELECT a.*, st.student_code, s.school_code
         FROM attendance a
+        JOIN schools s ON s.id = a.school_id
         JOIN students st ON st.id = a.student_id
         ORDER BY a.attendance_date, a.created_at
       `),
       this.all(`
-        SELECT p.*, st.student_code
+        SELECT p.*, st.student_code, s.school_code
         FROM payments p
+        JOIN schools s ON s.id = p.school_id
         JOIN students st ON st.id = p.student_id
         ORDER BY p.payment_date, p.created_at
       `),
@@ -147,11 +150,13 @@ class PostgresRepository {
     const students = studentRows.map((student) => this.mapStudent(student));
     const classes = this.uniqueBy(
       classRows.map((schoolClass) => ({
-        id: schoolClass.class_code,
-        publicId: schoolClass.class_code,
-        name: schoolClass.name,
-        level: schoolClass.level,
-        track: schoolClass.section,
+      id: schoolClass.class_code,
+      publicId: schoolClass.class_code,
+      schoolId: schoolClass.school_id,
+      schoolCode: schoolRows.find((school) => school.id === schoolClass.school_id)?.school_code ?? "",
+      name: schoolClass.name,
+      level: schoolClass.level,
+      track: schoolClass.section,
         teacherId: teacherRows.find((teacher) => teacher.school_id === schoolClass.school_id)?.teacher_code ?? "",
       })),
       "id"
@@ -198,6 +203,111 @@ class PostgresRepository {
 
   async close() {
     await this.pool.end();
+  }
+
+  async createSession({ sessionId, refreshTokenHash, userId, schoolCode, role, expiresAt, ipAddress, userAgent }) {
+    await this.init();
+    const school = schoolCode && schoolCode !== "*" ? await this.getSchoolByCode(schoolCode) : null;
+    const dbUserId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(userId ?? ""))
+      ? userId
+      : null;
+    await this.pool.query(
+      `INSERT INTO sessions (session_code, refresh_token_hash, user_id, school_id, role, expires_at, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [sessionId, refreshTokenHash, dbUserId, school?.id ?? null, role, expiresAt, ipAddress ?? "", userAgent ?? ""]
+    );
+  }
+
+  async findActiveSession(sessionId, refreshTokenHash) {
+    await this.init();
+    return this.one(
+      `SELECT sess.*, u.user_code, u.role, s.school_code, c.iso_code AS country_code
+       FROM sessions sess
+       LEFT JOIN users u ON u.id = sess.user_id
+       LEFT JOIN schools s ON s.id = sess.school_id
+       LEFT JOIN countries c ON c.id = s.country_id
+       WHERE sess.session_code = $1
+         AND sess.refresh_token_hash = $2
+         AND sess.revoked_at IS NULL
+         AND sess.expires_at > NOW()`,
+      [sessionId, refreshTokenHash]
+    );
+  }
+
+  async revokeSession(sessionId, reason = "logout") {
+    await this.init();
+    await this.pool.query(
+      "UPDATE sessions SET revoked_at = NOW(), revoke_reason = $2 WHERE session_code = $1 AND revoked_at IS NULL",
+      [sessionId, reason]
+    );
+  }
+
+  async recordAudit({ schoolCode, userId, action, entityType, entityId, oldValue, newValue, ipAddress, userAgent }) {
+    await this.init();
+    const school = schoolCode && schoolCode !== "*" ? await this.getSchoolByCode(schoolCode) : null;
+    const dbUserId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(userId ?? ""))
+      ? userId
+      : null;
+    await this.pool.query(
+      `INSERT INTO audit_logs (school_id, user_id, action, entity_type, entity_id, old_value, new_value, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        school?.id ?? null,
+        dbUserId,
+        action,
+        entityType,
+        entityId ?? null,
+        oldValue ? JSON.stringify(oldValue) : null,
+        newValue ? JSON.stringify(newValue) : null,
+        ipAddress ?? "",
+        userAgent ?? "",
+      ]
+    );
+  }
+
+  async getAuditLogs({ schoolCode, userId, action, from, to, limit = 100 } = {}) {
+    await this.init();
+    const filters = [];
+    const params = [];
+    const addFilter = (sql, value) => {
+      params.push(value);
+      filters.push(sql.replace("?", `$${params.length}`));
+    };
+
+    if (schoolCode) addFilter("s.school_code = ?", schoolCode);
+    if (userId) addFilter("a.user_id = ?", userId);
+    if (action) addFilter("a.action = ?", action);
+    if (from) addFilter("a.created_at >= ?", from);
+    if (to) addFilter("a.created_at <= ?", to);
+
+    params.push(Math.min(Number(limit) || 100, 500));
+    const rows = await this.all(
+      `SELECT a.*, s.school_code, u.user_code, u.first_name, u.last_name
+       FROM audit_logs a
+       LEFT JOIN schools s ON s.id = a.school_id
+       LEFT JOIN users u ON u.id = a.user_id
+       ${filters.length ? `WHERE ${filters.join(" AND ")}` : ""}
+       ORDER BY a.created_at DESC
+       LIMIT $${params.length}`,
+      params
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      schoolCode: row.school_code,
+      userId: row.user_id,
+      userCode: row.user_code,
+      actor: [row.first_name, row.last_name].filter(Boolean).join(" ") || row.user_code || "system",
+      action: row.action,
+      entityType: row.entity_type,
+      entityId: row.entity_id,
+      oldValue: row.old_value,
+      newValue: row.new_value,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
+      createdAt: row.created_at,
+      date: this.formatDate(row.created_at),
+    }));
   }
 
   async seedIfEmpty() {
@@ -667,24 +777,29 @@ class PostgresRepository {
   async getSubjectsV2() {
     await this.init();
     const rows = await this.all(`
-      SELECT sub.*,
+      SELECT sub.*, s.school_code, c.iso_code AS country_code,
              COUNT(DISTINCT sca.class_id) AS class_count,
              COUNT(DISTINCT ta.teacher_id) AS teacher_count,
              COUNT(DISTINCT g.id) AS grade_count,
              COALESCE(json_agg(DISTINCT cl.name) FILTER (WHERE cl.name IS NOT NULL), '[]') AS classes,
              COALESCE(json_agg(DISTINCT u.first_name || ' ' || u.last_name) FILTER (WHERE u.id IS NOT NULL), '[]') AS teachers
       FROM subjects sub
+      JOIN schools s ON s.id = sub.school_id
+      JOIN countries c ON c.id = s.country_id
       LEFT JOIN subject_class_assignments sca ON sca.subject_id = sub.id
       LEFT JOIN classes cl ON cl.id = sca.class_id
       LEFT JOIN teacher_assignments ta ON ta.subject_id = sub.id
       LEFT JOIN teachers t ON t.id = ta.teacher_id
       LEFT JOIN users u ON u.id = t.user_id
       LEFT JOIN grades g ON g.subject_id = sub.id
-      GROUP BY sub.id
+      GROUP BY sub.id, s.school_code, c.iso_code
       ORDER BY sub.created_at, sub.subject_code
     `);
     return rows.map((row) => ({
       id: row.id,
+      schoolId: row.school_id,
+      schoolCode: row.school_code,
+      countryCode: row.country_code,
       code: row.subject_code,
       name: row.name,
       coefficient: Number(row.coefficient),
@@ -731,6 +846,13 @@ class PostgresRepository {
       ]
     );
     this.cachedDataset = null;
+    await this.recordAudit({
+      schoolCode: payload.schoolCode ?? seedData.school.code,
+      action: "subject_upsert",
+      entityType: "subject",
+      entityId: String(payload.code).trim().toUpperCase(),
+      newValue: payload,
+    });
     return { id: row.id, message: "Matière enregistrée" };
   }
 
@@ -746,26 +868,36 @@ class PostgresRepository {
     }
     await this.pool.query("DELETE FROM subjects WHERE id = $1", [subject.id]);
     this.cachedDataset = null;
+    await this.recordAudit({
+      action: "subject_delete",
+      entityType: "subject",
+      entityId: subject.subject_code,
+    });
     return { message: "Matière supprimée" };
   }
 
   async getAcademicYearsV2() {
     await this.init();
     const rows = await this.all(`
-      SELECT ay.*,
+      SELECT ay.*, s.school_code, c.iso_code AS country_code,
              COUNT(DISTINCT e.id) AS enrollment_count,
              COUNT(DISTINCT g.id) AS grade_count,
              COUNT(DISTINCT pd.id) AS decision_count
       FROM academic_years ay
+      JOIN schools s ON s.id = ay.school_id
+      JOIN countries c ON c.id = s.country_id
       LEFT JOIN enrollments e ON e.academic_year_id = ay.id
       LEFT JOIN terms tm ON tm.academic_year_id = ay.id
       LEFT JOIN grades g ON g.term_id = tm.id
       LEFT JOIN promotion_decisions pd ON pd.academic_year_id = ay.id
-      GROUP BY ay.id
+      GROUP BY ay.id, s.school_code, c.iso_code
       ORDER BY ay.start_date DESC NULLS LAST, ay.created_at DESC
     `);
     return rows.map((row) => ({
       id: row.id,
+      schoolId: row.school_id,
+      schoolCode: row.school_code,
+      countryCode: row.country_code,
       name: row.name,
       startDate: this.formatIsoDate(row.start_date),
       endDate: this.formatIsoDate(row.end_date),
@@ -781,19 +913,24 @@ class PostgresRepository {
   async getExamsV2() {
     await this.init();
     const rows = await this.all(`
-      SELECT ex.*, cl.name AS class_name, sub.name AS subject_name,
+      SELECT ex.*, s.school_code, c.iso_code AS country_code, cl.name AS class_name, sub.name AS subject_name,
              COUNT(er.id) AS result_count,
              AVG(er.score) AS average_score,
              AVG(CASE WHEN er.score >= er.max_score / 2 THEN 1 ELSE 0 END) * 100 AS success_rate
       FROM exams ex
+      JOIN schools s ON s.id = ex.school_id
+      JOIN countries c ON c.id = s.country_id
       JOIN classes cl ON cl.id = ex.class_id
       LEFT JOIN subjects sub ON sub.id = ex.subject_id
       LEFT JOIN exam_results er ON er.exam_id = ex.id
-      GROUP BY ex.id, cl.name, sub.name
+      GROUP BY ex.id, s.school_code, c.iso_code, cl.name, sub.name
       ORDER BY ex.exam_date DESC, ex.created_at DESC
     `);
     return rows.map((row) => ({
       id: row.id,
+      schoolId: row.school_id,
+      schoolCode: row.school_code,
+      countryCode: row.country_code,
       code: row.exam_code,
       name: row.name,
       type: row.exam_type,
@@ -810,13 +947,18 @@ class PostgresRepository {
   async getDocumentsV2() {
     await this.init();
     const rows = await this.all(`
-      SELECT doc.*, st.student_code, st.first_name, st.last_name
+      SELECT doc.*, s.school_code, c.iso_code AS country_code, st.student_code, st.first_name, st.last_name
       FROM student_documents doc
+      JOIN schools s ON s.id = doc.school_id
+      JOIN countries c ON c.id = s.country_id
       LEFT JOIN students st ON st.id = doc.student_id
       ORDER BY doc.generated_at DESC, doc.document_code
     `);
     return rows.map((row) => ({
       id: row.id,
+      schoolId: row.school_id,
+      schoolCode: row.school_code,
+      countryCode: row.country_code,
       code: row.document_code,
       type: row.document_type,
       title: row.title,
@@ -927,6 +1069,8 @@ class PostgresRepository {
   mapSchool(school, subscription) {
     return {
       id: school.id,
+      countryId: school.country_id,
+      countryCode: school.iso_code,
       publicId: school.school_code,
       code: school.school_code,
       name: school.name,
@@ -959,6 +1103,7 @@ class PostgresRepository {
   mapSubscription(subscription) {
     return {
       id: subscription.id,
+      schoolId: subscription.school_id,
       schoolCode: subscription.school_code,
       countryCode: subscription.country_code,
       country: subscription.country_name,
@@ -977,9 +1122,13 @@ class PostgresRepository {
   mapUser(user, schoolByCode) {
     const role = roleFromDb[user.role] ?? user.role;
     const school = user.school_code ? schoolByCode.get(user.school_code) : null;
+    const identifier = this.getUserIdentifier(user, role);
+    const countryCode = school?.iso_code ?? this.getCountryCodeForUser(user, role);
+    const countryScope = this.getCountryScopeForUser(school, countryCode);
 
     return {
       id: user.id,
+      schoolId: user.school_id,
       publicId: user.user_code,
       lastName: user.last_name,
       firstName: user.first_name,
@@ -989,7 +1138,8 @@ class PostgresRepository {
       role,
       secondaryRoles: [],
       scopeLevel: role === "Super Administrateur SchoolLink" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
-      countryScope: school?.country_name === "République Démocratique du Congo" ? "RDC" : school?.country_name ?? "",
+      countryScope,
+      countryCode,
       schoolCode: user.school_code ?? "*",
       accessChannel: [
         "SUPER_ADMIN",
@@ -1001,7 +1151,7 @@ class PostgresRepository {
         "SECRETARY",
         "ACCOUNTANT",
       ].includes(user.role) ? "BackOffice" : "Application",
-      identifier: user.email || user.phone || user.user_code,
+      identifier,
       passwordHash: user.password_hash,
       pinHash: user.pin_hash,
       status: this.fromDbStatus(user.status),
@@ -1015,6 +1165,45 @@ class PostgresRepository {
     };
   }
 
+  getCountryCodeForUser(user, role) {
+    if (role === "Admin Pays") {
+      const match = String(user.user_code ?? "").match(/^ADM-([A-Z]{2})-/i);
+      if (match) return match[1].toUpperCase();
+    }
+
+    return "";
+  }
+
+  getCountryScopeForUser(school, countryCode) {
+    if (school?.country_name) {
+      return school.country_name === "République Démocratique du Congo" ? "RDC" : school.country_name;
+    }
+
+    if (countryCode === "CD") {
+      return "RDC";
+    }
+
+    return countryCode;
+  }
+
+  getUserIdentifier(user, role) {
+    const aliases = {
+      "USR-2026-000001": "admin",
+      "USR-2026-000002": "superadmin",
+      "ADM-CD-2026-0001": "admin-rdc",
+    };
+
+    if (aliases[user.user_code]) {
+      return aliases[user.user_code];
+    }
+
+    if (role === "Enseignant" && /^ENS-\d+$/i.test(String(user.user_code))) {
+      return user.user_code;
+    }
+
+    return user.email || user.phone || user.user_code;
+  }
+
   mapTeacher(teacher, gradeRows) {
     const assignments = this.uniqueBy(
       gradeRows
@@ -1025,6 +1214,8 @@ class PostgresRepository {
     );
     return {
       id: teacher.teacher_code,
+      schoolId: teacher.school_id,
+      schoolCode: teacher.school_code,
       publicId: teacher.teacher_code,
       name: [teacher.first_name, teacher.last_name].filter(Boolean).join(" ") || teacher.teacher_code,
       firstName: teacher.first_name,
@@ -1040,6 +1231,7 @@ class PostgresRepository {
   mapStudent(student) {
     return {
       id: student.student_code,
+      schoolId: student.school_id,
       publicId: student.student_code,
       name: `${student.first_name} ${student.last_name}`.trim(),
       firstName: student.first_name,
@@ -1059,6 +1251,8 @@ class PostgresRepository {
   mapGrade(grade) {
     return {
       id: grade.id,
+      schoolId: grade.school_id,
+      schoolCode: grade.school_code,
       studentId: grade.student_code,
       subject: grade.subject_name,
       value: Number(grade.score),
@@ -1077,6 +1271,8 @@ class PostgresRepository {
     const status = this.fromAttendanceStatus(attendance.status);
     return {
       id: attendance.id,
+      schoolId: attendance.school_id,
+      schoolCode: attendance.school_code,
       publicId: attendance.id,
       studentId: attendance.student_code,
       date: this.formatIsoDate(attendance.attendance_date),
@@ -1088,6 +1284,8 @@ class PostgresRepository {
   mapPayment(payment) {
     return {
       id: payment.id,
+      schoolId: payment.school_id,
+      schoolCode: payment.school_code,
       publicId: payment.payment_code,
       studentId: payment.student_code,
       amount: Number(payment.amount),
@@ -1100,6 +1298,7 @@ class PostgresRepository {
   mapAnnouncement(announcement) {
     return {
       id: announcement.id,
+      schoolId: announcement.school_id,
       title: announcement.title,
       message: announcement.message,
       date: this.formatDate(announcement.published_at ?? announcement.created_at),
@@ -1109,6 +1308,8 @@ class PostgresRepository {
   mapNotification(notification) {
     return {
       id: notification.id,
+      schoolId: notification.school_id,
+      schoolCode: notification.school_code,
       audience: "BackOffice",
       countryCode: "*",
       title: notification.title,

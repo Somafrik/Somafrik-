@@ -223,6 +223,7 @@ async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(state.session?.accessToken ? { Authorization: `Bearer ${state.session.accessToken}` } : {}),
       ...options.headers,
     },
     ...options,
@@ -557,7 +558,14 @@ function renderPermissions() {
   const permissions = state.session.user.permissions ?? [];
   permissionCount.textContent = `${permissions.length} permission(s)`;
   permissionsList.innerHTML = permissions
-    .map((permission) => `<div class="permission">${permission}</div>`)
+    .map(
+      (permission) => `
+        <article class="permission" aria-label="Permission autorisée">
+          <span>Autorisé</span>
+          <strong>${escapeHtml(permission)}</strong>
+        </article>
+      `
+    )
     .join("");
 }
 
@@ -787,6 +795,8 @@ function showView(viewName) {
     permissions: "Permissions",
   };
 
+  closeDetail();
+  closeSchoolForm();
   pageTitle.textContent = titles[viewName] ?? "BackOffice";
   document.querySelectorAll(".view").forEach((view) => view.classList.add("hidden"));
   document.querySelector(`#${viewName}View`)?.classList.remove("hidden");
@@ -1091,8 +1101,8 @@ function handleActionClick(event) {
 
   if (action === "export-permissions") {
     const permissions = state.session.user.permissions ?? [];
-    navigator.clipboard?.writeText(permissions.join("\n"));
-    showToast("Permissions copiées dans le presse-papiers.");
+    copyToClipboard(permissions.join("\n"));
+    showToast("Permissions exportées dans le presse-papiers.");
     return;
   }
 
@@ -1100,7 +1110,7 @@ function handleActionClick(event) {
     const report = mvpCoverage
       .map((item) => `${item.priority} | ${item.status} | ${item.scope} | ${item.module} | ${item.detail}`)
       .join("\n");
-    navigator.clipboard?.writeText(report);
+    copyToClipboard(report);
     showToast("Rapport MVP copié dans le presse-papiers.");
   }
 }
@@ -1131,6 +1141,27 @@ function showToast(message) {
   showToast.timeoutId = setTimeout(() => {
     toastMessage.classList.add("hidden");
   }, 2600);
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopyToClipboard(text));
+    return;
+  }
+
+  fallbackCopyToClipboard(text);
+}
+
+function fallbackCopyToClipboard(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "readonly");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function openSchoolDetail(school) {
@@ -1181,6 +1212,7 @@ function openSchoolDetail(school) {
 }
 
 function openSchoolForm(school = null) {
+  closeDetail();
   schoolForm.reset();
   schoolFormError.textContent = "";
   schoolOriginalCode.value = school?.code ?? "";
@@ -1361,6 +1393,7 @@ function renderDetailItem(label, value) {
 }
 
 function openDetail(eyebrow, title, body) {
+  closeSchoolForm();
   detailEyebrow.textContent = eyebrow;
   detailTitle.textContent = title;
   detailBody.innerHTML = body;

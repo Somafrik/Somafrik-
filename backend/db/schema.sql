@@ -357,13 +357,33 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  school_id UUID REFERENCES schools(id),
+  session_code UUID NOT NULL UNIQUE,
+  refresh_token_hash TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL,
+  ip_address TEXT,
+  user_agent TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  revoke_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_schools_country_id ON schools(country_id);
 CREATE INDEX IF NOT EXISTS idx_users_school_id ON users(school_id);
 CREATE INDEX IF NOT EXISTS idx_students_school_id ON students(school_id);
+CREATE INDEX IF NOT EXISTS idx_students_school_search ON students(school_id, student_code, first_name, last_name);
 CREATE INDEX IF NOT EXISTS idx_grades_student_id ON grades(student_id);
+CREATE INDEX IF NOT EXISTS idx_grades_school_id ON grades(school_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_student_date ON attendance(student_id, attendance_date);
 CREATE INDEX IF NOT EXISTS idx_payments_student_id ON payments(student_id);
+CREATE INDEX IF NOT EXISTS idx_payments_school_id ON payments(school_id);
 CREATE INDEX IF NOT EXISTS idx_subject_assignments_school_id ON subject_class_assignments(school_id);
 CREATE INDEX IF NOT EXISTS idx_exams_school_date ON exams(school_id, exam_date);
 CREATE INDEX IF NOT EXISTS idx_exam_results_exam_id ON exam_results(exam_id);
 CREATE INDEX IF NOT EXISTS idx_student_documents_student_id ON student_documents(student_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_filters ON audit_logs(school_id, user_id, action, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(user_id, session_code) WHERE revoked_at IS NULL;
