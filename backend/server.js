@@ -7,6 +7,7 @@ const { GradeBookService } = require("./services/gradeBookService");
 const { MvpBusinessService } = require("./services/mvpBusinessService");
 const { ReportPdfService } = require("./services/reportPdfService");
 const { PostgresRepository } = require("./db/postgresRepository");
+const { FallbackRepository } = require("./db/fallbackRepository");
 const { TokenService } = require("./services/tokenService");
 const { RbacService } = require("./services/rbacService");
 const { PaginationService } = require("./services/paginationService");
@@ -17,13 +18,13 @@ const { AuditService } = require("./services/auditService");
 const app = express();
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgresql://schoollink:schoollink123@localhost:5432/schoollink";
-const repository = new PostgresRepository(databaseUrl);
+let repository = new PostgresRepository(databaseUrl);
 const tokenService = new TokenService();
 const rbacService = new RbacService();
 const paginationService = new PaginationService();
 const cacheService = new CacheService();
 const tenantScopeService = new TenantScopeService();
-const auditService = new AuditService(repository);
+let auditService = new AuditService(repository);
 
 app.use(cors());
 app.use(express.json());
@@ -44,7 +45,7 @@ app.get("/", asyncHandler(async (_req, res) => {
   res.json({
     name: "SchoolLink API",
     status: "ok",
-    database: "postgresql",
+    database: repository.engine ?? "postgresql",
     endpoints: [
       "/api/health",
       "/api/schools",
@@ -85,7 +86,7 @@ app.get("/", asyncHandler(async (_req, res) => {
 
 app.get("/api/health", asyncHandler(async (_req, res) => {
   await repository.init();
-  res.json({ status: "ok", database: "postgresql" });
+  res.json({ status: "ok", database: repository.engine ?? "postgresql" });
 }));
 
 app.get("/api/schools", asyncHandler(async (_req, res) => {
@@ -622,14 +623,31 @@ app.use((error, _req, res, _next) => {
 const PORT = process.env.PORT || 5000;
 const HOST = "0.0.0.0";
 
-repository
-  .init()
+initRepository()
   .then(() => {
     app.listen(PORT, HOST, () => {
       console.log(`Serveur lancé sur http://${HOST}:${PORT}`);
+      console.log(`Base active: ${repository.engine ?? "postgresql"}`);
     });
   })
   .catch((error) => {
-    console.error("Impossible d'initialiser PostgreSQL", error);
+    console.error("Impossible d'initialiser le stockage SchoolLink", error);
     process.exit(1);
   });
+
+async function initRepository() {
+  try {
+    repository.engine = "postgresql";
+    await repository.init();
+  } catch (error) {
+    if (process.env.SCHOOLLINK_DB_REQUIRED === "true") {
+      throw error;
+    }
+
+    console.warn("PostgreSQL indisponible, démarrage en mode démo mémoire.");
+    console.warn(`Cause: ${error.code ?? error.message}`);
+    repository = new FallbackRepository();
+    auditService = new AuditService(repository);
+    await repository.init();
+  }
+}

@@ -15,6 +15,7 @@ import StudentPaymentsScreen from "../screens/StudentPaymentsScreen";
 import TeacherAttendanceScreen from "../screens/TeacherAttendanceScreen";
 import TeacherGradesScreen from "../screens/TeacherGradesScreen";
 import { useAuth } from "../context/AuthContext";
+import { canReadRoute } from "../domain/security/permissions";
 
 const Tab = createBottomTabNavigator();
 
@@ -100,6 +101,17 @@ export default function BottomTabsNavigator() {
   const isGlobalAdmin = session?.role === "super_admin" || session?.role === "country_admin";
   const isPedagogicalStaff = session?.role === "principal" || session?.role === "prefet";
   const isSecretary = session?.role === "secretary";
+  const canOpenClasses = canReadRoute(session, "Classes");
+  const canOpenStudents = canReadRoute(session, "Students");
+  const canOpenTeachers = canReadRoute(session, "Teachers");
+  const canOpenPayments = canReadRoute(session, "Payments");
+  const canOpenProfile = canReadRoute(session, "Profil");
+  const canOpenNotes = canReadRoute(session, "Notes");
+  const canOpenPresences = canReadRoute(session, "Presences");
+  const canOpenStudentPayments = canReadRoute(session, "FraisEleve");
+  const canOpenMessages = canReadRoute(session, "Messages");
+  const canOpenTeacherAttendance = canReadRoute(session, "TeacherAttendance");
+  const canOpenTeacherGrades = canReadRoute(session, "TeacherGrades");
 
   return (
     <Tab.Navigator
@@ -161,59 +173,63 @@ export default function BottomTabsNavigator() {
       <Tab.Screen name="Accueil" component={HomeScreen} />
       {isParentStudent ? (
         <>
-          <Tab.Screen name="Profil" component={StudentDetailScreen} />
-          <Tab.Screen name="Notes" component={StudentNotesScreen} />
-          <Tab.Screen name="Presences" component={StudentPresencesScreen} />
-          <Tab.Screen name="FraisEleve" component={StudentPaymentsScreen} />
+          {canOpenProfile && <Tab.Screen name="Profil" component={StudentDetailScreen} />}
+          {canOpenNotes && <Tab.Screen name="Notes" component={StudentNotesScreen} />}
+          {canOpenPresences && <Tab.Screen name="Presences" component={StudentPresencesScreen} />}
+          {canOpenStudentPayments && <Tab.Screen name="FraisEleve" component={StudentPaymentsScreen} />}
         </>
       ) : isTeacher ? (
         <>
-          <Tab.Screen name="Classes" component={ClassesScreen} />
-          <Tab.Screen name="TeacherStudents" component={StudentsScreen} />
-          <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />
-          <Tab.Screen name="TeacherGrades" component={TeacherGradesScreen} />
+          {canOpenClasses && <Tab.Screen name="Classes" component={ClassesScreen} />}
+          {canOpenStudents && <Tab.Screen name="TeacherStudents" component={StudentsScreen} />}
+          {canOpenTeacherAttendance && <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />}
+          {canOpenTeacherGrades && <Tab.Screen name="TeacherGrades" component={TeacherGradesScreen} />}
         </>
       ) : isPedagogicalStaff ? (
         <>
-          <Tab.Screen name="Classes" component={ClassesScreen} />
-          <Tab.Screen name="TeacherStudents" component={StudentsScreen} />
-          <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />
-          <Tab.Screen name="TeacherGrades" component={TeacherGradesScreen} />
+          {canOpenClasses && <Tab.Screen name="Classes" component={ClassesScreen} />}
+          {canOpenStudents && <Tab.Screen name="TeacherStudents" component={StudentsScreen} />}
+          {canOpenTeacherAttendance && <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />}
+          {canOpenTeacherGrades && <Tab.Screen name="TeacherGrades" component={TeacherGradesScreen} />}
         </>
       ) : isSecretary ? (
         <>
-          <Tab.Screen name="TeacherStudents" component={StudentsScreen} />
-          <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />
-          <Tab.Screen name="Paiements" component={PaymentsScreen} />
-          <Tab.Screen name="Messages" component={MessagesScreen} />
+          {canOpenStudents && <Tab.Screen name="TeacherStudents" component={StudentsScreen} />}
+          {canOpenTeacherAttendance && <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />}
+          {canOpenPayments && <Tab.Screen name="Paiements" component={PaymentsScreen} />}
+          {canOpenMessages && <Tab.Screen name="Messages" component={MessagesScreen} />}
         </>
       ) : isGlobalAdmin ? (
         <>
-          <Tab.Screen name="Classes" component={ClassesScreen} />
-          <Tab.Screen name="Enseignants" component={TeachersScreen} />
-          <Tab.Screen name="Paiements" component={PaymentsScreen} />
-          <Tab.Screen
-            name="Students"
-            component={StudentsScreen}
-            options={{
-              tabBarButton: () => null,
-              tabBarItemStyle: { display: "none" },
-            }}
-          />
+          {canOpenClasses && <Tab.Screen name="Classes" component={ClassesScreen} />}
+          {canOpenTeachers && <Tab.Screen name="Enseignants" component={TeachersScreen} />}
+          {canOpenPayments && <Tab.Screen name="Paiements" component={PaymentsScreen} />}
+          {canOpenStudents && (
+            <Tab.Screen
+              name="Students"
+              component={StudentsScreen}
+              options={{
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: "none" },
+              }}
+            />
+          )}
         </>
       ) : (
         <>
-          <Tab.Screen name="Classes" component={ClassesScreen} />
-          <Tab.Screen
-            name="Students"
-            component={StudentsScreen}
-            options={{
-              tabBarButton: () => null,
-              tabBarItemStyle: { display: "none" },
-            }}
-          />
-          <Tab.Screen name="Enseignants" component={TeachersScreen} />
-          <Tab.Screen name="Paiements" component={PaymentsScreen} />
+          {canOpenClasses && <Tab.Screen name="Classes" component={ClassesScreen} />}
+          {canOpenStudents && (
+            <Tab.Screen
+              name="Students"
+              component={StudentsScreen}
+              options={{
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: "none" },
+              }}
+            />
+          )}
+          {canOpenTeachers && <Tab.Screen name="Enseignants" component={TeachersScreen} />}
+          {canOpenPayments && <Tab.Screen name="Paiements" component={PaymentsScreen} />}
         </>
       )}
       <Tab.Screen name="Menu" component={MenuScreen} />

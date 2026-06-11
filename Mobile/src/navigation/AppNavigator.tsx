@@ -22,6 +22,7 @@ import TimetableScreen from "../screens/TimetableScreen";
 import ReportCardsScreen from "../screens/ReportCardsScreen";
 import { AdminEntity } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
+import { canReadRoute } from "../domain/security/permissions";
 
 export type UserRole =
   | "super_admin"
@@ -98,10 +99,10 @@ export default function AppNavigator() {
   const isPedagogicalStaff = role === "principal" || role === "prefet";
   const isSecretary = role === "secretary";
   const canOpenAdminCrud = isAdmin || isPedagogicalStaff || isSecretary;
-  const isTeacher = role === "teacher";
-  const isParent = role === "parent_student";
-  const isStudent = role === "student";
-  const canOpenStudentScreens = isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent;
+  const canOpenStudentScreens =
+    canReadRoute(session, "StudentDetail") ||
+    canReadRoute(session, "StudentNotes") ||
+    canReadRoute(session, "StudentPresences");
 
   return (
     <NavigationContainer>
@@ -132,44 +133,49 @@ export default function AppNavigator() {
 
         {canOpenAdminCrud && (
           <>
-            {isAdmin && <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />}
-            {(isAdmin || isPedagogicalStaff || isSecretary) && <Stack.Screen name="Teachers" component={TeachersScreen} />}
-            {(isAdmin || isPedagogicalStaff || isSecretary) && <Stack.Screen name="Payments" component={PaymentsScreen} />}
+            {canReadRoute(session, "SchoolManagement") && <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />}
+            {canReadRoute(session, "Teachers") && <Stack.Screen name="Teachers" component={TeachersScreen} />}
+            {canReadRoute(session, "Payments") && <Stack.Screen name="Payments" component={PaymentsScreen} />}
             <Stack.Screen name="AdminCrud" component={AdminCrudScreen} options={{ title: "Administration" }} />
           </>
         )}
 
-        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher) && (
+        {canReadRoute(session, "Classes") && (
           <>
             <Stack.Screen name="Classes" component={ClassesScreen} />
+          </>
+        )}
+
+        {canReadRoute(session, "Students") && (
+          <>
             <Stack.Screen name="Students" component={StudentsScreen} options={{ title: "Élèves" }} />
           </>
         )}
 
         {canOpenStudentScreens && (
           <>
-            <Stack.Screen name="StudentDetail" component={StudentDetailScreen} />
-            <Stack.Screen name="StudentNotes" component={StudentNotesScreen} options={{ title: "Notes" }} />
-            <Stack.Screen name="StudentPresences" component={StudentPresencesScreen} options={{ title: "Présences" }} />
+            {canReadRoute(session, "StudentDetail") && <Stack.Screen name="StudentDetail" component={StudentDetailScreen} />}
+            {canReadRoute(session, "StudentNotes") && <Stack.Screen name="StudentNotes" component={StudentNotesScreen} options={{ title: "Notes" }} />}
+            {canReadRoute(session, "StudentPresences") && <Stack.Screen name="StudentPresences" component={StudentPresencesScreen} options={{ title: "Présences" }} />}
           </>
         )}
 
-        {(isAdmin || isPedagogicalStaff || isSecretary || isParent || isStudent) && (
+        {canReadRoute(session, "StudentPayments") && (
           <Stack.Screen name="StudentPayments" component={StudentPaymentsScreen} options={{ title: "Paiements" }} />
         )}
 
-        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent) && (
+        {canReadRoute(session, "Announcements") && (
           <Stack.Screen name="Announcements" component={AnnouncementsScreen} />
         )}
 
-        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent) && (
+        {canReadRoute(session, "Messages") && (
           <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: "Messages" }} />
         )}
 
-        {(isAdmin || isPedagogicalStaff || isSecretary || isTeacher || isParent || isStudent) && (
+        {(canReadRoute(session, "Timetable") || canReadRoute(session, "ReportCards")) && (
           <>
-            <Stack.Screen name="Timetable" component={TimetableScreen} options={{ title: "Emploi du temps" }} />
-            <Stack.Screen name="ReportCards" component={ReportCardsScreen} options={{ title: "Bulletins" }} />
+            {canReadRoute(session, "Timetable") && <Stack.Screen name="Timetable" component={TimetableScreen} options={{ title: "Emploi du temps" }} />}
+            {canReadRoute(session, "ReportCards") && <Stack.Screen name="ReportCards" component={ReportCardsScreen} options={{ title: "Bulletins" }} />}
           </>
         )}
       </Stack.Navigator>

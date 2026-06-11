@@ -1,0 +1,12 @@
+{
+  "name": "schoollink-workspace",
+  "private": true,
+  "scripts": {
+    "backend": "npm --prefix backend run dev",
+    "mobile": "npm --prefix Mobile run start --",
+    "mobile:clear": "npm --prefix Mobile run start -- --clear",
+    "mobile:web": "npm --prefix Mobile run web",
+    "mobile:android": "npm --prefix Mobile run android",
+    "mobile:ios": "npm --prefix Mobile run ios"
+  }
+}

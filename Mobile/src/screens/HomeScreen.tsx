@@ -138,26 +138,34 @@ export default function HomeScreen({ navigation }: any) {
               label="Appel"
               onPress={() => navigation.navigate("TeacherAttendance")}
             />
-            <QuickAction
-              icon="reader-outline"
-              label="Notes"
-              onPress={() => navigation.navigate("TeacherGrades")}
-            />
-            <QuickAction
-              icon="time-outline"
-              label="Planning"
-              onPress={() => navigation.navigate("Timetable")}
-            />
-            <QuickAction
-              icon="document-text-outline"
-              label="Bulletins"
-              onPress={() => navigation.navigate("ReportCards")}
-            />
-            <QuickAction
-              icon="chatbubbles-outline"
-              label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
-              onPress={() => navigation.navigate("Messages")}
-            />
+            {canReadRoute(session, "TeacherGrades") && (
+              <QuickAction
+                icon="reader-outline"
+                label="Notes"
+                onPress={() => navigation.navigate("TeacherGrades")}
+              />
+            )}
+            {canReadRoute(session, "Timetable") && (
+              <QuickAction
+                icon="time-outline"
+                label="Planning"
+                onPress={() => navigation.navigate("Timetable")}
+              />
+            )}
+            {canReadRoute(session, "ReportCards") && (
+              <QuickAction
+                icon="document-text-outline"
+                label="Bulletins"
+                onPress={() => navigation.navigate("ReportCards")}
+              />
+            )}
+            {canReadRoute(session, "Messages") && (
+              <QuickAction
+                icon="chatbubbles-outline"
+                label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
+                onPress={() => navigation.navigate("Messages")}
+              />
+            )}
           </View>
         </ScrollView>
       </View>
@@ -280,22 +288,26 @@ export default function HomeScreen({ navigation }: any) {
               label="Présences"
               onPress={() => navigation.navigate("StudentPresences", { studentId: selectedStudentId })}
             />
-            <QuickAction
-              icon="time-outline"
-              label="Emploi du temps"
-              onPress={() => navigation.navigate("Timetable")}
-            />
-            <QuickAction
-              icon="document-text-outline"
-              label="Bulletins"
-              onPress={() => navigation.navigate("ReportCards")}
-            />
+            {canReadRoute(session, "Timetable") && (
+              <QuickAction
+                icon="time-outline"
+                label="Emploi du temps"
+                onPress={() => navigation.navigate("Timetable")}
+              />
+            )}
+            {canReadRoute(session, "ReportCards") && (
+              <QuickAction
+                icon="document-text-outline"
+                label="Bulletins"
+                onPress={() => navigation.navigate("ReportCards")}
+              />
+            )}
             <QuickAction
               icon="card-outline"
               label="Paiements"
               onPress={() => navigation.navigate("StudentPayments", { studentId: selectedStudentId })}
             />
-            {session.role === "parent_student" && (
+            {session.role === "parent_student" && canReadRoute(session, "Messages") && (
               <QuickAction
                 icon="chatbubbles-outline"
                 label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
@@ -538,71 +550,97 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.actionsGrid}>
-          <QuickAction
-            icon="business-outline"
-            label="Établissement"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "schools" })}
-          />
-          <QuickAction
-            icon="person-circle-outline"
-            label="Utilisateurs"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
-          />
-          <QuickAction
-            icon="add-circle-outline"
-            label="Élèves"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
-          />
-          <QuickAction
-            icon="person-add-outline"
-            label="Profs"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
-          />
-          <QuickAction
-            icon="card-outline"
-            label="Paiements"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
-          />
-          <QuickAction
-            icon="settings-outline"
-            label="Statuts"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "paymentStatuses" })}
-          />
-          <QuickAction
-            icon="megaphone-outline"
-            label="Annonces"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
-          />
-          <QuickAction
-            icon="chatbubbles-outline"
-            label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
-            onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
-          />
-          <QuickAction
-            icon="grid-outline"
-            label="Classes"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "classes" })}
-          />
-          <QuickAction
-            icon="book-outline"
-            label="Cours"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "courses" })}
-          />
-          <QuickAction
-            icon="swap-horizontal-outline"
-            label="Affectations"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "assignments" })}
-          />
-          <QuickAction
-            icon="time-outline"
-            label="Planning"
-            onPress={() => navigation.navigate("Timetable")}
-          />
-          <QuickAction
-            icon="document-text-outline"
-            label="Bulletins"
-            onPress={() => navigation.navigate("ReportCards")}
-          />
+          {canReadEntity(session, "schools") && (
+            <QuickAction
+              icon="business-outline"
+              label="Établissement"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "schools" })}
+            />
+          )}
+          {canReadEntity(session, "users") && (
+            <QuickAction
+              icon="person-circle-outline"
+              label="Utilisateurs"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
+            />
+          )}
+          {canReadEntity(session, "students") && (
+            <QuickAction
+              icon="add-circle-outline"
+              label="Élèves"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
+            />
+          )}
+          {canReadEntity(session, "teachers") && (
+            <QuickAction
+              icon="person-add-outline"
+              label="Profs"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
+            />
+          )}
+          {canReadEntity(session, "payments") && (
+            <QuickAction
+              icon="card-outline"
+              label="Paiements"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+            />
+          )}
+          {canReadEntity(session, "paymentStatuses") && (
+            <QuickAction
+              icon="settings-outline"
+              label="Statuts"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "paymentStatuses" })}
+            />
+          )}
+          {canReadEntity(session, "announcements") && (
+            <QuickAction
+              icon="megaphone-outline"
+              label="Annonces"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+            />
+          )}
+          {canReadEntity(session, "messages") && (
+            <QuickAction
+              icon="chatbubbles-outline"
+              label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
+              onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
+            />
+          )}
+          {canReadEntity(session, "classes") && (
+            <QuickAction
+              icon="grid-outline"
+              label="Classes"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "classes" })}
+            />
+          )}
+          {canReadEntity(session, "courses") && (
+            <QuickAction
+              icon="book-outline"
+              label="Cours"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "courses" })}
+            />
+          )}
+          {canReadEntity(session, "assignments") && (
+            <QuickAction
+              icon="swap-horizontal-outline"
+              label="Affectations"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "assignments" })}
+            />
+          )}
+          {canReadRoute(session, "Timetable") && (
+            <QuickAction
+              icon="time-outline"
+              label="Planning"
+              onPress={() => navigation.navigate("Timetable")}
+            />
+          )}
+          {canReadRoute(session, "ReportCards") && (
+            <QuickAction
+              icon="document-text-outline"
+              label="Bulletins"
+              onPress={() => navigation.navigate("ReportCards")}
+            />
+          )}
         </View>
       </ScrollView>
     </View>

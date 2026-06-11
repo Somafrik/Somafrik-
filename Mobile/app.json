@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "SchoolLink",
+    "slug": "schoollink",
+    "version": "1.2.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "android": {
+      "package": "com.schoollink.app",
+      "versionCode": 12
+    }
+  }
+}

@@ -71,6 +71,14 @@ const teacherMenuItems: MenuItem[] = [
   { label: "🆘 Support", message: "Le module support sera connecté à l'administration." },
 ];
 
+function filterMenuItemsByPermission(session: any, items: MenuItem[]) {
+  return items.filter((item) => {
+    if (item.entity) return canReadEntity(session, item.entity);
+    if (item.route) return canReadRoute(session, item.route);
+    return true;
+  });
+}
+
 export default function MenuScreen() {
   const navigation = useNavigation<any>();
   const { session, logout } = useAuth();
@@ -80,16 +88,12 @@ export default function MenuScreen() {
   const isTeacher = session?.role === "teacher";
   const unreadMessages = getUnreadMessagesCount(session, messagesData, studentsData);
   const menuItems = isStudent
-    ? studentMenuItems
+    ? filterMenuItemsByPermission(session, studentMenuItems)
     : isParentStudent
-    ? parentMenuItems
+    ? filterMenuItemsByPermission(session, parentMenuItems)
     : isTeacher
-      ? teacherMenuItems
-      : adminMenuItems.filter((item) => {
-        if (item.entity) return canReadEntity(session, item.entity);
-        if (item.route) return canReadRoute(session, item.route);
-        return true;
-      });
+      ? filterMenuItemsByPermission(session, teacherMenuItems)
+      : filterMenuItemsByPermission(session, adminMenuItems);
 
   const handleLogout = () => {
     logout();

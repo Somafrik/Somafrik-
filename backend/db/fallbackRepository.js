@@ -1,0 +1,265 @@
+const seedData = require("../data");
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+class FallbackRepository {
+  constructor() {
+    this.engine = "memory";
+    this.ready = false;
+    this.sessions = new Map();
+    this.auditLogs = [];
+    this.subjects = seedData.courses.map((course) => ({
+      id: course.publicId ?? course.id,
+      schoolId: seedData.school.id,
+      schoolCode: seedData.school.code,
+      countryCode: seedData.school.countryCode ?? "CD",
+      code: course.publicId ?? course.id,
+      name: course.name,
+      coefficient: course.coefficient ?? 1,
+      level: "Tous niveaux",
+      description: course.description ?? "",
+      status: "Active",
+      classCount: new Set(seedData.courses.filter((item) => item.name === course.name).map((item) => item.className)).size,
+      teacherCount: 1,
+      gradeCount: seedData.notes.filter((note) => note.subject === course.name).length,
+      classes: [...new Set(seedData.courses.filter((item) => item.name === course.name).map((item) => item.className))],
+      teachers: [],
+      canDelete: seedData.notes.every((note) => note.subject !== course.name),
+      createdAt: "01-01-2026",
+    })).filter((subject, index, rows) => rows.findIndex((item) => item.name === subject.name) === index);
+  }
+
+  async init() {
+    this.ready = true;
+  }
+
+  async getDataset() {
+    await this.init();
+    return clone({
+      school: seedData.school,
+      platformSchools: seedData.platformSchools,
+      countries: seedData.countries,
+      subscriptions: seedData.subscriptions,
+      userAccounts: seedData.userAccounts,
+      teachers: seedData.teachers,
+      classes: seedData.classes,
+      courses: seedData.courses,
+      students: seedData.students,
+      notes: seedData.notes,
+      presences: seedData.presences,
+      payments: seedData.payments,
+      announcements: seedData.announcements,
+      platformNotifications: seedData.platformNotifications,
+    });
+  }
+
+  async createSession({ sessionId, refreshTokenHash, userId, schoolCode, role, expiresAt, ipAddress, userAgent }) {
+    this.sessions.set(sessionId, {
+      session_code: sessionId,
+      refresh_token_hash: refreshTokenHash,
+      user_id: userId,
+      school_code: schoolCode,
+      role,
+      expires_at: expiresAt,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      revoked_at: null,
+    });
+  }
+
+  async findActiveSession(sessionId, refreshTokenHash) {
+    const session = this.sessions.get(sessionId);
+
+    if (!session || session.refresh_token_hash !== refreshTokenHash || session.revoked_at) {
+      return null;
+    }
+
+    if (new Date(session.expires_at).getTime() <= Date.now()) {
+      return null;
+    }
+
+    return session;
+  }
+
+  async revokeSession(sessionId, reason = "logout") {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.revoked_at = new Date();
+      session.revoke_reason = reason;
+    }
+  }
+
+  async recordAudit({ schoolCode, userId, action, entityType, entityId, oldValue, newValue, ipAddress, userAgent }) {
+    this.auditLogs.unshift({
+      id: `AUDIT-MEM-${String(this.auditLogs.length + 1).padStart(5, "0")}`,
+      schoolCode,
+      userId,
+      userCode: userId,
+      actor: userId ?? "system",
+      action,
+      entityType,
+      entityId,
+      oldValue,
+      newValue,
+      ipAddress,
+      userAgent,
+      createdAt: new Date().toISOString(),
+      date: new Date().toLocaleDateString("fr-FR"),
+    });
+  }
+
+  async getAuditLogs({ schoolCode, userId, action, limit = 100 } = {}) {
+    return this.auditLogs
+      .filter((row) => !schoolCode || row.schoolCode === schoolCode)
+      .filter((row) => !userId || row.userId === userId)
+      .filter((row) => !action || row.action === action)
+      .slice(0, Math.min(Number(limit) || 100, 500));
+  }
+
+  async getSubjectsV2() {
+    return clone(this.subjects);
+  }
+
+  async createSubject(payload) {
+    for (const field of ["name", "code", "coefficient", "level", "description", "status"]) {
+      if (!payload[field]) throw new Error(`Champ obligatoire: ${field}`);
+    }
+
+    const code = String(payload.code).trim().toUpperCase();
+    const subject = {
+      id: code,
+      schoolId: seedData.school.id,
+      schoolCode: payload.schoolCode ?? seedData.school.code,
+      countryCode: "CD",
+      code,
+      name: String(payload.name).trim(),
+      coefficient: Number(payload.coefficient),
+      level: String(payload.level).trim(),
+      description: String(payload.description).trim(),
+      status: String(payload.status).trim(),
+      classCount: 0,
+      teacherCount: 0,
+      gradeCount: 0,
+      classes: [],
+      teachers: [],
+      canDelete: true,
+      createdAt: new Date().toLocaleDateString("fr-FR"),
+    };
+
+    const existingIndex = this.subjects.findIndex((item) => item.code === code);
+    if (existingIndex >= 0) {
+      this.subjects[existingIndex] = subject;
+    } else {
+      this.subjects.push(subject);
+    }
+
+    await this.recordAudit({
+      schoolCode: subject.schoolCode,
+      action: "subject_upsert",
+      entityType: "subject",
+      entityId: code,
+      newValue: payload,
+    });
+    return { id: code, message: "Matière enregistrée" };
+  }
+
+  async deleteSubject(subjectCode) {
+    const code = String(subjectCode).trim().toUpperCase();
+    const subject = this.subjects.find((item) => item.code === code);
+
+    if (!subject) throw new Error("Matière introuvable");
+    if (subject.gradeCount > 0) {
+      const error = new Error("Suppression refusée: la matière possède déjà des notes");
+      error.statusCode = 409;
+      throw error;
+    }
+
+    this.subjects = this.subjects.filter((item) => item.code !== code);
+    await this.recordAudit({ action: "subject_delete", entityType: "subject", entityId: code });
+    return { message: "Matière supprimée" };
+  }
+
+  async getAcademicYearsV2() {
+    return [{
+      id: "AY-DEMO-2026",
+      schoolId: seedData.school.id,
+      schoolCode: seedData.school.code,
+      countryCode: "CD",
+      name: seedData.school.schoolYear ?? "2025-2026",
+      startDate: "2025-09-01",
+      endDate: "2026-08-31",
+      status: "Ouverte",
+      isCurrent: true,
+      enrollmentCount: seedData.students.length,
+      gradeCount: seedData.notes.length,
+      promotionDecisionCount: 0,
+      notesLocked: false,
+    }];
+  }
+
+  async getExamsV2() {
+    return seedData.notes.slice(0, 12).map((note, index) => ({
+      id: `EXAM-DEMO-${String(index + 1).padStart(3, "0")}`,
+      schoolId: seedData.school.id,
+      schoolCode: seedData.school.code,
+      countryCode: "CD",
+      code: `EXAM-${String(index + 1).padStart(3, "0")}`,
+      name: `Évaluation ${note.subject}`,
+      type: "Contrôle",
+      className: seedData.students.find((student) => student.id === note.studentId)?.className ?? "",
+      subject: note.subject,
+      date: "2026-06-01",
+      status: "Publié",
+      resultCount: 1,
+      average: Number(note.value ?? 0).toFixed(2),
+      successRate: Number(note.value ?? 0) >= 10 ? 100 : 0,
+    }));
+  }
+
+  async getDocumentsV2() {
+    return seedData.students.slice(0, 20).map((student, index) => ({
+      id: `DOC-DEMO-${String(index + 1).padStart(3, "0")}`,
+      schoolId: seedData.school.id,
+      schoolCode: seedData.school.code,
+      countryCode: "CD",
+      code: `BUL-${student.matricule}`,
+      type: "Bulletin",
+      title: `Bulletin - ${student.name}`,
+      format: "PDF",
+      version: 1,
+      studentCode: student.matricule,
+      studentName: student.name,
+      status: "Disponible",
+      storageKey: "",
+      generatedAt: "01-06-2026",
+    }));
+  }
+
+  async getAdvancedReportsV2() {
+    const paid = seedData.payments.filter((payment) => payment.status === "PAYE").reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const unpaid = seedData.payments.filter((payment) => payment.status !== "PAYE").reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const present = seedData.presences.filter((presence) => presence.present || presence.status === "Retard").length;
+
+    return {
+      academic: seedData.classes.map((item) => ({ label: item.name, average: "12.50", grades: seedData.notes.length })),
+      financial: { paid, unpaid, payments: seedData.payments.length, forecast: paid + unpaid },
+      attendance: {
+        rate: seedData.presences.length ? Math.round((present / seedData.presences.length) * 100) : 0,
+        total: seedData.presences.length,
+        breakdown: [],
+      },
+      exams: [],
+      global: {
+        countries: seedData.countries.length,
+        schools: seedData.platformSchools.length,
+        students: seedData.students.length,
+        teachers: seedData.teachers.length,
+        activeSubscriptions: seedData.subscriptions.filter((item) => item.status === "Actif").length,
+      },
+    };
+  }
+}
+
+module.exports = { FallbackRepository };

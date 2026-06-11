@@ -1,5 +1,12 @@
 import { UserRole } from "../navigation/AppNavigator";
 import { AuthResolver } from "../domain/auth/AuthResolver";
+import { AccountIdentifier } from "../domain/auth/AccountIdentifier";
+import {
+  school as demoSchool,
+  students as demoStudents,
+  teachers as demoTeachers,
+  userAccounts as demoUsers,
+} from "../data/catalog";
 
 declare const process: {
   env?: {
@@ -140,7 +147,7 @@ export function login(payload: LoginPayload) {
   return request<LoginResponse>("/login", {
     method: "POST",
     body: JSON.stringify(payload),
-  }).then((session) => {
+  }).catch(() => loginWithDemoData(payload)).then((session) => {
     accessToken = session.accessToken ?? null;
     return session;
   });
@@ -158,7 +165,16 @@ export async function logout() {
 
 export async function getSchoolByCode(code: string) {
   const normalizedCode = code.trim().toUpperCase();
-  return request<SchoolInfo>(`/schools/${encodeURIComponent(normalizedCode)}`);
+  try {
+    return await request<SchoolInfo>(`/schools/${encodeURIComponent(normalizedCode)}`);
+  } catch (error) {
+    const school = getDemoSchoolByCode(normalizedCode);
+    if (school) {
+      return school;
+    }
+
+    throw error;
+  }
 }
 
 export async function identifyAccount(payload: { schoolCode: string; identifier: string }) {
@@ -168,7 +184,7 @@ export async function identifyAccount(payload: { schoolCode: string; identifier:
       body: JSON.stringify(payload),
     });
   } catch {
-    return identifyAccountFromExistingEndpoints(payload);
+    return identifyAccountFromDemoData(payload);
   }
 }
 
@@ -195,4 +211,196 @@ async function identifyAccountFromExistingEndpoints({
   const authResolver = new AuthResolver({ teachers, students });
 
   return authResolver.identify(schoolCode, identifier);
+}
+
+function getDemoSchoolByCode(code: string): SchoolInfo | null {
+  const normalizedCode = code.trim().toUpperCase();
+
+  if (![demoSchool.code, demoSchool.publicId].some((value) => String(value ?? "").trim().toUpperCase() === normalizedCode)) {
+    return null;
+  }
+
+  return {
+    id: demoSchool.id,
+    publicId: demoSchool.publicId,
+    code: demoSchool.code,
+    name: demoSchool.name,
+    type: demoSchool.type,
+    city: demoSchool.city,
+    country: demoSchool.country,
+    address: demoSchool.address,
+    phone: demoSchool.phone,
+    email: demoSchool.email,
+    website: demoSchool.website,
+    currency: demoSchool.currency,
+    slogan: demoSchool.slogan,
+    status: demoSchool.status,
+    logoUrl: demoSchool.logoUrl,
+    schoolYear: demoSchool.schoolYear,
+    timezone: demoSchool.timezone,
+    language: demoSchool.language,
+    dateFormat: demoSchool.dateFormat,
+    primaryColor: demoSchool.primaryColor,
+    subscriptionPlan: demoSchool.subscriptionPlan,
+    subscriptionStartDate: demoSchool.subscriptionStartDate,
+    subscriptionEndDate: demoSchool.subscriptionEndDate,
+    maxStudents: demoSchool.maxStudents,
+    maxTeachers: demoSchool.maxTeachers,
+  };
+}
+
+function identifyAccountFromDemoData({
+  schoolCode,
+  identifier,
+}: {
+  schoolCode: string;
+  identifier: string;
+}): IdentifyResponse {
+  const managedUser = findDemoUser(identifier, schoolCode);
+
+  if (managedUser) {
+    const role = mobileRoleFromLabel(managedUser.role);
+    if (role) return role;
+  }
+
+  return new AuthResolver({
+    teachers: demoTeachers,
+    students: demoStudents,
+  }).identify(schoolCode, identifier);
+}
+
+function findDemoUser(identifier: string, schoolCode: string) {
+  const normalizedSchoolCode = schoolCode.trim().toUpperCase();
+  const normalizedIdentifier = identifier.trim().toLowerCase();
+
+  return demoUsers.find(
+    (user) =>
+      (user.schoolCode === "*" || user.schoolCode === normalizedSchoolCode) &&
+      [user.identifier, user.email, user.phone, user.publicId].some(
+        (value) => String(value ?? "").trim().toLowerCase() === normalizedIdentifier
+      )
+  );
+}
+
+function mobileRoleFromLabel(role: string): IdentifyResponse | null {
+  if (role === "Super Administrateur SchoolLink") return { role: "super_admin", roleLabel: "Super Administrateur" };
+  if (role === "Admin Pays") return { role: "country_admin", roleLabel: "Admin Pays" };
+  if (role === "Admin School") return { role: "school_admin", roleLabel: "Admin Établissement" };
+  if (role === "Préfet des études") return { role: "prefet", roleLabel: "Préfet des études" };
+  if (role === "Secrétaire") return { role: "secretary", roleLabel: "Secrétaire" };
+  return null;
+}
+
+function loginWithDemoData({ role, schoolCode, identifier, pin }: LoginPayload): LoginResponse {
+  if (pin !== "1234") {
+    throw new Error("Identifiants incorrects");
+  }
+
+  const school = getDemoSchoolByCode(schoolCode);
+  if (!school) {
+    throw new Error("Code établissement invalide");
+  }
+
+  const managedUser = findDemoUser(identifier, schoolCode);
+  const managedRole = managedUser ? mobileRoleFromLabel(managedUser.role) : null;
+
+  if (managedUser && managedRole?.role === role) {
+    return {
+      role,
+      accessToken: "demo-access-token",
+      refreshToken: "demo-refresh-token",
+      tokenType: "Bearer",
+      expiresIn: 28800,
+      permissions: managedUser.permissions,
+      user: {
+        id: managedUser.id,
+        publicId: managedUser.publicId,
+        name: `${managedUser.firstName ?? ""} ${managedUser.lastName ?? ""}`.trim() || managedUser.identifier,
+        firstName: managedUser.firstName,
+        lastName: managedUser.lastName,
+        phone: managedUser.phone,
+        schoolCode: managedUser.schoolCode,
+        scopeLevel: managedUser.scopeLevel,
+        countryScope: managedUser.countryScope,
+        countryCode: managedUser.countryScope,
+        permissions: managedUser.permissions,
+      },
+      school,
+    };
+  }
+
+  const accountIdentifier = new AccountIdentifier(schoolCode, identifier);
+
+  if (role === "teacher") {
+    const teacher = demoTeachers.find(
+      (item) =>
+        accountIdentifier.matches(item.id) ||
+        accountIdentifier.matches(item.publicId) ||
+        accountIdentifier.matches(item.phone)
+    );
+
+    if (teacher) {
+      const assignments = teacher.assignments ?? [];
+      const assignedClasses = [...new Set(assignments.map((item) => item.className))];
+      const courses = [...new Set(assignments.map((item) => item.course))];
+      return {
+        role,
+        accessToken: "demo-access-token",
+        refreshToken: "demo-refresh-token",
+        tokenType: "Bearer",
+        expiresIn: 28800,
+        permissions: demoUsers.find((user) => user.role === "Enseignant")?.permissions,
+        user: { ...teacher, assignedClasses, courses },
+        school,
+      };
+    }
+  }
+
+  if (role === "student") {
+    const student = demoStudents.find(
+      (item) =>
+        item.schoolCode === accountIdentifier.schoolCode &&
+        (accountIdentifier.matches(item.matricule) || accountIdentifier.matches(item.publicId))
+    );
+
+    if (student) {
+      return {
+        role,
+        accessToken: "demo-access-token",
+        refreshToken: "demo-refresh-token",
+        tokenType: "Bearer",
+        expiresIn: 28800,
+        permissions: demoUsers.find((user) => user.role === "Élève / Étudiant")?.permissions,
+        user: student,
+        school,
+      };
+    }
+  }
+
+  if (role === "parent_student") {
+    const children = demoStudents.filter(
+      (item) => item.schoolCode === accountIdentifier.schoolCode && accountIdentifier.matches(item.parentPhone)
+    );
+
+    if (children.length > 0) {
+      const firstStudent = children[0];
+      return {
+        role,
+        accessToken: "demo-access-token",
+        refreshToken: "demo-refresh-token",
+        tokenType: "Bearer",
+        expiresIn: 28800,
+        permissions: demoUsers.find((user) => user.role === "Parent")?.permissions,
+        user: {
+          id: `PARENT-${firstStudent.parentPhone}`,
+          name: "Parent SchoolLink",
+          parentPhone: firstStudent.parentPhone,
+          children,
+        },
+        school,
+      };
+    }
+  }
+
+  throw new Error("Identifiants incorrects");
 }

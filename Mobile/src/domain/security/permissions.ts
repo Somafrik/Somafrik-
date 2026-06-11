@@ -21,7 +21,12 @@ export const entityFeatureMap: Partial<Record<AdminEntity, string>> = {
 };
 
 export const routeFeatureMap: Record<string, string> = {
+  Profil: "Élèves",
+  StudentDetail: "Élèves",
+  StudentNotes: "Notes",
+  StudentPresences: "Présences",
   Classes: "Classes",
+  Teachers: "Enseignants",
   Students: "Élèves",
   TeacherStudents: "Élèves",
   TeacherAttendance: "Présences",
@@ -29,6 +34,8 @@ export const routeFeatureMap: Record<string, string> = {
   Notes: "Notes",
   Presences: "Présences",
   FraisEleve: "Paiements",
+  StudentPayments: "Paiements",
+  SchoolManagement: "Établissements",
   Payments: "Paiements",
   Paiements: "Paiements",
   Messages: "Messages",
