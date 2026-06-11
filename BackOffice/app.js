@@ -8,11 +8,6 @@ const state = {
   subscriptions: [],
   notifications: [],
   auditLog: [],
-  subjects: [],
-  academicYears: [],
-  exams: [],
-  documents: [],
-  advancedReports: null,
   schoolPage: 1,
   pageSize: 10,
 };
@@ -21,10 +16,6 @@ const loginPanel = document.querySelector("#loginPanel");
 const appPanel = document.querySelector("#appPanel");
 const loginForm = document.querySelector("#loginForm");
 const loginError = document.querySelector("#loginError");
-const loginSchoolCodeInput = document.querySelector("#loginSchoolCodeInput");
-const loginSchoolLogo = document.querySelector("#loginSchoolLogo");
-const loginSchoolName = document.querySelector("#loginSchoolName");
-const loginSchoolMeta = document.querySelector("#loginSchoolMeta");
 const identifierInput = document.querySelector("#identifierInput");
 const passwordInput = document.querySelector("#passwordInput");
 const logoutButton = document.querySelector("#logoutButton");
@@ -49,17 +40,6 @@ const coverageGrid = document.querySelector("#coverageGrid");
 const roadmapList = document.querySelector("#roadmapList");
 const permissionsList = document.querySelector("#permissionsList");
 const permissionCount = document.querySelector("#permissionCount");
-const subjectCount = document.querySelector("#subjectCount");
-const subjectsTable = document.querySelector("#subjectsTable");
-const academicYearCount = document.querySelector("#academicYearCount");
-const academicYearsTable = document.querySelector("#academicYearsTable");
-const examCount = document.querySelector("#examCount");
-const examsTable = document.querySelector("#examsTable");
-const documentCount = document.querySelector("#documentCount");
-const documentsTable = document.querySelector("#documentsTable");
-const advancedReportSummary = document.querySelector("#advancedReportSummary");
-const advancedReportKpis = document.querySelector("#advancedReportKpis");
-const advancedReportList = document.querySelector("#advancedReportList");
 const schoolSearch = document.querySelector("#schoolSearch");
 const schoolCountryFilter = document.querySelector("#schoolCountryFilter");
 const schoolTypeFilter = document.querySelector("#schoolTypeFilter");
@@ -93,7 +73,7 @@ const schoolAddressInput = document.querySelector("#schoolAddressInput");
 const schoolLogoInput = document.querySelector("#schoolLogoInput");
 
 const mvpCoverage = [
-  ["Authentification par établissement", "Web / Mobile", "Couvert", "P0", "Code établissement, logo/nom école, rôle détecté, mot de passe et blocage comptes suspendus."],
+  ["Authentification par établissement", "Web / Mobile", "Couvert", "P0", "Code unique, logo/nom école, rôle détecté, mot de passe et blocage comptes suspendus."],
   ["Établissements SaaS", "BackOffice", "Couvert", "P0", "Création, fiche, modification, suspension, paramètres, abonnement et code unique."],
   ["Utilisateurs et permissions", "BackOffice / Mobile", "Couvert", "P0", "Rôles MVP, statuts, permissions automatiques et réinitialisation mot de passe."],
   ["Élèves", "Web / Mobile", "Couvert", "P0", "Matricule, parent associé, dossier élève, statut actif/archivé et séparation des dossiers."],
@@ -109,7 +89,6 @@ const mvpCoverage = [
 
 document.querySelectorAll("[data-demo]").forEach((button) => {
   button.addEventListener("click", () => {
-    loginSchoolCodeInput.value = "CD-2026-0001";
     identifierInput.value = button.dataset.demo;
     passwordInput.value = "1234";
     loginForm.requestSubmit();
@@ -130,7 +109,6 @@ loginForm.addEventListener("submit", async (event) => {
 
   try {
     const payload = {
-      schoolCode: loginSchoolCodeInput.value.trim(),
       identifier: identifierInput.value.trim(),
       password: passwordInput.value.trim(),
     };
@@ -162,11 +140,6 @@ logoutButton.addEventListener("click", () => {
   state.subscriptions = [];
   state.notifications = [];
   state.auditLog = [];
-  state.subjects = [];
-  state.academicYears = [];
-  state.exams = [];
-  state.documents = [];
-  state.advancedReports = null;
   loginPanel.classList.remove("hidden");
   appPanel.classList.add("hidden");
 });
@@ -176,8 +149,6 @@ schoolSearch.addEventListener("input", () => {
   renderSchools();
 });
 
-loginSchoolCodeInput.addEventListener("blur", () => refreshLoginSchoolPreview());
-loginSchoolCodeInput.addEventListener("change", () => refreshLoginSchoolPreview());
 schoolCountryFilter.addEventListener("change", () => {
   state.schoolPage = 1;
   renderSchools();
@@ -195,7 +166,6 @@ userSearch.addEventListener("input", () => renderUsers());
 document.addEventListener("click", handleActionClick);
 
 boot();
-refreshLoginSchoolPreview();
 
 function boot() {
   const saved = localStorage.getItem("schoollink-backoffice-session");
@@ -257,44 +227,7 @@ function renderApp() {
   renderUsers();
   renderReports();
   renderPermissions();
-  loadV2Data();
   showView("overview");
-}
-
-async function refreshLoginSchoolPreview() {
-  const schoolCode = loginSchoolCodeInput.value.trim();
-
-  if (!schoolCode) {
-    loginSchoolLogo.textContent = "SL";
-    loginSchoolName.textContent = "Code établissement requis";
-    loginSchoolMeta.textContent = "Saisissez le code de votre établissement";
-    return;
-  }
-
-  try {
-    const school = await request(`/schools/${encodeURIComponent(schoolCode)}`);
-    renderLoginSchoolPreview(school);
-  } catch (error) {
-    loginSchoolLogo.textContent = "!";
-    loginSchoolName.textContent = "Établissement introuvable";
-    loginSchoolMeta.textContent = error.message;
-  }
-}
-
-function renderLoginSchoolPreview(school) {
-  const initials = String(school.name ?? "SL")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-
-  loginSchoolLogo.innerHTML = school.logoUrl
-    ? `<img src="${escapeHtml(school.logoUrl)}" alt="Logo ${escapeHtml(school.name)}">`
-    : escapeHtml(initials || "SL");
-  loginSchoolName.textContent = school.name;
-  loginSchoolMeta.textContent = `${school.code} • ${school.city ?? ""} • ${school.status ?? "Statut non défini"}`;
 }
 
 function renderKpis() {
@@ -325,22 +258,12 @@ function renderMenus() {
     Support: "notifications",
     Rapports: "overview",
     "Conformité MVP": "reports",
-    Matières: "subjects",
-    "Années académiques": "academicYears",
-    Examens: "exams",
-    Documents: "documents",
-    "Rapports V2": "advancedReports",
     Paramètres: "permissions",
   };
   const allowedViews = new Set([
     "overview",
     "reports",
     "permissions",
-    "subjects",
-    "academicYears",
-    "exams",
-    "documents",
-    "advancedReports",
   ]);
 
   allowedMenus.forEach((menu) => {
@@ -360,10 +283,11 @@ function renderControls() {
     .slice(0, 8)
     .map(
       (permission) => `
-        <article class="control-card">
-          <strong>${permission}</strong>
+        <button class="control-card control-action" type="button" data-action="inspect-control" data-id="${escapeHtml(permission)}">
+          <strong>${escapeHtml(permission)}</strong>
           <p>${getControlDescription(permission)}</p>
-        </article>
+          <span>Voir le contrôle</span>
+        </button>
       `
     )
     .join("");
@@ -560,10 +484,10 @@ function renderPermissions() {
   permissionsList.innerHTML = permissions
     .map(
       (permission) => `
-        <article class="permission" aria-label="Permission autorisée">
+        <button class="permission permission-action" type="button" data-action="inspect-permission" data-id="${escapeHtml(permission)}" aria-label="Voir la permission ${escapeHtml(permission)}">
           <span>Autorisé</span>
           <strong>${escapeHtml(permission)}</strong>
-        </article>
+        </button>
       `
     )
     .join("");
@@ -609,175 +533,6 @@ function renderReports() {
     .join("");
 }
 
-async function loadV2Data() {
-  try {
-    const [subjects, academicYears, exams, documents, advancedReports] = await Promise.all([
-      request("/v2/subjects"),
-      request("/v2/academic-years"),
-      request("/v2/exams"),
-      request("/v2/documents"),
-      request("/v2/reports/advanced"),
-    ]);
-
-    state.subjects = subjects;
-    state.academicYears = academicYears;
-    state.exams = exams;
-    state.documents = documents;
-    state.advancedReports = advancedReports;
-    renderV2Views();
-  } catch (error) {
-    showToast(error.message);
-  }
-}
-
-function renderV2Views() {
-  renderSubjects();
-  renderAcademicYears();
-  renderExams();
-  renderDocuments();
-  renderAdvancedReports();
-}
-
-function renderSubjects() {
-  subjectCount.textContent = `${state.subjects.length} matière(s)`;
-  subjectsTable.innerHTML = state.subjects
-    .map(
-      (subject) => `
-        <tr>
-          <td><strong>${escapeHtml(subject.name)}</strong><br><small>${escapeHtml(subject.code)} • ${escapeHtml(subject.description || "Description à compléter")}</small></td>
-          <td>${subject.coefficient}</td>
-          <td>${escapeHtml(subject.level)}</td>
-          <td>${subject.classCount} classe(s)<br><small>${subject.teacherCount} enseignant(s)</small></td>
-          <td><span class="status ${getCoverageClass(subject.status === "Active" ? "Couvert" : "Partiel")}">${subject.status}</span></td>
-          <td>
-            <div class="row-actions">
-              <button class="icon-action" type="button" data-action="inspect-subject" data-id="${escapeHtml(subject.code)}">Voir</button>
-              <button class="icon-action danger" type="button" data-action="delete-subject" data-id="${escapeHtml(subject.code)}" ${subject.canDelete ? "" : "disabled"}>Supprimer</button>
-            </div>
-          </td>
-        </tr>
-      `
-    )
-    .join("");
-}
-
-function renderAcademicYears() {
-  academicYearCount.textContent = `${state.academicYears.length} année(s)`;
-  academicYearsTable.innerHTML = state.academicYears
-    .map(
-      (year) => `
-        <tr>
-          <td><strong>${escapeHtml(year.name)}</strong><br><small>${year.isCurrent ? "Année courante unique" : "Historique"}</small></td>
-          <td>${year.startDate} → ${year.endDate}</td>
-          <td><span class="status ${year.notesLocked ? "status-warning" : ""}">${year.status}</span></td>
-          <td>${year.enrollmentCount}</td>
-          <td>${year.gradeCount}<br><small>${year.notesLocked ? "Notes verrouillées" : "Notes modifiables"}</small></td>
-          <td>${year.promotionDecisionCount}</td>
-        </tr>
-      `
-    )
-    .join("");
-}
-
-function renderExams() {
-  examCount.textContent = `${state.exams.length} examen(s)`;
-  examsTable.innerHTML = state.exams
-    .map(
-      (exam) => `
-        <tr>
-          <td><strong>${escapeHtml(exam.name)}</strong><br><small>${escapeHtml(exam.code)} • ${escapeHtml(exam.type)}</small></td>
-          <td>${escapeHtml(exam.className)}</td>
-          <td>${escapeHtml(exam.subject)}</td>
-          <td>${exam.date}</td>
-          <td><span class="status ${exam.status === "Publié" ? "status-ok" : "status-warning"}">${exam.status}</span></td>
-          <td>${exam.resultCount} résultat(s)<br><small>Moy. ${exam.average}/20 • Réussite ${exam.successRate}%</small></td>
-        </tr>
-      `
-    )
-    .join("");
-}
-
-function renderDocuments() {
-  documentCount.textContent = `${state.documents.length} document(s)`;
-  documentsTable.innerHTML = state.documents
-    .map(
-      (document) => `
-        <tr>
-          <td><strong>${escapeHtml(document.title)}</strong><br><small>${escapeHtml(document.code)} • ${escapeHtml(document.type)}</small></td>
-          <td>${escapeHtml(document.studentName || "-")}<br><small>${escapeHtml(document.studentCode || "Établissement")}</small></td>
-          <td>${escapeHtml(document.format)}</td>
-          <td>v${document.version}</td>
-          <td><span class="status">${escapeHtml(document.status)}</span></td>
-          <td>${document.generatedAt}</td>
-        </tr>
-      `
-    )
-    .join("");
-}
-
-function renderAdvancedReports() {
-  const report = state.advancedReports;
-  if (!report) {
-    advancedReportSummary.textContent = "Chargement";
-    advancedReportKpis.innerHTML = "";
-    advancedReportList.innerHTML = "";
-    return;
-  }
-
-  advancedReportSummary.textContent = "Académique • financier • présences • examens";
-  advancedReportKpis.innerHTML = [
-    { label: "Pays", value: report.global.countries },
-    { label: "Établissements", value: report.global.schools },
-    { label: "Élèves", value: report.global.students },
-    { label: "Présence", value: `${report.attendance.rate}%` },
-    { label: "Encaissé", value: formatMetric(report.financial.paid, " CDF") },
-    { label: "Impayés", value: formatMetric(report.financial.unpaid, " CDF") },
-  ]
-    .map((item) => `<article class="coverage-card"><span>${item.label}</span><strong>${item.value}</strong></article>`)
-    .join("");
-
-  const academicRows = report.academic.map(
-    (row) => `<article class="roadmap-item"><div><strong>${escapeHtml(row.label)}</strong><p>Moyenne classe ${row.average}/20 • ${row.grades} note(s)</p></div><span class="status">Académique</span></article>`
-  );
-  const examRows = report.exams.map(
-    (row) => `<article class="roadmap-item"><div><strong>${escapeHtml(row.label)}</strong><p>Moyenne ${row.average}/20 • Réussite ${row.successRate}%</p></div><span class="status">Examen</span></article>`
-  );
-
-  advancedReportList.innerHTML = [...academicRows, ...examRows].join("");
-}
-
-async function createDemoSubject() {
-  const nextIndex = state.subjects.length + 1;
-  try {
-    await request("/v2/subjects", {
-      method: "POST",
-      body: JSON.stringify({
-        schoolCode: "CD-2026-0001",
-        name: `Matière V2 ${nextIndex}`,
-        code: `SUB-V2-${String(nextIndex).padStart(4, "0")}`,
-        coefficient: 1,
-        level: "Secondaire",
-        description: "Matière créée depuis le BackOffice V2.",
-        status: "Active",
-      }),
-    });
-    await loadV2Data();
-    showToast("Matière V2 créée.");
-  } catch (error) {
-    showToast(error.message);
-  }
-}
-
-async function deleteSubject(code) {
-  try {
-    await request(`/v2/subjects/${encodeURIComponent(code)}`, { method: "DELETE" });
-    await loadV2Data();
-    showToast("Matière supprimée.");
-  } catch (error) {
-    showToast(error.message);
-  }
-}
-
 function showView(viewName) {
   const titles = {
     overview: "Vue globale",
@@ -786,11 +541,6 @@ function showView(viewName) {
     subscriptions: "Abonnements",
     notifications: "Notifications",
     users: "Utilisateurs",
-    subjects: "Matières",
-    academicYears: "Années académiques",
-    exams: "Examens",
-    documents: "Documents",
-    advancedReports: "Rapports avancés",
     reports: "Rapports",
     permissions: "Permissions",
   };
@@ -802,7 +552,7 @@ function showView(viewName) {
   document.querySelector(`#${viewName}View`)?.classList.remove("hidden");
 }
 
-function handleActionClick(event) {
+async function handleActionClick(event) {
   const button = event.target.closest("[data-action]");
 
   if (!button) return;
@@ -818,33 +568,13 @@ function handleActionClick(event) {
     return;
   }
 
-  if (action === "refresh-v2") {
-    loadV2Data();
-    showToast("Données V2 actualisées.");
+  if (action === "inspect-control") {
+    openPermissionDetail(id, "Contrôle métier");
     return;
   }
 
-  if (action === "add-subject-demo") {
-    createDemoSubject();
-    return;
-  }
-
-  if (action === "delete-subject") {
-    deleteSubject(id);
-    return;
-  }
-
-  if (action === "inspect-subject") {
-    const subject = state.subjects.find((item) => item.code === id);
-    if (!subject) return;
-    openDetail("Matière", subject.name, `
-      <p><strong>Code :</strong> ${escapeHtml(subject.code)}</p>
-      <p><strong>Niveau :</strong> ${escapeHtml(subject.level)}</p>
-      <p><strong>Description :</strong> ${escapeHtml(subject.description || "Aucune description")}</p>
-      <p><strong>Classes :</strong> ${(subject.classes ?? []).map(escapeHtml).join(", ") || "Aucune"}</p>
-      <p><strong>Enseignants :</strong> ${(subject.teachers ?? []).map(escapeHtml).join(", ") || "Aucun"}</p>
-      <p><strong>Protection :</strong> ${subject.canDelete ? "Supprimable" : "Suppression bloquée car des notes existent"}</p>
-    `);
+  if (action === "inspect-permission") {
+    openPermissionDetail(id, "Permission du compte");
     return;
   }
 
@@ -1057,7 +787,7 @@ function handleActionClick(event) {
       role: "Admin School",
       scopeLevel: "Établissement",
       countryScope: "RDC",
-      schoolCode: state.schools[0]?.code ?? "CD-2026-0001",
+      schoolCode: state.schools[0]?.code ?? generateSchoolCode(),
       accessChannel: "Application",
       status: "Actif",
       permissions: ["Voir tableau de bord"],
@@ -1101,8 +831,13 @@ function handleActionClick(event) {
 
   if (action === "export-permissions") {
     const permissions = state.session.user.permissions ?? [];
-    copyToClipboard(permissions.join("\n"));
-    showToast("Permissions exportées dans le presse-papiers.");
+    const payload = permissions.join("\n");
+    const copied = await copyToClipboard(payload);
+    if (copied) {
+      showToast("Permissions exportées dans le presse-papiers.");
+    } else {
+      openTextExport("Permissions du compte", payload);
+    }
     return;
   }
 
@@ -1110,8 +845,12 @@ function handleActionClick(event) {
     const report = mvpCoverage
       .map((item) => `${item.priority} | ${item.status} | ${item.scope} | ${item.module} | ${item.detail}`)
       .join("\n");
-    copyToClipboard(report);
-    showToast("Rapport MVP copié dans le presse-papiers.");
+    const copied = await copyToClipboard(report);
+    if (copied) {
+      showToast("Rapport MVP copié dans le presse-papiers.");
+    } else {
+      openTextExport("Rapport MVP", report);
+    }
   }
 }
 
@@ -1143,13 +882,17 @@ function showToast(message) {
   }, 2600);
 }
 
-function copyToClipboard(text) {
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).catch(() => fallbackCopyToClipboard(text));
-    return;
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (error) {
+    console.warn("Clipboard API indisponible, tentative de copie classique.", error);
   }
 
-  fallbackCopyToClipboard(text);
+  return fallbackCopyToClipboard(text);
 }
 
 function fallbackCopyToClipboard(text) {
@@ -1160,8 +903,58 @@ function fallbackCopyToClipboard(text) {
   textarea.style.opacity = "0";
   document.body.appendChild(textarea);
   textarea.select();
-  document.execCommand("copy");
-  textarea.remove();
+
+  try {
+    return document.execCommand("copy");
+  } catch (error) {
+    console.warn("Copie classique indisponible.", error);
+    return false;
+  } finally {
+    textarea.remove();
+  }
+}
+
+function openTextExport(title, text) {
+  openDetail(
+    "Export manuel",
+    title,
+    `
+      <div class="detail-section">
+        <strong>Copie manuelle</strong>
+        <p>Le navigateur a bloqué l'accès automatique au presse-papiers. Le contenu reste disponible ici.</p>
+        <textarea class="export-textarea" readonly>${escapeHtml(text)}</textarea>
+      </div>
+    `
+  );
+}
+
+function openPermissionDetail(permission, context) {
+  if (!permission) return;
+
+  const description = getControlDescription(permission);
+  const scope = getPermissionScope(permission);
+  const account = state.session?.user;
+
+  openDetail(
+    context,
+    permission,
+    `
+      <div class="detail-grid">
+        ${renderDetailItem("Statut", "Autorisé")}
+        ${renderDetailItem("Périmètre", scope)}
+        ${renderDetailItem("Compte", account?.identifier ?? "Session active")}
+        ${renderDetailItem("Rôle", account?.role ?? "Administrateur")}
+      </div>
+      <div class="detail-section">
+        <strong>Contrôle métier</strong>
+        <p>${escapeHtml(description)}</p>
+      </div>
+      <div class="detail-section">
+        <strong>Utilisation attendue</strong>
+        <p>Cette permission ouvre les actions liées au module correspondant dans le BackOffice et limite les opérations au périmètre de votre compte.</p>
+      </div>
+    `
+  );
 }
 
 function openSchoolDetail(school) {
@@ -1430,6 +1223,16 @@ function getControlDescription(permission) {
   if (permission.includes("rapport")) return "Suivi des indicateurs consolidés.";
   if (permission.includes("abonnement")) return "Gestion des plans, échéances et limites.";
   return "Action autorisée selon votre niveau métier.";
+}
+
+function getPermissionScope(permission) {
+  if (permission === "ALL_PRIVILEGES") return "Plateforme complète";
+  if (permission === "COUNTRY_PRIVILEGES" || permission.includes("pays")) return state.session?.user?.countryScope ?? "Pays affecté";
+  if (permission.includes("établissement")) return "Établissements accessibles";
+  if (permission.includes("utilisateur") || permission.includes("admins")) return "Comptes du périmètre autorisé";
+  if (permission.includes("rapport")) return "Rapports consolidés autorisés";
+  if (permission.includes("abonnement")) return "Abonnements et paiements";
+  return "Périmètre du compte";
 }
 
 function formatMetric(value, suffix) {

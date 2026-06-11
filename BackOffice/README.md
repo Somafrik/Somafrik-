@@ -1,43 +1,35 @@
 # SchoolLink BackOffice
 
-Portail web reserve aux comptes BackOffice :
-
-- Super Administrateur SchoolLink
-- Admin Pays
+Portail web réservé aux comptes BackOffice.
 
 ## Lancement
 
-Depuis le dossier backend :
+Depuis la racine du projet :
 
 ```powershell
-cd C:\Users\Lenovo\Desktop\Projets\SchoolLink\backend
-npm run dev
+docker compose up -d postgres backend
 ```
 
 Puis ouvrir :
 
 ```text
-http://localhost:5001/backoffice
+http://localhost:5000/backoffice
 ```
 
-Sur un autre appareil du meme reseau :
-
-```text
-http://ADRESSE_IP_DU_PC:5001/backoffice
-```
-
-## Identifiants demo
+## Identifiants de démonstration
 
 Super Administrateur :
 
 ```text
-Identifiant : superadmin
+Code établissement : CD-2026-0001
+Identifiant : superadmin@schoollink.app
 Mot de passe : 1234
 ```
 
 Admin Pays RDC :
 
 ```text
-Identifiant : admin-rdc
+Code établissement : CD-2026-0001
+Identifiant : admin.rdc@schoollink.app
 Mot de passe : 1234
 ```

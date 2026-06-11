@@ -1,8 +1,6 @@
 **/node_modules
 **/npm-debug.log
-.git
+**/.expo
+**/.git
+**/.env
 Mobile
-MinIO
-Nginx
-PostgreSQL
-Redis

@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -26,8 +28,10 @@ const cacheService = new CacheService();
 const tenantScopeService = new TenantScopeService();
 let auditService = new AuditService(repository);
 
-app.use(cors());
-app.use(express.json());
+app.disable("x-powered-by");
+app.use(appSecurityHeaders);
+app.use(cors(buildCorsOptions()));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT ?? "1mb" }));
 app.use(
   "/backoffice",
   express.static(path.join(__dirname, "..", "BackOffice"), {
@@ -86,7 +90,12 @@ app.get("/", asyncHandler(async (_req, res) => {
 
 app.get("/api/health", asyncHandler(async (_req, res) => {
   await repository.init();
-  res.json({ status: "ok", database: repository.engine ?? "postgresql" });
+  res.json({
+    status: "ok",
+    database: repository.engine ?? "postgresql",
+    version: process.env.npm_package_version ?? "1.0.0",
+    timestamp: new Date().toISOString(),
+  });
 }));
 
 app.get("/api/schools", asyncHandler(async (_req, res) => {
@@ -605,6 +614,36 @@ function asyncHandler(handler) {
   };
 }
 
+function buildCorsOptions() {
+  const rawOrigins = process.env.CORS_ORIGINS ?? "*";
+  const allowedOrigins = rawOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (allowedOrigins.includes("*")) {
+    return { origin: true };
+  }
+
+  return {
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new BusinessError(403, "Origine CORS non autorisée"));
+    },
+  };
+}
+
+function appSecurityHeaders(_req, res, next) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+}
+
 app.use((error, _req, res, _next) => {
   if (error.statusCode) {
     if (error.statusCode >= 500) {
@@ -636,6 +675,8 @@ initRepository()
   });
 
 async function initRepository() {
+  warnIfUnsafeConfiguration();
+
   try {
     repository.engine = "postgresql";
     await repository.init();
@@ -649,5 +690,15 @@ async function initRepository() {
     repository = new FallbackRepository();
     auditService = new AuditService(repository);
     await repository.init();
+  }
+}
+
+function warnIfUnsafeConfiguration() {
+  if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET est obligatoire en production.");
+  }
+
+  if (!process.env.JWT_SECRET) {
+    console.warn("JWT_SECRET non défini: utilisation du secret de développement.");
   }
 }

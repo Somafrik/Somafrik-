@@ -14,8 +14,8 @@ class BackOfficeAccessService {
   }
 
   login({ schoolCode, identifier, password }) {
-    if (!schoolCode || !identifier || !password) {
-      throw new BusinessError(400, "Code établissement, identifiant et mot de passe obligatoires");
+    if (!identifier || !password) {
+      throw new BusinessError(400, "Identifiant et mot de passe obligatoires");
     }
 
     const user = this.userAccounts.find((account) =>
@@ -34,7 +34,7 @@ class BackOfficeAccessService {
       throw new BusinessError(403, "Ce compte n'a pas accès au BackOffice");
     }
 
-    const schoolContext = this.resolveSchoolContext(schoolCode);
+    const schoolContext = this.resolveSchoolContext(schoolCode || this.getDefaultSchoolCodeForUser(user));
     this.assertScopeCanAccessSchool(user, schoolContext);
 
     const { password: _password, temporaryPassword: _temporaryPassword, ...safeUser } = user;
@@ -83,6 +83,25 @@ class BackOfficeAccessService {
     }
 
     return school;
+  }
+
+  getDefaultSchoolCodeForUser(user) {
+    if (user.schoolCode && user.schoolCode !== "*") {
+      return user.schoolCode;
+    }
+
+    if (user.countryScope) {
+      const countryCode = this.getCountryCode(user.countryScope);
+      const scopedSchool = this.schools.find((school) =>
+        school.status !== "Suspendu" && (school.country === user.countryScope || school.code.startsWith(countryCode))
+      );
+
+      if (scopedSchool) {
+        return scopedSchool.code;
+      }
+    }
+
+    return this.schools.find((school) => school.status !== "Suspendu")?.code ?? this.school?.code;
   }
 
   assertScopeCanAccessSchool(user, school) {

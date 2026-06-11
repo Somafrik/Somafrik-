@@ -2,11 +2,14 @@
   "name": "schoollink-workspace",
   "private": true,
   "scripts": {
+    "start": "npm --prefix backend run start",
     "backend": "npm --prefix backend run dev",
+    "backend:start": "npm --prefix backend run start",
     "mobile": "npm --prefix Mobile run start --",
     "mobile:clear": "npm --prefix Mobile run start -- --clear",
     "mobile:web": "npm --prefix Mobile run web",
     "mobile:android": "npm --prefix Mobile run android",
-    "mobile:ios": "npm --prefix Mobile run ios"
+    "mobile:ios": "npm --prefix Mobile run ios",
+    "check": "node -c backend/server.js && node -c backend/db/postgresRepository.js && node --check BackOffice/app.js && cd Mobile && npx tsc --noEmit"
   }
 }

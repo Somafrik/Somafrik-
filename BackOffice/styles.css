@@ -417,6 +417,23 @@ nav {
   padding: 16px;
 }
 
+button.control-card,
+button.permission {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.control-card:hover,
+button.control-card:focus-visible,
+button.permission:hover,
+button.permission:focus-visible {
+  border-color: var(--blue);
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
 .control-card strong {
   display: block;
   margin-bottom: 8px;
@@ -427,6 +444,14 @@ nav {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.control-card span {
+  display: inline-flex;
+  margin-top: 12px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .table-wrap {
@@ -482,7 +507,6 @@ th {
 }
 
 .permission {
-  cursor: default;
   border-radius: 8px;
   background: #f8fafc;
   border: 1px solid var(--line);
@@ -502,6 +526,19 @@ th {
   display: block;
   color: var(--ink);
   font-weight: 900;
+}
+
+.export-textarea {
+  width: 100%;
+  min-height: 220px;
+  margin-top: 12px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--ink);
+  background: #fff;
+  font: 800 13px/1.5 Consolas, "Courier New", monospace;
 }
 
 .coverage-grid {
