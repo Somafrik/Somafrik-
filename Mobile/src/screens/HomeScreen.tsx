@@ -24,12 +24,25 @@ import { canReadEntity, canReadRoute } from "../domain/security/permissions";
 export default function HomeScreen({ navigation }: any) {
   const { session, selectedStudentId } = useAuth();
   const { studentsData, paymentsData, presencesData, announcementsData, messagesData, schoolsData, usersData } = useAdminData();
-  const currentSchool = schoolsData[0] ?? school;
+  const currentSchool =
+    schoolsData.find((item) => item.code === session?.school.code || item.code === session?.user.schoolCode) ??
+    session?.school ??
+    schoolsData[0] ??
+    school;
   const studentIds = studentsData.map((student) => student.id);
   const presenceStats = getPresenceStats(presencesData, studentIds);
   const paymentStats = getPaymentStats(paymentsData, studentIds);
   const userName = session?.user.name ?? "Administrateur";
+  const welcomeGreeting = buildTimeGreeting(currentSchool.timezone);
+  const welcomeName = getGreetingName(userName, session?.role);
   const unreadMessages = getUnreadMessagesCount(session, messagesData, studentsData);
+  const canReadStudents = canReadEntity(session, "students");
+  const canReadUsers = canReadEntity(session, "users");
+  const canReadPayments = canReadEntity(session, "payments");
+  const canReadAnnouncements = canReadEntity(session, "announcements");
+  const canReadMessages = canReadEntity(session, "messages");
+  const canReadAttendance = canReadRoute(session, "TeacherAttendance");
+  const canOpenSchoolManagement = canReadRoute(session, "SchoolManagement");
 
   if (session?.role === "teacher") {
     const assignedClasses = session.user.assignedClasses ?? [];
@@ -431,7 +444,7 @@ export default function HomeScreen({ navigation }: any) {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.schoolCard}
-          onPress={() => navigation.navigate("SchoolManagement")}
+          onPress={() => canOpenSchoolManagement && navigation.navigate("SchoolManagement")}
         >
           <View style={styles.schoolIconBox}>
             {currentSchool.logoUrl ? (
@@ -452,10 +465,12 @@ export default function HomeScreen({ navigation }: any) {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.welcomeCard}
-          onPress={() => navigation.navigate("SchoolManagement")}
+          onPress={() => canOpenSchoolManagement && navigation.navigate("SchoolManagement")}
         >
           <View>
-            <Text style={styles.welcomeTitle}>Bonjour {userName}</Text>
+            <Text style={styles.welcomeTitle}>
+              {welcomeGreeting}{welcomeName ? ` ${welcomeName}` : ""}
+            </Text>
           </View>
 
           <View style={styles.welcomeIcon}>
@@ -470,41 +485,49 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.statsGrid}>
-          <StatCard
-            icon="people-outline"
-            value={String(studentsData.length)}
-            label="Élèves"
-            color="#2563EB"
-            bg="#EFF6FF"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
-          />
+          {canReadStudents && (
+            <StatCard
+              icon="people-outline"
+              value={String(studentsData.length)}
+              label="Élèves"
+              color="#2563EB"
+              bg="#EFF6FF"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
+            />
+          )}
 
-          <StatCard
-            icon="person-outline"
-            value={String(usersData.length)}
-            label="Utilisateurs"
-            color="#7C3AED"
-            bg="#F5F3FF"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
-          />
+          {canReadUsers && (
+            <StatCard
+              icon="person-outline"
+              value={String(usersData.length)}
+              label="Utilisateurs"
+              color="#7C3AED"
+              bg="#F5F3FF"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
+            />
+          )}
 
-          <StatCard
-            icon="checkmark-circle-outline"
-            value={`${presenceStats.rate}%`}
-            label="Présence"
-            color="#16A34A"
-            bg="#ECFDF5"
-            onPress={() => navigation.navigate("Students", { className: "Toutes les classes" })}
-          />
+          {canReadAttendance && (
+            <StatCard
+              icon="checkmark-circle-outline"
+              value={`${presenceStats.rate}%`}
+              label="Présence"
+              color="#16A34A"
+              bg="#ECFDF5"
+              onPress={() => navigation.navigate("TeacherAttendance")}
+            />
+          )}
 
-          <StatCard
-            icon="card-outline"
-            value={`${paymentStats.rate}%`}
-            label="Paiements"
-            color="#EA580C"
-            bg="#FFF7ED"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
-          />
+          {canReadPayments && (
+            <StatCard
+              icon="card-outline"
+              value={`${paymentStats.rate}%`}
+              label="Paiements"
+              color="#EA580C"
+              bg="#FFF7ED"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+            />
+          )}
         </View>
 
         {/* Activité récente */}
@@ -514,36 +537,44 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.activityCard}>
-          <ActivityItem
-            icon="cash-outline"
-            title="Paiement reçu"
-            description={`${paymentsData.filter((payment) => payment.status === "PAYE").length} paiement(s) validé(s)`}
-            color="#16A34A"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
-          />
+          {canReadPayments && (
+            <ActivityItem
+              icon="cash-outline"
+              title="Paiement reçu"
+              description={`${paymentsData.filter((payment) => payment.status === "PAYE").length} paiement(s) validé(s)`}
+              color="#16A34A"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+            />
+          )}
 
-          <ActivityItem
-            icon="person-add-outline"
-            title="Élèves inscrits"
-            description={`${studentsData.length} dossier(s) actif(s)`}
-            color="#2563EB"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
-          />
+          {canReadStudents && (
+            <ActivityItem
+              icon="person-add-outline"
+              title="Élèves inscrits"
+              description={`${studentsData.length} dossier(s) actif(s)`}
+              color="#2563EB"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
+            />
+          )}
 
-          <ActivityItem
-            icon="megaphone-outline"
-            title="Annonce publiée"
-            description={`${announcementsData.length} communication(s) envoyée(s)`}
-            color="#7C3AED"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
-          />
-          <ActivityItem
-            icon="chatbubbles-outline"
-            title="Messages parents"
-            description={`${unreadMessages} non lu(s) • ${messagesData.length} échange(s)`}
-            color="#0F766E"
-            onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
-          />
+          {canReadAnnouncements && (
+            <ActivityItem
+              icon="megaphone-outline"
+              title="Annonce publiée"
+              description={`${announcementsData.length} communication(s) envoyée(s)`}
+              color="#7C3AED"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+            />
+          )}
+          {canReadMessages && (
+            <ActivityItem
+              icon="chatbubbles-outline"
+              title="Messages parents"
+              description={`${unreadMessages} non lu(s) • ${messagesData.length} échange(s)`}
+              color="#0F766E"
+              onPress={() => navigation.navigate("Messages")}
+            />
+          )}
         </View>
 
         {/* Actions rapides */}
@@ -552,13 +583,6 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.actionsGrid}>
-          {canReadEntity(session, "schools") && (
-            <QuickAction
-              icon="business-outline"
-              label="Établissement"
-              onPress={() => navigation.navigate("AdminCrud", { entity: "schools" })}
-            />
-          )}
           {canReadEntity(session, "users") && (
             <QuickAction
               icon="person-circle-outline"
@@ -605,7 +629,7 @@ export default function HomeScreen({ navigation }: any) {
             <QuickAction
               icon="chatbubbles-outline"
               label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"}
-              onPress={() => navigation.navigate("AdminCrud", { entity: "messages" })}
+              onPress={() => navigation.navigate("Messages")}
             />
           )}
           {canReadEntity(session, "classes") && (
@@ -647,6 +671,35 @@ export default function HomeScreen({ navigation }: any) {
       </ScrollView>
     </View>
   );
+}
+
+function buildTimeGreeting(timezone?: string) {
+  const hour = getHourForTimezone(timezone);
+
+  if (hour >= 18 || hour < 5) return "Bonsoir";
+  if (hour >= 12) return "Bon après-midi";
+  return "Bonjour";
+}
+
+function getHourForTimezone(timezone?: string) {
+  try {
+    const formattedHour = new Intl.DateTimeFormat("fr-FR", {
+      hour: "2-digit",
+      hour12: false,
+      timeZone: timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }).format(new Date());
+    return Number(formattedHour.replace(/\D/g, ""));
+  } catch {
+    return new Date().getHours();
+  }
+}
+
+function getGreetingName(userName: string, role?: string) {
+  if (!userName || /schoollink/i.test(userName)) {
+    return role === "school_admin" ? "Administrateur" : "";
+  }
+
+  return userName;
 }
 
 function getUnreadMessagesCount(session: any, messagesData: any[], studentsData: any[]) {

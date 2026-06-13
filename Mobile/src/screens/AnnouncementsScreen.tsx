@@ -1,20 +1,47 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { Alert, View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAdminData } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
-import { canMutateEntity } from "../domain/security/permissions";
+import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
 
 export default function AnnouncementsScreen({ navigation }: any) {
   const { session } = useAuth();
-  const { announcementsData } = useAdminData();
+  const { announcementsData, deleteItem } = useAdminData();
+  const canRead = canReadEntity(session, "announcements");
   const canCreate = canMutateEntity(session, "announcements", "CREATE");
   const canUpdate = canMutateEntity(session, "announcements", "UPDATE");
+  const canDelete = canMutateEntity(session, "announcements", "DELETE");
+
+  const confirmDelete = (announcement: any) => {
+    if (!canDelete) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de supprimer une annonce.");
+      return;
+    }
+
+    Alert.alert("Supprimer l'annonce", "Confirmer la suppression ?", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: () => deleteItem("announcements", announcement.id),
+      },
+    ]);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Annonces</Text>
       <Text style={styles.subtitle}>Communications envoyées aux familles</Text>
 
+      {!canRead && (
+        <View style={styles.emptyState}>
+          <Ionicons name="lock-closed-outline" size={24} color="#DC2626" />
+          <Text style={styles.emptyText}>Accès refusé aux annonces.</Text>
+        </View>
+      )}
+
+      {canRead && (
+        <>
       {canCreate && (
         <TouchableOpacity
           activeOpacity={0.85}
@@ -27,12 +54,12 @@ export default function AnnouncementsScreen({ navigation }: any) {
       )}
 
       {announcementsData.map((announcement) => (
-        <TouchableOpacity
-          key={announcement.id}
-          activeOpacity={0.85}
-          style={styles.card}
-          onPress={() => canUpdate && navigation.navigate("AdminCrud", { entity: "announcements" })}
-        >
+        <View key={announcement.id} style={styles.card}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.cardMain}
+            onPress={() => canUpdate && navigation.navigate("AdminCrud", { entity: "announcements" })}
+          >
           <View style={styles.iconBox}>
             <Ionicons name="megaphone-outline" size={24} color="#7C3AED" />
           </View>
@@ -41,8 +68,33 @@ export default function AnnouncementsScreen({ navigation }: any) {
             <Text style={styles.message}>{announcement.message}</Text>
             <Text style={styles.date}>{announcement.date}</Text>
           </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+
+          <View style={styles.actionRow}>
+            {canUpdate && (
+              <TouchableOpacity style={styles.smallAction} onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}>
+                <Ionicons name="create-outline" size={18} color="#2563EB" />
+                <Text style={styles.smallActionText}>Modifier</Text>
+              </TouchableOpacity>
+            )}
+            {canDelete && (
+              <TouchableOpacity style={styles.smallDangerAction} onPress={() => confirmDelete(announcement)}>
+                <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                <Text style={styles.smallDangerText}>Supprimer</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       ))}
+
+      {announcementsData.length === 0 && (
+        <View style={styles.emptyState}>
+          <Ionicons name="megaphone-outline" size={24} color="#94A3B8" />
+          <Text style={styles.emptyText}>Aucune annonce.</Text>
+        </View>
+      )}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -86,6 +138,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 16,
     marginBottom: 14,
+  },
+  cardMain: {
     flexDirection: "row",
   },
   iconBox: {
@@ -115,5 +169,44 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#7C3AED",
     fontWeight: "800",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+  smallAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  smallActionText: { color: "#2563EB", fontWeight: "900" },
+  smallDangerAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "#FEF2F2",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  smallDangerText: { color: "#DC2626", fontWeight: "900" },
+  emptyState: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 18,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: "#64748B",
+    fontWeight: "800",
+    marginTop: 8,
   },
 });

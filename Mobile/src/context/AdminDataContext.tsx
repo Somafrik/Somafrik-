@@ -142,6 +142,10 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       academicConfigData,
     ]
   );
+  const scopedStateSnapshot = useMemo(
+    () => scopeBackOfficePayload(stateSnapshot, session),
+    [session, stateSnapshot]
+  );
 
   useEffect(() => {
     if (!canSyncBackOfficeState(session?.role, session?.accessToken)) {
@@ -191,26 +195,27 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   }, [session?.accessToken]);
 
   const applySyncedState = (payload: BackOfficeStatePayload) => {
-    applyArray(payload.students, setStudentsData);
-    applyArray(payload.teachers, setTeachersData);
-    applyArray(payload.classes, setClassesData);
-    applyArray(payload.countries, setCountriesData);
-    applyArray(payload.courses, setCoursesData);
-    applyArray(payload.assignments, setAssignmentsData);
-    applyArray(payload.payments, setPaymentsData);
-    applyArray(payload.subscriptions, setSubscriptionsData);
-    applyArray(payload.paymentStatuses, setPaymentStatusesData);
-    applyArray(payload.presences, setPresencesData);
-    applyArray(payload.notes, setNotesData);
-    applyArray(payload.schools, setSchoolsData);
-    applyArray(payload.users, setUsersData);
-    applyArray(payload.announcements, setAnnouncementsData);
-    applyArray(payload.messages, setMessagesData);
+    const scopedPayload = scopeBackOfficePayload(payload, session);
+    applyArray(scopedPayload.students, setStudentsData);
+    applyArray(scopedPayload.teachers, setTeachersData);
+    applyArray(scopedPayload.classes, setClassesData);
+    applyArray(scopedPayload.countries, setCountriesData);
+    applyArray(scopedPayload.courses, setCoursesData);
+    applyArray(scopedPayload.assignments, setAssignmentsData);
+    applyArray(scopedPayload.payments, setPaymentsData);
+    applyArray(scopedPayload.subscriptions, setSubscriptionsData);
+    applyArray(scopedPayload.paymentStatuses, setPaymentStatusesData);
+    applyArray(scopedPayload.presences, setPresencesData);
+    applyArray(scopedPayload.notes, setNotesData);
+    applyArray(scopedPayload.schools, setSchoolsData);
+    applyArray(scopedPayload.users, setUsersData);
+    applyArray(scopedPayload.announcements, setAnnouncementsData);
+    applyArray(scopedPayload.messages, setMessagesData);
     if (payload.rolePermissions && typeof payload.rolePermissions === "object") {
       setRolePermissionsData(payload.rolePermissions);
     }
-    if (payload.academicConfigs && typeof payload.academicConfigs === "object") {
-      const configs = payload.academicConfigs as Record<string, AcademicManagementConfig>;
+    if (scopedPayload.academicConfigs && typeof scopedPayload.academicConfigs === "object") {
+      const configs = scopedPayload.academicConfigs as Record<string, AcademicManagementConfig>;
       const firstConfig = Object.values(configs)[0];
       if (firstConfig) {
         setAcademicConfigData(firstConfig);
@@ -256,7 +261,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo<AdminDataContextValue>(() => {
-    const state = stateSnapshot;
+    const state = scopedStateSnapshot;
 
     const setters = {
       students: setStudentsData,
@@ -283,21 +288,21 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     };
 
     return {
-      studentsData,
-      teachersData,
-      classesData,
-      countriesData,
-      coursesData,
-      assignmentsData,
-      paymentsData,
-      subscriptionsData,
-      paymentStatusesData,
-      presencesData,
-      notesData,
-      schoolsData,
-      usersData,
-      announcementsData,
-      messagesData,
+      studentsData: (state.students ?? []) as Student[],
+      teachersData: (state.teachers ?? []) as Teacher[],
+      classesData: (state.classes ?? []) as SchoolClass[],
+      countriesData: (state.countries ?? []) as CountryProfile[],
+      coursesData: (state.courses ?? []) as Course[],
+      assignmentsData: (state.assignments ?? []) as TeacherAssignment[],
+      paymentsData: (state.payments ?? []) as PaymentItem[],
+      subscriptionsData: (state.subscriptions ?? []) as SubscriptionItem[],
+      paymentStatusesData: (state.paymentStatuses ?? []) as PaymentStatus[],
+      presencesData: (state.presences ?? []) as PresenceItem[],
+      notesData: (state.notes ?? []) as NoteItem[],
+      schoolsData: (state.schools ?? []) as SchoolProfile[],
+      usersData: (state.users ?? []) as UserAccount[],
+      announcementsData: (state.announcements ?? []) as Announcement[],
+      messagesData: (state.messages ?? []) as SchoolMessage[],
       rolePermissionsData,
       academicConfigData,
       syncStatus,
@@ -342,6 +347,9 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     rolePermissionsData,
     session?.accessToken,
     session?.role,
+    session?.school.code,
+    session?.user.schoolCode,
+    scopedStateSnapshot,
     stateSnapshot,
     syncStatus,
   ]);
@@ -357,6 +365,76 @@ function applyArray<T>(value: unknown, setter: React.Dispatch<React.SetStateActi
   if (Array.isArray(value)) {
     setter(value as T[]);
   }
+}
+
+function scopeBackOfficePayload<T extends BackOfficeStatePayload>(payload: T, session: any): T {
+  if (!session || session.role === "super_admin") {
+    return payload;
+  }
+
+  const schoolCode = getSessionSchoolCode(session);
+  if (!schoolCode || session.role === "country_admin") {
+    return payload;
+  }
+
+  const students = filterBySchool(payload.students, schoolCode) as Student[];
+  const studentIds = new Set(students.map((item) => item.id));
+  const classNames = new Set(students.map((item) => item.className).filter(Boolean));
+  const classes = filterRows(payload.classes, (item) => rowInSchool(item, schoolCode) || classNames.has(item.name)) as SchoolClass[];
+  classes.forEach((item) => item.name && classNames.add(item.name));
+  const teachers = filterRows(payload.teachers, (item) =>
+    rowInSchool(item, schoolCode) ||
+    (item.assignedClasses ?? []).some((className: string) => classNames.has(className)) ||
+    (item.assignments ?? []).some((assignment: TeacherAssignment) => classNames.has(assignment.className))
+  ) as Teacher[];
+  const teacherIds = new Set(teachers.map((item) => item.id));
+
+  return {
+    ...payload,
+    schools: filterRows(payload.schools, (item) => item.code === schoolCode),
+    users: filterRows(payload.users, (item) => item.schoolCode === schoolCode),
+    students,
+    teachers,
+    classes,
+    courses: filterRows(payload.courses, (item) => rowInSchool(item, schoolCode) || classNames.has(item.className)),
+    assignments: filterRows(payload.assignments, (item) =>
+      rowInSchool(item, schoolCode) || classNames.has(item.className) || teacherIds.has(item.teacherId)
+    ),
+    payments: filterRows(payload.payments, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
+    subscriptions: filterRows(payload.subscriptions, (item) => item.schoolCode === schoolCode),
+    presences: filterRows(payload.presences, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
+    notes: filterRows(payload.notes, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
+    announcements: filterRows(payload.announcements, (item) => rowInSchool(item, schoolCode)),
+    messages: filterRows(payload.messages, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
+    academicConfigs: filterAcademicConfigs(payload.academicConfigs, schoolCode),
+  };
+}
+
+function getSessionSchoolCode(session: any) {
+  return String(session?.user?.schoolCode && session.user.schoolCode !== "*" ? session.user.schoolCode : session?.school?.code ?? "")
+    .trim()
+    .toUpperCase();
+}
+
+function filterBySchool(value: unknown, schoolCode: string) {
+  return filterRows(value, (item) => rowInSchool(item, schoolCode));
+}
+
+function filterRows(value: unknown, predicate: (item: any) => boolean) {
+  return Array.isArray(value) ? value.filter((item) => predicate(item ?? {})) : [];
+}
+
+function rowInSchool(item: any, schoolCode: string) {
+  return item?.schoolCode === schoolCode || item?.code === schoolCode || item?.publicId === schoolCode;
+}
+
+function filterAcademicConfigs(value: unknown, schoolCode: string) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
+  }
+
+  const config = (value as Record<string, AcademicManagementConfig>)[schoolCode];
+  return config ? { [schoolCode]: config } : {};
 }
 
 function roleLabelFromSession(role?: string) {

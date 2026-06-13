@@ -260,8 +260,15 @@ class BackOfficeAccessService {
     }
 
     if (user.role === "Admin Pays") {
-      return this.userAccounts.filter(
-        (account) => account.countryScope === user.countryScope || account.schoolCode === "*"
+      const countryCode = this.getCountryCode(user.countryScope);
+      const scopedSchoolCodes = new Set(
+        this.schools
+          .filter((school) => school.country === user.countryScope || school.code.startsWith(countryCode))
+          .map((school) => school.code)
+      );
+      return this.userAccounts.filter((account) =>
+        account.role === "Admin School" &&
+        (account.countryScope === user.countryScope || scopedSchoolCodes.has(account.schoolCode))
       );
     }
 

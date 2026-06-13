@@ -141,6 +141,16 @@ const rolePermissions = {
 };
 
 const securityMatrix = {
+  Pays: {
+    "Super Administrateur SchoolLink": "CRUD",
+    "Admin Pays": "R",
+    "Admin School": "-",
+    "Préfet des études": "-",
+    Enseignant: "-",
+    Secrétaire: "-",
+    Parent: "-",
+    "Élève / Étudiant": "-",
+  },
   "Établissements": {
     "Super Administrateur SchoolLink": "CRUD",
     "Admin Pays": "CRUD",
@@ -231,6 +241,16 @@ const securityMatrix = {
     Parent: "R",
     "Élève / Étudiant": "R",
   },
+  Abonnements: {
+    "Super Administrateur SchoolLink": "CRUD",
+    "Admin Pays": "CRUD",
+    "Admin School": "R",
+    "Préfet des études": "-",
+    Enseignant: "-",
+    Secrétaire: "R",
+    Parent: "-",
+    "Élève / Étudiant": "-",
+  },
   Notifications: {
     "Super Administrateur SchoolLink": "CRUD",
     "Admin Pays": "CRUD",
@@ -318,7 +338,7 @@ function permissionsFromSecurityMatrix(role) {
   return Object.entries(securityMatrix).flatMap(([feature, grants]) => {
     const access = grants[matrixRole] ?? "-";
     if (access === "-") return [];
-    const actions = access === "CRUD" ? ["READ", "CREATE", "UPDATE", "DELETE"] : ["READ"];
+    const actions = access === "CRUD" ? ["READ", "CREATE", "UPDATE", "DELETE", "SUSPEND"] : ["READ"];
     return actions.map((action) => `${feature}:${action}`);
   });
 }

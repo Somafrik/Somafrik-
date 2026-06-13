@@ -1,4 +1,5 @@
 const seedData = require("../data");
+const { hashSecret } = require("../services/credentialService");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -176,6 +177,46 @@ class FallbackRepository {
       },
     };
     return clone(savedConfig);
+  }
+
+  async resetUserPassword(userId, temporaryPassword) {
+    const secretHash = hashSecret(temporaryPassword);
+    const existingStateUsers = this.backOfficeState?.users ?? [];
+    const seedUserIndex = seedData.userAccounts.findIndex((user) => String(user.id) === String(userId) || user.publicId === userId);
+    const stateUser = existingStateUsers.find((user) => String(user.id) === String(userId) || user.publicId === userId);
+
+    if (!stateUser && seedUserIndex === -1) {
+      const error = new Error("Utilisateur introuvable");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const sourceUser = stateUser ?? seedData.userAccounts[seedUserIndex];
+    const updatedUser = {
+      ...sourceUser,
+      password: temporaryPassword,
+      pin: temporaryPassword,
+      passwordHash: secretHash,
+      pinHash: secretHash,
+      temporaryPassword,
+      history: [
+        ...(sourceUser.history ?? []),
+        `Mot de passe temporaire régénéré le ${new Date().toLocaleDateString("fr-FR")}. Ancien mot de passe invalidé.`,
+      ],
+    };
+
+    if (seedUserIndex !== -1) {
+      seedData.userAccounts[seedUserIndex] = updatedUser;
+    }
+
+    this.backOfficeState = {
+      ...(this.backOfficeState ?? {}),
+      users: stateUser
+        ? existingStateUsers.map((user) => (String(user.id) === String(userId) || user.publicId === userId ? updatedUser : user))
+        : [updatedUser, ...existingStateUsers],
+    };
+
+    return clone(updatedUser);
   }
 
   async upsertGrade(payload, principal) {

@@ -25,7 +25,7 @@ const adminMenuItems: MenuItem[] = [
   { label: "🔁 Affectations profs", entity: "assignments" },
   { label: "💰 Paiements", entity: "payments" },
   { label: "⚙️ Statuts paiement", entity: "paymentStatuses" },
-  { label: "💬 Messages parents", entity: "messages" },
+  { label: "💬 Messages parents", route: "Messages" },
   { label: "📢 Annonces", entity: "announcements" },
   { label: "🗓️ Emplois du temps", route: "Timetable" },
   { label: "📄 Bulletins", route: "ReportCards" },

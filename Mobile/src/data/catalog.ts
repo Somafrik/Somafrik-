@@ -508,6 +508,7 @@ export const defaultAcademicConfig: AcademicManagementConfig = {
 };
 
 const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
+  Pays: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "R", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   "Établissements": { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "R", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Utilisateurs: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Classes: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
@@ -517,6 +518,7 @@ const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
   Notes: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "R", "Élève / Étudiant": "R" },
   Bulletins: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
   Paiements: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "R", Enseignant: "-", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Abonnements: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "R", "Préfet des études": "-", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
   Notifications: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Messages: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "CRUD", "Élève / Étudiant": "CRUD" },
   Documents: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
@@ -532,7 +534,7 @@ function permissionsFromSecurityMatrix(role: string) {
   return Object.entries(securityMatrix).flatMap(([feature, grants]) => {
     const access = grants[matrixRole] ?? "-";
     if (access === "-") return [];
-    const actions = access === "CRUD" ? ["READ", "CREATE", "UPDATE", "DELETE"] : ["READ"];
+    const actions = access === "CRUD" ? ["READ", "CREATE", "UPDATE", "DELETE", "SUSPEND"] : ["READ"];
     return actions.map((action) => `${feature}:${action}`);
   });
 }

@@ -317,10 +317,46 @@ app.get("/api/teachers", requireAuth, requirePermission("GET /api/teachers"), as
 app.get("/api/users", requireAuth, requirePermission("GET /api/users"), asyncHandler(async (req, res) => {
   const { userAccounts } = await getRuntime();
   const result = tenantScopeService.filterRows(userAccounts, req.principal).map(({ temporaryPassword, passwordHash, pinHash, ...user }) => ({
-      ...user,
-      hasTemporaryPassword: Boolean(temporaryPassword),
-    }));
+    ...user,
+    hasTemporaryPassword: Boolean(temporaryPassword),
+  }));
   sendList(res, result, req.query, ["firstName", "lastName", "identifier", "role", "schoolCode"]);
+}));
+
+app.post("/api/users/:id/reset-password", requireAuth, asyncHandler(async (req, res) => {
+  const permissions = new Set(req.principal.permissions ?? []);
+  if (!permissions.has("ALL_PRIVILEGES") && !permissions.has("COUNTRY_PRIVILEGES") && !permissions.has("Utilisateurs:UPDATE")) {
+    throw new BusinessError(403, "Permission insuffisante pour réinitialiser le mot de passe.");
+  }
+
+  const { userAccounts } = await getRuntime();
+  const scopedUsers = tenantScopeService.filterRows(userAccounts, req.principal);
+  const target = scopedUsers.find((user) =>
+    [user.id, user.publicId, user.identifier].some((value) => String(value ?? "") === String(req.params.id))
+  );
+
+  if (!target) {
+    throw new BusinessError(404, "Utilisateur introuvable dans votre établissement.");
+  }
+
+  const temporaryPassword = String(req.body?.temporaryPassword ?? "").trim();
+  if (temporaryPassword.length < 6) {
+    throw new BusinessError(400, "Le mot de passe temporaire doit contenir au moins 6 caractères.");
+  }
+
+  const updatedUser = await repository.resetUserPassword(target.id, temporaryPassword);
+  await auditService.record(req, "reset_user_password", "user", target.id, {
+    user: target.identifier,
+    oldPasswordInvalidated: true,
+  });
+  const { passwordHash, pinHash, password, pin, ...safeUser } = updatedUser;
+  res.json({
+    temporaryPassword,
+    user: {
+      ...safeUser,
+      hasTemporaryPassword: true,
+    },
+  });
 }));
 
 app.get("/api/payments", requireAuth, requirePermission("GET /api/payments"), asyncHandler(async (req, res) => {
@@ -360,16 +396,15 @@ app.get("/api/backoffice/notifications", requireAuth, requirePermission("GET /ap
 
 app.get("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
   assertBackOfficeManager(req.principal);
-  res.json((await repository.getBackOfficeState()) ?? {});
+  res.json(scopeBackOfficeState((await repository.getBackOfficeState()) ?? {}, req.principal));
 }));
 
 app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
   assertBackOfficeManager(req.principal);
   const currentState = (await repository.getBackOfficeState()) ?? {};
-  const saved = await repository.saveBackOfficeState(sanitizeBackOfficeState({
-    ...currentState,
-    ...(req.body ?? {}),
-  }));
+  const requestedState = sanitizeBackOfficeState(req.body ?? {});
+  const nextState = mergeScopedBackOfficeState(currentState, requestedState, req.principal);
+  const saved = await repository.saveBackOfficeState(nextState);
   await auditService.record(req, "sync_backoffice_state", "backoffice_state", "default", {
     schools: saved.schools?.length ?? 0,
     users: saved.users?.length ?? 0,
@@ -381,7 +416,7 @@ app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
     classes: saved.classes?.length ?? 0,
     roles: Object.keys(saved.rolePermissions ?? {}).length,
   });
-  res.json(saved);
+  res.json(scopeBackOfficeState(saved, req.principal));
 }));
 
 app.get("/api/audit", requireAuth, asyncHandler(async (req, res) => {
@@ -566,6 +601,140 @@ function sanitizeBackOfficeState(payload = {}) {
     rolePermissions: isPlainObject(payload.rolePermissions) ? payload.rolePermissions : {},
     updatedAt: new Date().toISOString(),
   };
+}
+
+function scopeBackOfficeState(payload = {}, principal) {
+  const state = sanitizeBackOfficeState(payload);
+  if (!principal || principal.role === "Super Administrateur SchoolLink") {
+    return state;
+  }
+
+  if (principal.role === "Admin Pays") {
+    const countryCode = principal.countryCode;
+    const schools = state.schools.filter((item) => countryCodeFromSchoolOrCountry(item.code, item.country) === countryCode);
+    const schoolCodes = new Set(schools.map((item) => item.code));
+    const scopedState = scopeStateWithSchools(state, schoolCodes, { countries: state.countries.filter((item) => item.code === countryCode) });
+    return {
+      ...scopedState,
+      users: scopedState.users.filter((item) => item.role === "Admin School"),
+    };
+  }
+
+  const schoolCodes = new Set([principal.schoolCode].filter(Boolean));
+  return scopeStateWithSchools(state, schoolCodes);
+}
+
+function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
+  const students = state.students.filter((item) => hasSchoolScope(item, schoolCodes));
+  const studentIds = new Set(students.map((item) => item.id));
+  const classNames = new Set(students.map((item) => item.className).filter(Boolean));
+  const teachers = state.teachers.filter((item) =>
+    hasSchoolScope(item, schoolCodes) ||
+    (item.assignedClasses ?? []).some((className) => classNames.has(className)) ||
+    (item.assignments ?? []).some((assignment) => classNames.has(assignment.className))
+  );
+  const teacherIds = new Set(teachers.map((item) => item.id));
+  const classes = state.classes.filter((item) => hasSchoolScope(item, schoolCodes) || classNames.has(item.name));
+  classes.forEach((item) => {
+    if (item.name) classNames.add(item.name);
+  });
+
+  const courses = state.courses.filter((item) => hasSchoolScope(item, schoolCodes) || classNames.has(item.className));
+  const assignments = state.assignments.filter((item) =>
+    hasSchoolScope(item, schoolCodes) ||
+    classNames.has(item.className) ||
+    teacherIds.has(item.teacherId)
+  );
+  const users = state.users.filter((item) => hasSchoolScope(item, schoolCodes));
+  const schools = state.schools.filter((item) => schoolCodes.has(item.code));
+  const subscriptions = state.subscriptions.filter((item) => hasSchoolScope(item, schoolCodes));
+  const payments = state.payments.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
+  const presences = state.presences.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
+  const notes = state.notes.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
+  const announcements = state.announcements.filter((item) => hasSchoolScope(item, schoolCodes));
+  const messages = state.messages.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
+  const academicConfigs = Object.fromEntries(
+    Object.entries(state.academicConfigs).filter(([schoolCode]) => schoolCodes.has(schoolCode))
+  );
+
+  return {
+    ...state,
+    schools,
+    users,
+    students,
+    teachers,
+    classes,
+    courses,
+    assignments,
+    payments,
+    subscriptions,
+    presences,
+    notes,
+    announcements,
+    messages,
+    academicConfigs,
+    countries: overrides.countries ?? state.countries,
+  };
+}
+
+function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, principal) {
+  const current = sanitizeBackOfficeState(currentPayload);
+  const requested = sanitizeBackOfficeState(requestedPayload);
+
+  if (!principal || principal.role === "Super Administrateur SchoolLink") {
+    return requested;
+  }
+
+  const scopedCurrent = scopeBackOfficeState(current, principal);
+  const scopedRequested = scopeBackOfficeState(requested, principal);
+
+  return {
+    ...current,
+    schools: mergeScopedRows(current.schools, scopedRequested.schools, scopedCurrent.schools),
+    users: mergeScopedRows(current.users, scopedRequested.users, scopedCurrent.users),
+    countries: principal.role === "Admin Pays" ? mergeScopedRows(current.countries, scopedRequested.countries, scopedCurrent.countries) : current.countries,
+    subscriptions: mergeScopedRows(current.subscriptions, scopedRequested.subscriptions, scopedCurrent.subscriptions),
+    notifications: current.notifications,
+    students: mergeScopedRows(current.students, scopedRequested.students, scopedCurrent.students),
+    teachers: mergeScopedRows(current.teachers, scopedRequested.teachers, scopedCurrent.teachers),
+    classes: mergeScopedRows(current.classes, scopedRequested.classes, scopedCurrent.classes),
+    courses: mergeScopedRows(current.courses, scopedRequested.courses, scopedCurrent.courses),
+    assignments: mergeScopedRows(current.assignments, scopedRequested.assignments, scopedCurrent.assignments),
+    payments: mergeScopedRows(current.payments, scopedRequested.payments, scopedCurrent.payments),
+    paymentStatuses: requested.paymentStatuses.length ? requested.paymentStatuses : current.paymentStatuses,
+    presences: mergeScopedRows(current.presences, scopedRequested.presences, scopedCurrent.presences),
+    notes: mergeScopedRows(current.notes, scopedRequested.notes, scopedCurrent.notes),
+    announcements: mergeScopedRows(current.announcements, scopedRequested.announcements, scopedCurrent.announcements),
+    messages: mergeScopedRows(current.messages, scopedRequested.messages, scopedCurrent.messages),
+    rolePermissions: current.rolePermissions,
+    academicConfigs: {
+      ...current.academicConfigs,
+      ...scopedRequested.academicConfigs,
+    },
+    auditLog: current.auditLog,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function mergeScopedRows(currentRows, requestedScopedRows, currentScopedRows) {
+  const scopedKeys = new Set(currentScopedRows.map(rowKey));
+  const requestedKeys = new Set(requestedScopedRows.map(rowKey));
+  return [
+    ...requestedScopedRows,
+    ...currentRows.filter((row) => !scopedKeys.has(rowKey(row)) && !requestedKeys.has(rowKey(row))),
+  ];
+}
+
+function rowKey(row = {}) {
+  return String(row.id ?? row.publicId ?? row.code ?? row.schoolCode ?? row.value ?? JSON.stringify(row));
+}
+
+function hasSchoolScope(row = {}, schoolCodes) {
+  return (
+    schoolCodes.has(row.schoolCode) ||
+    schoolCodes.has(row.code) ||
+    schoolCodes.has(row.publicId)
+  );
 }
 
 function isPlainObject(value) {

@@ -138,7 +138,12 @@ class PostgresRepository {
         JOIN students st ON st.id = p.student_id
         ORDER BY p.payment_date, p.created_at
       `),
-      this.all("SELECT * FROM announcements ORDER BY published_at DESC NULLS LAST, created_at DESC"),
+      this.all(`
+        SELECT a.*, s.school_code
+        FROM announcements a
+        LEFT JOIN schools s ON s.id = a.school_id
+        ORDER BY a.published_at DESC NULLS LAST, a.created_at DESC
+      `),
       this.all(`
         SELECT n.*, s.school_code
         FROM notifications n
@@ -400,6 +405,41 @@ class PostgresRepository {
       },
     });
     return savedConfig;
+  }
+
+  async resetUserPassword(userId, temporaryPassword) {
+    await this.init();
+    const secretHash = hashSecret(temporaryPassword);
+    const updated = await this.one(
+      `UPDATE users
+       SET password_hash = $1, pin_hash = $1, updated_at = NOW()
+       WHERE id::text = $2 OR user_code = $2
+       RETURNING *`,
+      [secretHash, String(userId)]
+    );
+
+    if (!updated) {
+      const error = new Error("Utilisateur introuvable");
+      error.statusCode = 404;
+      throw error;
+    }
+    this.cachedDataset = null;
+
+    const schoolRows = await this.all(`
+      SELECT s.*, c.name AS country_name, c.iso_code
+      FROM schools s
+      LEFT JOIN countries c ON c.id = s.country_id
+    `);
+    const schoolByCode = new Map(schoolRows.map((school) => [school.school_code, school]));
+    const row = await this.one(
+      `SELECT u.*, s.school_code
+       FROM users u
+       LEFT JOIN schools s ON s.id = u.school_id
+       WHERE u.id = $1`,
+      [updated.id]
+    );
+
+    return this.mapUser(row, schoolByCode);
   }
 
   async upsertGrade(payload, principal = {}) {
@@ -1567,6 +1607,7 @@ class PostgresRepository {
     return {
       id: announcement.id,
       schoolId: announcement.school_id,
+      schoolCode: announcement.school_code,
       title: announcement.title,
       message: announcement.message,
       date: this.formatDate(announcement.published_at ?? announcement.created_at),

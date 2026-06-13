@@ -268,6 +268,13 @@ export function saveBackOfficeState(payload: BackOfficeStatePayload) {
   });
 }
 
+export function resetUserPassword(userId: string, temporaryPassword: string) {
+  return request<{ temporaryPassword: string; user: unknown }>(`/users/${encodeURIComponent(userId)}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ temporaryPassword }),
+  });
+}
+
 export function getReportCardPdfUrl(studentId: string, period = "Trimestre 1") {
   const tokenQuery = accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : "";
   return `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/report.pdf?period=${encodeURIComponent(period)}${tokenQuery}`;

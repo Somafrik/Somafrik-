@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,6 +31,7 @@ export default function MessagesScreen({ navigation }: any) {
   const [recipient, setRecipient] = useState<"school" | "teacher">("school");
   const [selectedTeacherId, setSelectedTeacherId] = useState(session?.user.id ?? "");
   const [teacherStudentId, setTeacherStudentId] = useState("");
+  const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
 
   const role = session?.role;
   const parentPhone =
@@ -69,6 +71,14 @@ export default function MessagesScreen({ navigation }: any) {
   }, [messagesData, parentPhone, role, session, teacherStudents]);
 
   const visibleMessages = useMemo(() => messageService.search(roleMessages, query), [query, roleMessages]);
+  const receivedMessages = useMemo(
+    () => visibleMessages.filter((item) => isReceivedMessage(item, role, session)),
+    [role, session, visibleMessages]
+  );
+  const sentMessages = useMemo(
+    () => visibleMessages.filter((item) => !isReceivedMessage(item, role, session)),
+    [role, session, visibleMessages]
+  );
   const unreadCount = getUnreadMessagesCount(role, session, visibleMessages);
   const canManageMessages = canMutateEntity(session, "messages", "UPDATE");
 
@@ -131,8 +141,19 @@ export default function MessagesScreen({ navigation }: any) {
     }
   };
 
-  const markAsRead = (item: any) => updateItem("messages", messageService.markAsRead(item, session?.user.id ?? parentPhone));
   const archiveMessage = (item: any) => updateItem("messages", messageService.archive(item, session?.user.id ?? parentPhone));
+  const openMessage = (item: any) => {
+    const shouldMarkRead = isReceivedMessage(item, role, session) && isUnreadStatus(item.status);
+    const nextMessage = shouldMarkRead
+      ? messageService.markAsRead(item, session?.user.id ?? parentPhone)
+      : item;
+
+    if (shouldMarkRead) {
+      updateItem("messages", nextMessage);
+    }
+
+    setSelectedMessage(nextMessage);
+  };
 
   return (
     <View style={styles.screen}>
@@ -316,7 +337,7 @@ export default function MessagesScreen({ navigation }: any) {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Historique</Text>
+        <Text style={styles.sectionTitle}>Messages parents</Text>
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -324,56 +345,25 @@ export default function MessagesScreen({ navigation }: any) {
           placeholderTextColor="#94A3B8"
           style={styles.searchInput}
         />
-        {visibleMessages.map((item) => {
-          const fromSchool = item.direction === "École vers parent";
-          const fromTeacher = item.direction === "Enseignant vers parent";
-          const teacher = teachersData.find((row) => row.id === item.teacherId);
+        <MessageSection
+          title="Messages reçus"
+          emptyText="Aucun message reçu."
+          messages={receivedMessages}
+          teachersData={teachersData}
+          onOpen={openMessage}
+          onArchive={archiveMessage}
+          canArchive
+        />
 
-          return (
-            <View key={item.id} style={styles.messageCard}>
-              <View style={styles.messageTop}>
-                <View
-                  style={[
-                    styles.directionIcon,
-                    fromSchool ? styles.schoolIcon : fromTeacher ? styles.teacherIcon : styles.parentIcon,
-                  ]}
-                >
-                  <Ionicons
-                    name={fromSchool ? "school-outline" : fromTeacher ? "school-outline" : "person-outline"}
-                    size={18}
-                    color={fromSchool ? "#2563EB" : fromTeacher ? "#7C3AED" : "#0F766E"}
-                  />
-                </View>
-                <View style={styles.messageHeaderText}>
-                  <Text style={styles.messageTheme}>{item.theme}</Text>
-                <Text style={styles.messageMeta}>
-                    {item.direction} • {teacher?.name ?? item.parentPhone} • {item.date}
-                  </Text>
-                </View>
-                <Text style={[styles.status, isUnreadStatus(item.status) && styles.unreadStatus]}>
-                  {item.status}
-                </Text>
-              </View>
-              <View style={styles.badgeRow}>
-                <Text style={styles.priorityBadge}>{item.priority ?? "Moyenne"}</Text>
-                {item.attachmentUrl ? <Text style={styles.attachmentBadge}>Pièce jointe</Text> : null}
-              </View>
-              <Text style={styles.messageBody}>{item.message}</Text>
-              <View style={styles.actionRow}>
-                {isUnreadStatus(item.status) && (
-                  <TouchableOpacity style={styles.smallAction} onPress={() => markAsRead(item)}>
-                    <Text style={styles.smallActionText}>Marquer lu</Text>
-                  </TouchableOpacity>
-                )}
-                {item.status !== "Archivé" && (
-                  <TouchableOpacity style={styles.smallAction} onPress={() => archiveMessage(item)}>
-                    <Text style={styles.smallActionText}>Archiver</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          );
-        })}
+        <MessageSection
+          title="Messages envoyés"
+          emptyText="Aucun message envoyé."
+          messages={sentMessages}
+          teachersData={teachersData}
+          onOpen={openMessage}
+          onArchive={archiveMessage}
+          canArchive
+        />
 
         {visibleMessages.length === 0 && (
           <View style={styles.emptyState}>
@@ -382,7 +372,136 @@ export default function MessagesScreen({ navigation }: any) {
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={Boolean(selectedMessage)} transparent animationType="fade" onRequestClose={() => setSelectedMessage(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.readerCard}>
+            <View style={styles.readerHeader}>
+              <View>
+                <Text style={styles.readerTitle}>{selectedMessage?.theme ?? "Message"}</Text>
+                <Text style={styles.readerMeta}>
+                  {selectedMessage?.direction} • {selectedMessage?.date}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.readerClose} onPress={() => setSelectedMessage(null)}>
+                <Ionicons name="close" size={20} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.badgeRow}>
+              <Text style={[styles.status, selectedMessage && isUnreadStatus(selectedMessage.status) && styles.unreadStatus]}>
+                {selectedMessage?.status ?? ""}
+              </Text>
+              <Text style={styles.priorityBadge}>{selectedMessage?.priority ?? "Moyenne"}</Text>
+            </View>
+            <Text style={styles.readerBody}>{selectedMessage?.message ?? ""}</Text>
+            {selectedMessage?.attachmentUrl ? (
+              <Text style={styles.readerAttachment}>Pièce jointe : {selectedMessage.attachmentUrl}</Text>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
+  );
+}
+
+function MessageSection({
+  title,
+  emptyText,
+  messages,
+  teachersData,
+  onOpen,
+  onArchive,
+  canArchive,
+}: {
+  title: string;
+  emptyText: string;
+  messages: any[];
+  teachersData: any[];
+  onOpen: (message: any) => void;
+  onArchive: (message: any) => void;
+  canArchive: boolean;
+}) {
+  return (
+    <View style={styles.messageSection}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.messageSectionTitle}>{title}</Text>
+        <Text style={styles.sectionCount}>{messages.length}</Text>
+      </View>
+      {messages.map((item) => (
+        <MessageCard
+          key={item.id}
+          item={item}
+          teacher={teachersData.find((row) => row.id === item.teacherId)}
+          onOpen={() => onOpen(item)}
+          onArchive={() => onArchive(item)}
+          canArchive={canArchive}
+        />
+      ))}
+      {messages.length === 0 && <Text style={styles.sectionEmpty}>{emptyText}</Text>}
+    </View>
+  );
+}
+
+function MessageCard({
+  item,
+  teacher,
+  onOpen,
+  onArchive,
+  canArchive,
+}: {
+  item: any;
+  teacher?: any;
+  onOpen: () => void;
+  onArchive: () => void;
+  canArchive: boolean;
+}) {
+  const fromSchool = item.direction === "École vers parent";
+  const fromTeacher = item.direction === "Enseignant vers parent";
+
+  return (
+    <TouchableOpacity key={item.id} activeOpacity={0.86} style={styles.messageCard} onPress={onOpen}>
+      <View style={styles.messageTop}>
+        <View
+          style={[
+            styles.directionIcon,
+            fromSchool ? styles.schoolIcon : fromTeacher ? styles.teacherIcon : styles.parentIcon,
+          ]}
+        >
+          <Ionicons
+            name={fromSchool ? "school-outline" : fromTeacher ? "school-outline" : "person-outline"}
+            size={18}
+            color={fromSchool ? "#2563EB" : fromTeacher ? "#7C3AED" : "#0F766E"}
+          />
+        </View>
+        <View style={styles.messageHeaderText}>
+          <Text style={styles.messageTheme}>{item.theme}</Text>
+          <Text style={styles.messageMeta}>
+            {item.direction} • {teacher?.name ?? item.parentPhone} • {item.date}
+          </Text>
+        </View>
+        <Text style={[styles.status, isUnreadStatus(item.status) && styles.unreadStatus]}>
+          {item.status}
+        </Text>
+      </View>
+      <View style={styles.badgeRow}>
+        <Text style={styles.priorityBadge}>{item.priority ?? "Moyenne"}</Text>
+        {item.attachmentUrl ? <Text style={styles.attachmentBadge}>Pièce jointe</Text> : null}
+      </View>
+      <Text style={styles.messageBody} numberOfLines={2}>{item.message}</Text>
+      {canArchive && item.status !== "Archivé" && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={styles.smallAction}
+            onPress={(event) => {
+              event.stopPropagation();
+              onArchive();
+            }}
+          >
+            <Text style={styles.smallActionText}>Archiver</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -412,6 +531,25 @@ function getUnreadMessagesCount(role: string | undefined, session: any, messages
 
 function isUnreadStatus(status?: string) {
   return ["Nouveau", "Distribué", "Envoyé"].includes(String(status));
+}
+
+function isReceivedMessage(message: any, role: string | undefined, session: any) {
+  if (
+    role === "super_admin" ||
+    role === "school_admin" ||
+    role === "country_admin" ||
+    role === "principal" ||
+    role === "prefet" ||
+    role === "secretary"
+  ) {
+    return message.direction === "Parent vers école";
+  }
+
+  if (role === "teacher") {
+    return message.direction === "Parent vers enseignant" && message.teacherId === session?.user.id;
+  }
+
+  return message.direction === "École vers parent" || message.direction === "Enseignant vers parent";
 }
 
 const styles = StyleSheet.create({
@@ -512,6 +650,34 @@ const styles = StyleSheet.create({
   },
   sendText: { color: "#FFFFFF", fontWeight: "900", marginLeft: 8 },
   sectionTitle: { color: "#0F172A", fontSize: 20, fontWeight: "900", marginBottom: 12 },
+  messageSection: {
+    marginBottom: 18,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  messageSectionTitle: { color: "#0F172A", fontSize: 18, fontWeight: "900" },
+  sectionCount: {
+    minWidth: 28,
+    textAlign: "center",
+    color: "#2563EB",
+    backgroundColor: "#EFF6FF",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontWeight: "900",
+  },
+  sectionEmpty: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
+    color: "#64748B",
+    fontWeight: "800",
+    marginBottom: 12,
+  },
   messageCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -581,4 +747,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyText: { color: "#64748B", fontWeight: "800", marginTop: 8 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  readerCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 18,
+  },
+  readerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 14,
+  },
+  readerTitle: { color: "#0F172A", fontSize: 20, fontWeight: "900" },
+  readerMeta: { color: "#64748B", fontSize: 12, fontWeight: "800", marginTop: 4 },
+  readerClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  readerBody: {
+    color: "#0F172A",
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 24,
+    marginTop: 6,
+  },
+  readerAttachment: {
+    marginTop: 16,
+    color: "#0F766E",
+    backgroundColor: "#ECFDF5",
+    borderRadius: 14,
+    padding: 12,
+    fontWeight: "800",
+  },
 });

@@ -13,11 +13,11 @@ export const entityFeatureMap: Partial<Record<AdminEntity, string>> = {
   teachers: "Enseignants",
   payments: "Paiements",
   subscriptions: "Abonnements",
-  paymentStatuses: "Paiements",
+  paymentStatuses: "Paramètres Établissement",
   messages: "Messages",
   announcements: "Notifications",
   courses: "Matières",
-  assignments: "Matières",
+  assignments: "Enseignants",
 };
 
 export const routeFeatureMap: Record<string, string> = {
@@ -42,13 +42,13 @@ export const routeFeatureMap: Record<string, string> = {
   Announcements: "Notifications",
   Timetable: "Années Académiques",
   ReportCards: "Bulletins",
-  Documents: "Élèves",
+  Documents: "Documents",
   Reports: "Rapports",
   Audit: "Utilisateurs",
   Support: "Messages",
   MobilePayment: "Paiements",
-  OfflineMode: "Élèves",
-  Synchronization: "Élèves",
+  OfflineMode: "Documents",
+  Synchronization: "Documents",
 };
 
 export function hasSecurityPermission(session: any, feature: string | undefined, action: SecurityAction = "READ") {
@@ -62,12 +62,20 @@ export function hasSecurityPermission(session: any, feature: string | undefined,
     return true;
   }
 
+  if (permissions.has(`${feature}:CRUD`)) {
+    return true;
+  }
+
+  if (action === "READ" && (permissions.has(`${feature}:R`) || permissions.has(`${feature}:READ`))) {
+    return true;
+  }
+
   if (feature === "Pays") {
-    return permissions.has("Contrôler tous les pays");
+    return permissions.has("Contrôler tous les pays") || permissions.has(`Pays:${action}`);
   }
 
   if (feature === "Abonnements") {
-    return permissions.has("Gérer abonnements") || permissions.has("Suivre abonnements pays");
+    return permissions.has("Gérer abonnements") || permissions.has("Suivre abonnements pays") || permissions.has(`Abonnements:${action}`);
   }
 
   return permissions.has(`${feature}:${action}`);

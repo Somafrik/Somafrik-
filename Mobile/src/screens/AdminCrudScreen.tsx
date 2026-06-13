@@ -18,6 +18,7 @@ import { AdminEntity, useAdminData } from "../context/AdminDataContext";
 import { messageThemes, rolePermissions } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
+import { resetUserPassword as resetUserPasswordOnBackend } from "../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
 
@@ -180,9 +181,6 @@ const configs: Record<
       { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
       { key: "email", label: "Email", placeholder: "email@exemple.com" },
       { key: "role", label: "Rôle", placeholder: "Choisir le rôle", type: "select" },
-      { key: "secondaryRoles", label: "Rôles secondaires", placeholder: "Directeur, Comptable" },
-      { key: "scopeLevel", label: "Niveau de contrôle", placeholder: "Automatique selon le rôle", type: "select" },
-      { key: "countryScope", label: "Pays géré", placeholder: "RDC" },
       { key: "schoolCode", label: "Établissement", placeholder: "Choisir l'établissement", type: "select" },
       { key: "accessChannel", label: "Canal d'accès", placeholder: "BackOffice ou Application", type: "select" },
       { key: "identifier", label: "Identifiant unique", placeholder: "USR001" },
@@ -246,7 +244,6 @@ export default function AdminCrudScreen({ route }: Props) {
   const [schoolTypeFilter, setSchoolTypeFilter] = useState("Tous");
   const [schoolCountryFilter, setSchoolCountryFilter] = useState("Tous");
   const [userRoleFilter, setUserRoleFilter] = useState("Tous");
-  const [userSchoolFilter, setUserSchoolFilter] = useState("Tous");
   const [userStatusFilter, setUserStatusFilter] = useState("Tous");
   const [dateField, setDateField] = useState<Field | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -254,6 +251,14 @@ export default function AdminCrudScreen({ route }: Props) {
   const canRead = canReadEntity(session, entity);
   const canUpdate = canMutateEntity(session, entity, "UPDATE");
   const canDelete = canMutateEntity(session, entity, "DELETE");
+
+  useEffect(() => {
+    if (!canRead) {
+      setVisible(false);
+      setSelectField(null);
+      setDateField(null);
+    }
+  }, [canRead]);
 
   useEffect(() => {
     if (entity === "courses" && !selectedCourseClass && classesData.length > 0) {
@@ -288,16 +293,16 @@ export default function AdminCrudScreen({ route }: Props) {
       const query = normalize(searchQuery);
 
       return items.filter((item: any) => {
+        const adminCreated = isAdminCreatedUser(item);
         const matchesSearch =
           !query ||
           [item.lastName, item.firstName, item.phone, item.email, item.identifier].some((value) =>
             normalize(value).includes(query)
           );
         const matchesRole = userRoleFilter === "Tous" || normalize(item.role) === normalize(userRoleFilter);
-        const matchesSchool = userSchoolFilter === "Tous" || normalize(item.schoolCode) === normalize(userSchoolFilter);
         const matchesStatus = userStatusFilter === "Tous" || normalize(item.status) === normalize(userStatusFilter);
 
-        return matchesSearch && matchesRole && matchesSchool && matchesStatus;
+        return adminCreated && !isPlatformUserRole(item.role) && matchesSearch && matchesRole && matchesStatus;
       });
     }
 
@@ -310,7 +315,6 @@ export default function AdminCrudScreen({ route }: Props) {
     searchQuery,
     selectedCourseClass,
     userRoleFilter,
-    userSchoolFilter,
     userStatusFilter,
   ]);
 
@@ -323,8 +327,13 @@ export default function AdminCrudScreen({ route }: Props) {
     }
 
     setEditingItem(null);
+    const initialForm = getInitialForm(entity, {
+      schoolsData,
+      usersData,
+      session,
+    });
     setForm({
-      ...getInitialForm(entity),
+      ...initialForm,
       ...(entity === "courses" && selectedCourseClass
         ? { className: selectedCourseClass }
         : {}),
@@ -367,6 +376,7 @@ export default function AdminCrudScreen({ route }: Props) {
       usersData,
       countriesData,
       subscriptionsData,
+      session,
     });
 
     if (!nextItem) {
@@ -423,26 +433,40 @@ export default function AdminCrudScreen({ route }: Props) {
     ]);
   };
 
-  const resetUserPassword = (item: any) => {
+  const resetUserPassword = async (item: any) => {
     if (!canUpdate) {
       Alert.alert("Accès refusé", "Votre rôle ne permet pas de modifier ce compte.");
       return;
     }
 
     const temporaryPassword = generateTemporaryPassword();
+    let savedUser = item;
+
+    try {
+      const response = await resetUserPasswordOnBackend(item.id, temporaryPassword);
+      savedUser = response.user ?? item;
+    } catch {
+      // En mode hors ligne/démo, on conserve la mise à jour locale.
+    }
+
     const nextItem = {
       ...item,
+      ...savedUser,
       temporaryPassword,
+      password: temporaryPassword,
+      pin: temporaryPassword,
+      passwordHash: undefined,
+      pinHash: undefined,
       history: [
         ...(item.history ?? []),
-        `Mot de passe temporaire généré le ${formatDate(new Date())}`,
+        `Mot de passe temporaire régénéré le ${formatDate(new Date())}. Ancien mot de passe invalidé.`,
       ],
     };
 
     updateItem("users", nextItem);
     Alert.alert(
       "Mot de passe réinitialisé",
-      `Nouveau mot de passe temporaire : ${temporaryPassword}`
+      `Nouveau mot de passe temporaire : ${temporaryPassword}\nL'ancien mot de passe ne fonctionne plus.`
     );
   };
 
@@ -573,7 +597,7 @@ export default function AdminCrudScreen({ route }: Props) {
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              {["Tous", ...Object.keys(rolePermissions)].map((role) => (
+              {["Tous", ...Object.keys(rolePermissions).filter((role) => !isPlatformUserRole(role))].map((role) => (
                 <TouchableOpacity
                   key={`role-${role}`}
                   activeOpacity={0.85}
@@ -582,21 +606,6 @@ export default function AdminCrudScreen({ route }: Props) {
                 >
                   <Text style={[styles.filterText, userRoleFilter === role && styles.filterTextActive]}>
                     {role}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              {["Tous", ...schoolsData.map((item) => item.code)].map((schoolCode) => (
-                <TouchableOpacity
-                  key={`school-${schoolCode}`}
-                  activeOpacity={0.85}
-                  style={[styles.filterPill, userSchoolFilter === schoolCode && styles.filterPillActive]}
-                  onPress={() => setUserSchoolFilter(schoolCode)}
-                >
-                  <Text style={[styles.filterText, userSchoolFilter === schoolCode && styles.filterTextActive]}>
-                    {schoolCode}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -829,9 +838,9 @@ export default function AdminCrudScreen({ route }: Props) {
                       setForm((current) => ({
                         ...current,
                         [selectField.key]: option,
-                        ...(entity === "users" && selectField.key === "role"
-                          ? getRoleDefaults(option)
-                          : {}),
+        ...(entity === "users" && selectField.key === "role"
+          ? getRoleDefaults(option, form.schoolCode || getDefaultSchoolCode(schoolsData, session))
+          : {}),
                         ...(entity === "assignments" && selectField.key === "className"
                           ? { course: "" }
                           : {}),
@@ -926,7 +935,23 @@ function itemToForm(entity: AdminEntity, item: any) {
   );
 }
 
-function getInitialForm(_entity: AdminEntity): Record<string, string> {
+function getInitialForm(entity: AdminEntity, context?: any): Record<string, string> {
+  if (entity === "users") {
+    const schoolCode = getDefaultSchoolCode(context?.schoolsData ?? [], context?.session);
+    const role = "Secrétaire";
+    return {
+      gender: "Non renseigné",
+      role,
+      ...getRoleDefaults(role, schoolCode),
+      schoolCode,
+      accessChannel: "Application",
+      identifier: generateUserIdentifier(context?.usersData ?? []),
+      status: "Actif",
+      temporaryPassword: generateTemporaryPassword(),
+      createdBy: context?.session?.user?.name ?? "Administrateur",
+    };
+  }
+
   return {};
 }
 
@@ -1112,16 +1137,16 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
   }
 
   if (entity === "users") {
-    const defaults = getRoleDefaults(form.role);
-    const isCountryAdmin = form.role === "Admin Pays";
+    const userSchoolCode = form.schoolCode || schoolCodeFromContext(context);
+    const defaults = getRoleDefaults(form.role, userSchoolCode);
+    const temporaryPassword = form.temporaryPassword || generateTemporaryPassword();
     if (
       !form.lastName ||
       !form.firstName ||
-      !form.gender ||
       !form.phone ||
       !form.role ||
-      (isCountryAdmin && !form.countryScope) ||
-      (!isGlobalOrCountryRole(form.role) && !form.schoolCode) ||
+      isPlatformUserRole(form.role) ||
+      !userSchoolCode ||
       !form.identifier
     ) {
       return null;
@@ -1142,19 +1167,21 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       secondaryRoles: splitList(form.secondaryRoles),
       scopeLevel: form.scopeLevel || defaults.scopeLevel,
       countryScope: form.countryScope ?? "",
-      schoolCode: isCountryAdmin ? "*" : form.schoolCode || "*",
+      schoolCode: userSchoolCode,
       accessChannel: form.accessChannel || defaults.accessChannel,
       identifier: form.identifier.trim(),
       status: form.status || "Actif",
       permissions,
-      temporaryPassword: form.temporaryPassword ?? "",
+      temporaryPassword,
+      password: temporaryPassword,
+      pin: temporaryPassword,
       photoUrl: form.photoUrl ?? "",
       createdAt: form.createdAt || formatDate(new Date()),
       lastLoginAt: form.lastLoginAt ?? "",
-      createdBy: form.createdBy || "Administrateur",
+      createdBy: form.createdBy || context?.session?.user?.name || "Administrateur",
       history: [
         ...(splitList(form.history).length ? splitList(form.history) : []),
-        `${id ? "Compte modifié" : "Compte créé"} le ${formatDate(new Date())}`,
+        `${id ? "Compte modifié" : `Compte créé avec mot de passe temporaire ${temporaryPassword}`} le ${formatDate(new Date())}`,
       ],
     };
   }
@@ -1221,7 +1248,7 @@ function getSecondaryText(entity: AdminEntity, item: any) {
     return `${item.type} • ${item.city}, ${item.country} • ${item.status} • ${item.maxStudents} élèves / ${item.maxTeachers} enseignants`;
   }
   if (entity === "users") {
-    return `${item.role} • ${item.scopeLevel} • ${item.accessChannel} • ${item.schoolCode} • ${item.status} • Dernière connexion : ${item.lastLoginAt || "Jamais"}`;
+    return `${item.role} • ${item.accessChannel} • ${item.status} • Identifiant : ${item.identifier}${item.temporaryPassword ? ` • Mot de passe temporaire : ${item.temporaryPassword}` : ""}`;
   }
   if (entity === "payments") return `${item.publicId ?? item.id} • Élève ${item.studentId} • ${item.date} • ${item.status} • ${item.method ?? "Mode non renseigné"}`;
   if (entity === "messages") {
@@ -1528,7 +1555,16 @@ function shouldHideField(entity: AdminEntity, form: Record<string, string>, fiel
   return entity === "users" && form.role === "Admin Pays" && field.key === "schoolCode";
 }
 
-function getRoleDefaults(role?: string) {
+function isAdminCreatedUser(item: any) {
+  const creator = normalize(item.createdBy);
+  return Boolean(creator) && !["systeme", "système", "postgresql", "seed", "migration"].includes(creator);
+}
+
+function isPlatformUserRole(role?: string) {
+  return role === "Super Administrateur SchoolLink" || role === "Admin Pays";
+}
+
+function getRoleDefaults(role?: string, schoolCode = "") {
   if (role === "Super Administrateur SchoolLink") {
     return { scopeLevel: "Global", schoolCode: "*", accessChannel: "Application" };
   }
@@ -1537,11 +1573,29 @@ function getRoleDefaults(role?: string) {
     return { scopeLevel: "Pays", schoolCode: "*", accessChannel: "Application" };
   }
 
-  return { scopeLevel: "Établissement", schoolCode: "", accessChannel: "Application" };
+  return { scopeLevel: "Établissement", schoolCode, accessChannel: "Application" };
 }
 
 function generateTemporaryPassword() {
   return `SL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+
+function generateUserIdentifier(usersData: any[]) {
+  const nextNumber = usersData.length + 1;
+  return `USR-${String(nextNumber).padStart(4, "0")}`;
+}
+
+function getDefaultSchoolCode(schoolsData: any[], session?: any) {
+  const sessionSchool = session?.user?.schoolCode && session.user.schoolCode !== "*"
+    ? session.user.schoolCode
+    : session?.school?.code;
+  return sessionSchool || schoolsData[0]?.code || "CD-2026-0001";
+}
+
+function schoolCodeFromContext(context?: any) {
+  return context?.session
+    ? getDefaultSchoolCode(context?.schoolsData ?? [], context.session)
+    : context?.schoolsData?.[0]?.code ?? "CD-2026-0001";
 }
 
 function getSelectOptions(
@@ -1593,13 +1647,13 @@ function getSelectOptions(
   }
 
   if (key === "role") {
-    return Object.keys(rolePermissions);
+    return Object.keys(rolePermissions).filter((role) => !isPlatformUserRole(role));
   }
 
   if (key === "schoolCode") {
     return entity === "subscriptions"
       ? schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean)
-      : ["*", ...schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean)];
+      : schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean);
   }
 
   if (key === "administratorId") {
@@ -1610,7 +1664,7 @@ function getSelectOptions(
   }
 
   if (key === "scopeLevel") {
-    return ["Global", "Pays", "Établissement"];
+    return ["Établissement"];
   }
 
   if (key === "accessChannel") {

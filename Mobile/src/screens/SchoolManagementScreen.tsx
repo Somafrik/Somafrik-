@@ -4,7 +4,7 @@ import { RootStackParamList } from "../navigation/AppNavigator";
 import MenuCard from "../components/MenuCard";
 import { AdminEntity } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
-import { canReadEntity } from "../domain/security/permissions";
+import { canReadEntity, canReadRoute } from "../domain/security/permissions";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -25,10 +25,12 @@ export default function SchoolManagementScreen({
     { title: "🔁 Affectations", entity: "assignments" },
     { title: "💰 Paiements", entity: "payments" },
     { title: "⚙️ Statuts paiement", entity: "paymentStatuses" },
-    { title: "💬 Messages parents", entity: "messages" },
+    { title: "💬 Messages parents", route: "Messages" },
     { title: "📢 Annonces", entity: "announcements" },
-  ] satisfies { title: string; entity: AdminEntity }[];
-  const visibleItems = items.filter((item) => canReadEntity(session, item.entity));
+  ] satisfies { title: string; entity?: AdminEntity; route?: string }[];
+  const visibleItems = items.filter((item) =>
+    item.entity ? canReadEntity(session, item.entity) : canReadRoute(session, item.route)
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -36,9 +38,13 @@ export default function SchoolManagementScreen({
 
       {visibleItems.map((item) => (
         <MenuCard
-          key={item.entity}
+          key={item.entity ?? item.route}
           title={item.title}
-          onPress={() => navigation.navigate("AdminCrud", { entity: item.entity })}
+          onPress={() =>
+            item.entity
+              ? navigation.navigate("AdminCrud", { entity: item.entity })
+              : navigation.navigate(item.route as never)
+          }
         />
       ))}
 

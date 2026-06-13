@@ -1,1 +1,3 @@
 JWT_SECRET non défini: utilisation du secret de développement.
+PostgreSQL indisponible, démarrage en mode démo mémoire.
+Cause: ECONNREFUSED

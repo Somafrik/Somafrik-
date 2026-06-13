@@ -10,7 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { getPresenceRate } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
-import { canMutateEntity } from "../domain/security/permissions";
+import { canMutateEntity, canReadRoute } from "../domain/security/permissions";
 
 export default function ClassesScreen({ navigation }: any) {
   const { session } = useAuth();
@@ -26,6 +26,7 @@ export default function ClassesScreen({ navigation }: any) {
       : studentsData;
   const totalStudents = visibleStudents.length;
   const canCreateClass = canMutateEntity(session, "classes", "CREATE");
+  const canOpenStudents = canReadRoute(session, session?.role === "teacher" ? "TeacherStudents" : "Students");
 
   return (
     <View style={styles.screen}>
@@ -62,7 +63,7 @@ export default function ClassesScreen({ navigation }: any) {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.summaryCard}
-          onPress={() => navigation.navigate("Students", { className: "Toutes les classes" })}
+          onPress={() => canOpenStudents && navigation.navigate("Students", { className: "Toutes les classes" })}
         >
           <View>
             <Text style={styles.summaryValue}>{visibleClasses.length}</Text>
@@ -90,7 +91,7 @@ export default function ClassesScreen({ navigation }: any) {
               activeOpacity={0.85}
               style={styles.classCard}
               onPress={() =>
-                navigation.navigate("Students", {
+                canOpenStudents && navigation.navigate("Students", {
                   className: item.name,
                 })
               }

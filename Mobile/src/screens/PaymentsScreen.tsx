@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-nati
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats } from "../domain/metrics/schoolMetrics";
 import { useAuth } from "../context/AuthContext";
-import { canMutateEntity, canReadRoute } from "../domain/security/permissions";
+import { canMutateEntity, canReadEntity, canReadRoute } from "../domain/security/permissions";
 
 export default function PaymentsScreen({ navigation }: any) {
   const { session } = useAuth();
@@ -11,8 +11,9 @@ export default function PaymentsScreen({ navigation }: any) {
   const paymentStats = getPaymentStats(paymentsData);
   const canCreate = canMutateEntity(session, "payments", "CREATE");
   const canUpdate = canMutateEntity(session, "payments", "UPDATE");
+  const canReadPayments = canReadEntity(session, "payments");
   const canReadStudentPayments = canReadRoute(session, "StudentPayments");
-  const canOpenPaymentAdmin = canCreate || canUpdate;
+  const canOpenPaymentAdmin = canReadPayments || canCreate || canUpdate;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
