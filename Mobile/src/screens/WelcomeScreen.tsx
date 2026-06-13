@@ -1,10 +1,11 @@
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useRef } from "react";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Welcome">;
+const schoolLinkLogo = require("../../assets/schoollink-logo.png");
 
 export default function WelcomeScreen({ navigation }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -24,7 +25,7 @@ export default function WelcomeScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.logoBox, { opacity, transform: [{ scale }] }]}>
-        <Ionicons name="school-outline" size={54} color="#2563EB" />
+        <Image source={schoolLinkLogo} style={styles.logoImage} />
       </Animated.View>
       <Animated.Text style={[styles.brand, { opacity }]}>SchoolLink</Animated.Text>
       <Animated.Text style={[styles.subtitle, { opacity }]}>
@@ -56,11 +57,14 @@ const styles = StyleSheet.create({
     width: 112,
     height: 112,
     borderRadius: 34,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
+  logoImage: { width: 104, height: 104, resizeMode: "contain" },
   brand: { color: "#0F172A", fontSize: 40, fontWeight: "900" },
   subtitle: {
     color: "#64748B",

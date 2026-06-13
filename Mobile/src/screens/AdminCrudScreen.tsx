@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -10,12 +11,13 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
 import { messageThemes, rolePermissions } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
-import { canMutateEntity } from "../domain/security/permissions";
+import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
 
@@ -24,7 +26,7 @@ type Field = {
   label: string;
   placeholder: string;
   keyboardType?: "default" | "numeric";
-  type?: "text" | "select" | "date";
+  type?: "text" | "select" | "date" | "photo";
 };
 
 const configs: Record<
@@ -185,7 +187,7 @@ const configs: Record<
       { key: "accessChannel", label: "Canal d'accès", placeholder: "BackOffice ou Application", type: "select" },
       { key: "identifier", label: "Identifiant unique", placeholder: "USR001" },
       { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
-      { key: "photoUrl", label: "Photo", placeholder: "URL de la photo" },
+      { key: "photoUrl", label: "Photo", placeholder: "Ajouter une photo", type: "photo" },
     ],
   },
   announcements: {
@@ -249,6 +251,7 @@ export default function AdminCrudScreen({ route }: Props) {
   const [dateField, setDateField] = useState<Field | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const canCreate = canMutateEntity(session, entity, "CREATE");
+  const canRead = canReadEntity(session, entity);
   const canUpdate = canMutateEntity(session, entity, "UPDATE");
   const canDelete = canMutateEntity(session, entity, "DELETE");
 
@@ -314,6 +317,11 @@ export default function AdminCrudScreen({ route }: Props) {
   const statsLabel = useMemo(() => `${visibleItems.length} élément(s)`, [visibleItems.length]);
 
   const openCreate = () => {
+    if (!canCreate) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de créer cet élément.");
+      return;
+    }
+
     setEditingItem(null);
     setForm({
       ...getInitialForm(entity),
@@ -325,6 +333,11 @@ export default function AdminCrudScreen({ route }: Props) {
   };
 
   const openEdit = (item: any) => {
+    if (!canUpdate) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de modifier cet élément.");
+      return;
+    }
+
     setEditingItem(item);
     setForm(itemToForm(entity, item));
     if (entity === "courses") {
@@ -334,6 +347,16 @@ export default function AdminCrudScreen({ route }: Props) {
   };
 
   const save = () => {
+    if (editingItem && !canUpdate) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de modifier cet élément.");
+      return;
+    }
+
+    if (!editingItem && !canCreate) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de créer cet élément.");
+      return;
+    }
+
     const nextItem = formToItem(entity, form, editingItem?.id, {
       studentsData,
       teachersData,
@@ -385,6 +408,11 @@ export default function AdminCrudScreen({ route }: Props) {
   };
 
   const confirmDelete = (item: any) => {
+    if (!canDelete) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de supprimer cet élément.");
+      return;
+    }
+
     Alert.alert("Supprimer", "Confirmer la suppression ?", [
       { text: "Annuler", style: "cancel" },
       {
@@ -396,6 +424,11 @@ export default function AdminCrudScreen({ route }: Props) {
   };
 
   const resetUserPassword = (item: any) => {
+    if (!canUpdate) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de modifier ce compte.");
+      return;
+    }
+
     const temporaryPassword = generateTemporaryPassword();
     const nextItem = {
       ...item,
@@ -413,9 +446,63 @@ export default function AdminCrudScreen({ route }: Props) {
     );
   };
 
+  const choosePhotoSource = (field: Field) => {
+    Alert.alert("Photo du compte", "Choisissez la source de la photo.", [
+      { text: "Annuler", style: "cancel" },
+      { text: "Importer une photo", onPress: () => uploadPhoto(field.key) },
+      { text: "Prendre une photo", onPress: () => takePhoto(field.key) },
+    ]);
+  };
+
+  const uploadPhoto = async (fieldKey: string) => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert("Permission requise", "Autorisez l'accès aux photos pour importer une image.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setForm((current) => ({ ...current, [fieldKey]: result.assets[0].uri }));
+    }
+  };
+
+  const takePhoto = async (fieldKey: string) => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert("Permission requise", "Autorisez l'accès à l'appareil photo pour prendre une photo.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      setForm((current) => ({ ...current, [fieldKey]: result.assets[0].uri }));
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {!canRead ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="lock-closed-outline" size={24} color="#DC2626" />
+            <Text style={styles.emptyText}>Accès refusé pour ce module.</Text>
+          </View>
+        ) : (
+        <>
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>{config.title}</Text>
@@ -603,6 +690,8 @@ export default function AdminCrudScreen({ route }: Props) {
             <Text style={styles.emptyText}>Aucun élément pour cette sélection</Text>
           </View>
         )}
+        </>
+        )}
       </ScrollView>
 
       <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
@@ -612,6 +701,7 @@ export default function AdminCrudScreen({ route }: Props) {
 
             <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
               {config.fields.map((field) => (
+                shouldHideField(entity, form, field) ? null : (
                 <View key={field.key} style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>{field.label}</Text>
                   {field.type === "select" ? (
@@ -649,6 +739,38 @@ export default function AdminCrudScreen({ route }: Props) {
                       </Text>
                       <Ionicons name="calendar-outline" size={18} color="#64748B" />
                     </TouchableOpacity>
+                  ) : field.type === "photo" ? (
+                    <View style={styles.photoField}>
+                      {form[field.key] ? (
+                        <View style={styles.photoPreviewRow}>
+                          <Image source={{ uri: form[field.key] }} style={styles.photoPreview} />
+                          <View style={styles.photoMeta}>
+                            <Text style={styles.photoTitle}>Photo sélectionnée</Text>
+                            <Text style={styles.photoSubtitle} numberOfLines={1}>
+                              {form[field.key]}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.photoRemoveButton}
+                            activeOpacity={0.85}
+                            onPress={() => setForm((current) => ({ ...current, [field.key]: "" }))}
+                          >
+                            <Ionicons name="close" size={18} color="#DC2626" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <Text style={styles.photoHelp}>Aucune photo sélectionnée</Text>
+                      )}
+
+                      <TouchableOpacity
+                        style={styles.photoButton}
+                        activeOpacity={0.85}
+                        onPress={() => choosePhotoSource(field)}
+                      >
+                        <Ionicons name="camera-outline" size={18} color="#2563EB" />
+                        <Text style={styles.photoButtonText}>{field.placeholder}</Text>
+                      </TouchableOpacity>
+                    </View>
                   ) : (
                     <TextInput
                       value={form[field.key] ?? ""}
@@ -659,6 +781,7 @@ export default function AdminCrudScreen({ route }: Props) {
                     />
                   )}
                 </View>
+                )
               ))}
             </ScrollView>
 
@@ -696,9 +819,9 @@ export default function AdminCrudScreen({ route }: Props) {
                 usersData,
                 countriesData,
                 form
-              ).map((option) => (
+              ).map((option, index) => (
                 <TouchableOpacity
-                  key={option}
+                  key={`${selectField?.key ?? "option"}-${option}-${index}`}
                   style={styles.selectorOption}
                   activeOpacity={0.85}
                   onPress={() => {
@@ -990,12 +1113,14 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
 
   if (entity === "users") {
     const defaults = getRoleDefaults(form.role);
+    const isCountryAdmin = form.role === "Admin Pays";
     if (
       !form.lastName ||
       !form.firstName ||
       !form.gender ||
       !form.phone ||
       !form.role ||
+      (isCountryAdmin && !form.countryScope) ||
       (!isGlobalOrCountryRole(form.role) && !form.schoolCode) ||
       !form.identifier
     ) {
@@ -1017,7 +1142,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       secondaryRoles: splitList(form.secondaryRoles),
       scopeLevel: form.scopeLevel || defaults.scopeLevel,
       countryScope: form.countryScope ?? "",
-      schoolCode: form.schoolCode || "*",
+      schoolCode: isCountryAdmin ? "*" : form.schoolCode || "*",
       accessChannel: form.accessChannel || defaults.accessChannel,
       identifier: form.identifier.trim(),
       status: form.status || "Actif",
@@ -1167,8 +1292,8 @@ function validateBusinessRules({
       return "Utilisateur impossible : ce téléphone est déjà utilisé par un autre compte.";
     }
 
-    if (item.photoUrl && !/^https?:\/\//i.test(item.photoUrl)) {
-      return "Photo impossible : veuillez saisir une URL valide.";
+    if (item.photoUrl && !isValidPhotoReference(item.photoUrl)) {
+      return "Photo impossible : veuillez choisir une image ou utiliser une URL valide.";
     }
 
     return null;
@@ -1311,6 +1436,10 @@ function normalize(value: unknown) {
     .toLowerCase();
 }
 
+function isValidPhotoReference(value: string) {
+  return /^(https?:\/\/|file:\/\/|content:\/\/|data:image\/)/i.test(value);
+}
+
 function splitList(value?: string) {
   return String(value ?? "")
     .split(",")
@@ -1393,6 +1522,10 @@ function escapeRegExp(value: string) {
 
 function isGlobalOrCountryRole(role?: string) {
   return role === "Super Administrateur SchoolLink" || role === "Admin Pays";
+}
+
+function shouldHideField(entity: AdminEntity, form: Record<string, string>, field: Field) {
+  return entity === "users" && form.role === "Admin Pays" && field.key === "schoolCode";
 }
 
 function getRoleDefaults(role?: string) {
@@ -1818,6 +1951,64 @@ const styles = StyleSheet.create({
   },
   selectPlaceholder: {
     color: "#94A3B8",
+  },
+  photoField: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 16,
+    padding: 12,
+  },
+  photoPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  photoPreview: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: "#E2E8F0",
+  },
+  photoMeta: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  photoTitle: {
+    color: "#0F172A",
+    fontWeight: "900",
+  },
+  photoSubtitle: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  photoHelp: {
+    color: "#94A3B8",
+    fontWeight: "800",
+    marginBottom: 10,
+  },
+  photoButton: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoButtonText: {
+    color: "#2563EB",
+    fontWeight: "900",
+    marginLeft: 8,
+  },
+  photoRemoveButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 14,
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
   },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 8 },
   cancelButton: {

@@ -29,10 +29,10 @@ const adminMenuItems: MenuItem[] = [
   { label: "📢 Annonces", entity: "announcements" },
   { label: "🗓️ Emplois du temps", route: "Timetable" },
   { label: "📄 Bulletins", route: "ReportCards" },
-  { label: "📄 Documents scolaires", message: "Module à livrer : certificats, attestations et relevés administratifs." },
-  { label: "📊 Rapports", message: "Module à livrer : rapports académiques, financiers, présences et exports Excel/PDF." },
-  { label: "🔐 Audit et connexions", message: "Module à livrer : journal des actions, historique des modifications et connexions." },
-  { label: "🆘 Support", message: "Le module support sera connecté au centre d'assistance de l'école." },
+  { label: "📄 Documents scolaires", route: "Documents" },
+  { label: "📊 Rapports", route: "Reports" },
+  { label: "🔐 Audit et connexions", route: "Audit" },
+  { label: "🆘 Support", route: "Support" },
 ];
 
 const parentMenuItems: MenuItem[] = [
@@ -40,11 +40,11 @@ const parentMenuItems: MenuItem[] = [
   { label: "📚 Suivi scolaire", route: "Notes" },
   { label: "📄 Bulletins PDF", route: "ReportCards" },
   { label: "💰 Situation des frais", route: "FraisEleve" },
-  { label: "📱 Paiement mobile", message: "Module à livrer : Mobile Money, carte bancaire, reçu automatique et historique des paiements." },
+  { label: "📱 Paiement mobile", route: "MobilePayment" },
   { label: "💬 Messages école", route: "Messages" },
   { label: "📢 Annonces de l'école", route: "Announcements" },
-  { label: "🔄 Mode hors ligne", message: "Module à livrer : consultation locale, synchronisation et résolution des conflits." },
-  { label: "🆘 Support", message: "Le module support sera connecté au secrétariat de l'école." },
+  { label: "🔄 Mode hors ligne", route: "OfflineMode" },
+  { label: "🆘 Support", route: "Support" },
 ];
 
 const studentMenuItems: MenuItem[] = [
@@ -55,11 +55,11 @@ const studentMenuItems: MenuItem[] = [
   { label: "🗓️ Mon emploi du temps", route: "Timetable" },
   { label: "💰 Mes paiements", route: "FraisEleve" },
   { label: "📢 Annonces", route: "Announcements" },
-  { label: "🔄 Mode hors ligne", message: "Module à livrer : consultation des notes, présences et annonces sans réseau." },
+  { label: "🔄 Mode hors ligne", route: "OfflineMode" },
 ];
 
 const teacherMenuItems: MenuItem[] = [
-  { label: "👨‍🏫 Profil enseignant", message: "Votre profil enseignant sera disponible ici." },
+  { label: "👨‍🏫 Profil enseignant", route: "Support" },
   { label: "📚 Mes classes", route: "Classes" },
   { label: "✅ Appel des présences", route: "TeacherAttendance" },
   { label: "📝 Gestion des notes", route: "TeacherGrades" },
@@ -67,8 +67,8 @@ const teacherMenuItems: MenuItem[] = [
   { label: "🗓️ Mon emploi du temps", route: "Timetable" },
   { label: "💬 Messages parents", route: "Messages" },
   { label: "📢 Annonces de l'école", route: "Announcements" },
-  { label: "🔄 Synchronisation", message: "Module à livrer : saisie hors ligne des appels/notes puis synchronisation." },
-  { label: "🆘 Support", message: "Le module support sera connecté à l'administration." },
+  { label: "🔄 Synchronisation", route: "Synchronization" },
+  { label: "🆘 Support", route: "Support" },
 ];
 
 function filterMenuItemsByPermission(session: any, items: MenuItem[]) {
@@ -138,7 +138,7 @@ export default function MenuScreen() {
               return;
             }
 
-            Alert.alert("Information", item.message ?? "Cette action sera disponible bientôt.");
+            Alert.alert("Information", item.message ?? "Action non configurée pour ce rôle.");
           }}
         >
           <View style={styles.itemLabelBox}>

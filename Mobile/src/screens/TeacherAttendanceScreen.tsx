@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
+import { canReadRoute, hasSecurityPermission } from "../domain/security/permissions";
 
 type AttendanceStatus = "Présent" | "Absent" | "Retard" | "Justifié";
 
@@ -31,8 +32,8 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
   const { studentsData, classesData, presencesData, upsertPresenceItems } = useAdminData();
   const assignedClasses =
     session?.role === "teacher"
-      ? session?.user.assignedClasses ?? []
-      : classesData.map((schoolClass) => schoolClass.name);
+      ? uniqueValues(session?.user.assignedClasses ?? [])
+      : uniqueValues(classesData.map((schoolClass) => schoolClass.name));
   const assignments = session?.user.assignments ?? [];
   const classStudents = studentsData.filter((student) => assignedClasses.includes(student.className));
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
@@ -59,6 +60,8 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
   const selectedRows = selectedClass
     ? classStudents.filter((student) => student.className === selectedClass)
     : [];
+  const canUpdatePresences = hasSecurityPermission(session, "Présences", "UPDATE");
+  const canOpenStudentDetail = canReadRoute(session, "StudentDetail");
 
   const dailyStats = useMemo(() => {
     return getPresenceStats(
@@ -74,6 +77,11 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
   }, [attendance, selectedRows]);
 
   const cycleAttendance = (studentId: string) => {
+    if (!canUpdatePresences) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de modifier les présences.");
+      return;
+    }
+
     setAttendance((current) => {
       const currentEntry = current[studentId] ?? { status: "Présent" };
       const nextStatus = getNextStatus(currentEntry.status);
@@ -89,6 +97,11 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
   };
 
   const markClassPresent = (className: string) => {
+    if (!canUpdatePresences) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas de modifier les présences.");
+      return;
+    }
+
     const rows = classStudents.filter((student) => student.className === className);
     setAttendance((current) => ({
       ...current,
@@ -102,6 +115,11 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
   };
 
   const saveCall = (className: string) => {
+    if (!canUpdatePresences) {
+      Alert.alert("Accès refusé", "Votre rôle ne permet pas d'enregistrer l'appel.");
+      return;
+    }
+
     const rows = classStudents.filter((student) => student.className === className);
     const classAssignments = assignments.filter((assignment) => assignment.className === className);
     const entries = Object.fromEntries(
@@ -153,7 +171,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
       {!selectedClass && (
         <>
           <Text style={styles.sectionTitle}>Mes classes</Text>
-          {assignedClasses.map((className) => {
+          {assignedClasses.map((className, index) => {
             const rows = classStudents.filter((student) => student.className === className);
             const classCourses = assignments
               .filter((assignment) => assignment.className === className)
@@ -162,7 +180,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
 
             return (
               <TouchableOpacity
-                key={className}
+                key={`${className}-${index}`}
                 activeOpacity={0.85}
                 style={styles.selectClassCard}
                 onPress={() => setSelectedClass(className)}
@@ -200,7 +218,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
             <StatPill label="Taux" value={`${dailyStats.rate}%`} color="#2563EB" />
           </View>
 
-      {[selectedClass].map((className) => {
+      {[selectedClass].map((className, index) => {
         const rows = classStudents.filter((student) => student.className === className);
         const classCourses = assignments
           .filter((assignment) => assignment.className === className)
@@ -217,7 +235,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
         );
 
         return (
-          <View key={className} style={styles.classCard}>
+          <View key={`${className}-${index}`} style={styles.classCard}>
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.classHeader}
@@ -233,14 +251,16 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
               <Ionicons name="checkbox-outline" size={24} color="#16A34A" />
             </TouchableOpacity>
 
-            <View style={styles.classActions}>
-              <TouchableOpacity style={styles.secondaryButton} onPress={() => markClassPresent(className)}>
-                <Text style={styles.secondaryText}>Tout présent</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={() => saveCall(className)}>
-                <Text style={styles.saveText}>Enregistrer l'appel</Text>
-              </TouchableOpacity>
-            </View>
+            {canUpdatePresences && (
+              <View style={styles.classActions}>
+                <TouchableOpacity style={styles.secondaryButton} onPress={() => markClassPresent(className)}>
+                  <Text style={styles.secondaryText}>Tout présent</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveButton} onPress={() => saveCall(className)}>
+                  <Text style={styles.saveText}>Enregistrer l'appel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {rows.map((student) => {
               const entry = attendance[student.id] ?? { status: "Présent" };
@@ -252,7 +272,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
                   activeOpacity={0.85}
                   style={styles.studentRow}
                   onPress={() => cycleAttendance(student.id)}
-                  onLongPress={() => navigation.navigate("StudentDetail", { studentId: student.id })}
+                  onLongPress={() => canOpenStudentDetail && navigation.navigate("StudentDetail", { studentId: student.id })}
                 >
                   <View style={styles.avatar}>
                     <Text style={styles.avatarText}>{student.name.charAt(0)}</Text>
@@ -329,6 +349,10 @@ function formatDate(date: Date) {
 
 function formatHour(date: Date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function uniqueValues(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
 }
 
 function getStatusStyle(status: AttendanceStatus) {

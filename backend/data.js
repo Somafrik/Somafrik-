@@ -59,6 +59,7 @@ const rolePermissions = {
     "Refuser une inscription",
     "Demander pièces complémentaires",
     "Gérer admins écoles du pays",
+    "Gérer administrateurs écoles",
     "Voir rapports pays",
     "Suivre abonnements pays",
     "Relancer établissements en retard",
@@ -185,7 +186,7 @@ const securityMatrix = {
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "R",
-    Enseignant: "R",
+    Enseignant: "-",
     Secrétaire: "R",
     Parent: "-",
     "Élève / Étudiant": "-",
@@ -235,7 +236,7 @@ const securityMatrix = {
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
-    Enseignant: "CRUD",
+    Enseignant: "R",
     Secrétaire: "CRUD",
     Parent: "R",
     "Élève / Étudiant": "R",
@@ -255,7 +256,7 @@ const securityMatrix = {
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
-    Enseignant: "CRUD",
+    Enseignant: "R",
     Secrétaire: "CRUD",
     Parent: "R",
     "Élève / Étudiant": "R",
@@ -305,7 +306,7 @@ const securityMatrix = {
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
-    Enseignant: "CRUD",
+    Enseignant: "R",
     Secrétaire: "-",
     Parent: "-",
     "Élève / Étudiant": "-",
@@ -839,7 +840,29 @@ while (countries.length < 50) {
   });
 }
 
-const platformSchools = [school];
+const burundiSchool = {
+  ...school,
+  id: "SCHOOL-BI-2026-0002",
+  publicId: "BI-2026-0002",
+  code: "BI-2026-0002",
+  name: "Établissement SchoolLink Burundi",
+  type: "Université",
+  city: "Bujumbura",
+  country: "Burundi",
+  address: "Avenue de l'Indépendance, Bujumbura",
+  phone: "+257 710 000 000",
+  email: "contact.bi@schoollink.demo",
+  currency: "BIF",
+  timezone: "Africa/Bujumbura",
+  subscriptionPlan: "Premium",
+  subscriptionStatus: "À jour",
+  status: "Actif",
+  validationStatus: "Validé",
+  maxStudents: 900,
+  maxTeachers: 90,
+};
+
+const platformSchools = [school, burundiSchool];
 
 while (platformSchools.length < 50) {
   const index = platformSchools.length + 1;

@@ -10,6 +10,8 @@ class FallbackRepository {
     this.ready = false;
     this.sessions = new Map();
     this.auditLogs = [];
+    this.backOfficeState = null;
+    this.notes = clone(seedData.notes);
     this.subjects = seedData.courses.map((course) => ({
       id: course.publicId ?? course.id,
       schoolId: seedData.school.id,
@@ -47,7 +49,7 @@ class FallbackRepository {
       classes: seedData.classes,
       courses: seedData.courses,
       students: seedData.students,
-      notes: seedData.notes,
+      notes: this.notes,
       presences: seedData.presences,
       payments: seedData.payments,
       announcements: seedData.announcements,
@@ -116,6 +118,107 @@ class FallbackRepository {
       .filter((row) => !userId || row.userId === userId)
       .filter((row) => !action || row.action === action)
       .slice(0, Math.min(Number(limit) || 100, 500));
+  }
+
+  async getBackOfficeState() {
+    return clone(this.backOfficeState);
+  }
+
+  async saveBackOfficeState(payload) {
+    this.backOfficeState = clone(payload ?? {});
+    if (Array.isArray(payload?.notes)) {
+      this.notes = clone(payload.notes);
+    }
+    return this.getBackOfficeState();
+  }
+
+  async getAcademicConfig(schoolCode) {
+    const normalizedSchoolCode = String(schoolCode && schoolCode !== "*" ? schoolCode : seedData.school.code).trim().toUpperCase();
+    return this.backOfficeState?.academicConfigs?.[normalizedSchoolCode] ?? {
+      schoolCode: normalizedSchoolCode,
+      periodMode: "trimestre",
+      periods: [
+        { id: "trimestre-1", name: "Trimestre 1", type: "Trimestre", order: 1, startDate: "01-09-2025", endDate: "31-12-2025", active: true },
+        { id: "trimestre-2", name: "Trimestre 2", type: "Trimestre", order: 2, startDate: "01-01-2026", endDate: "31-03-2026", active: false },
+        { id: "trimestre-3", name: "Trimestre 3", type: "Trimestre", order: 3, startDate: "01-04-2026", endDate: "30-06-2026", active: false },
+      ],
+      evaluationTypes: ["Interrogation", "Devoir", "Examen", "Travail pratique", "Projet"],
+      defaultScale: 20,
+      reportCardMode: "period",
+      allowCustomClasses: true,
+      allowCustomCourses: true,
+      allowCustomReportCards: true,
+    };
+  }
+
+  async saveAcademicConfig(schoolCode, config) {
+    const normalizedSchoolCode = String(config.schoolCode ?? (schoolCode && schoolCode !== "*" ? schoolCode : seedData.school.code)).trim().toUpperCase();
+    const savedConfig = {
+      schoolCode: normalizedSchoolCode,
+      periodMode: config.periodMode ?? "trimestre",
+      periods: Array.isArray(config.periods) && config.periods.length ? config.periods : [
+        { id: "trimestre-1", name: "Trimestre 1", type: "Trimestre", order: 1, startDate: "01-09-2025", endDate: "31-12-2025", active: true },
+        { id: "trimestre-2", name: "Trimestre 2", type: "Trimestre", order: 2, startDate: "01-01-2026", endDate: "31-03-2026", active: false },
+        { id: "trimestre-3", name: "Trimestre 3", type: "Trimestre", order: 3, startDate: "01-04-2026", endDate: "30-06-2026", active: false },
+      ],
+      evaluationTypes: Array.isArray(config.evaluationTypes) && config.evaluationTypes.length ? config.evaluationTypes : ["Interrogation", "Devoir", "Examen"],
+      defaultScale: Number(config.defaultScale ?? 20),
+      reportCardMode: config.reportCardMode ?? "period",
+      allowCustomClasses: config.allowCustomClasses !== false,
+      allowCustomCourses: config.allowCustomCourses !== false,
+      allowCustomReportCards: config.allowCustomReportCards !== false,
+    };
+    this.backOfficeState = {
+      ...(this.backOfficeState ?? {}),
+      academicConfigs: {
+        ...(this.backOfficeState?.academicConfigs ?? {}),
+        [normalizedSchoolCode]: savedConfig,
+      },
+    };
+    return clone(savedConfig);
+  }
+
+  async upsertGrade(payload, principal) {
+    const value = Number(payload.value);
+    const scale = Number(payload.scale ?? 20);
+    if (!payload.studentId || !payload.subject || Number.isNaN(value) || value < 0 || value > scale) {
+      const error = new Error("Note invalide");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const existingIndex = this.notes.findIndex((note) => note.id === payload.id);
+    const now = new Date().toLocaleDateString("fr-FR");
+    const next = {
+      id: existingIndex >= 0 ? this.notes[existingIndex].id : `NOTE-MEM-${Date.now()}`,
+      studentId: payload.studentId,
+      subject: payload.subject,
+      value,
+      coefficient: Number(payload.coefficient ?? 1),
+      date: payload.date ?? now,
+      evaluationId: payload.evaluationId,
+      scale,
+      evaluationCoefficient: Number(payload.evaluationCoefficient ?? 1),
+      authorId: principal?.sub ?? payload.authorId ?? "teacher",
+      enteredAt: now,
+      audit: [
+        ...(existingIndex >= 0 ? this.notes[existingIndex].audit ?? [] : []),
+        {
+          authorId: principal?.sub ?? payload.authorId ?? "teacher",
+          oldValue: existingIndex >= 0 ? this.notes[existingIndex].value : undefined,
+          newValue: value,
+          date: now,
+        },
+      ],
+    };
+
+    if (existingIndex >= 0) {
+      this.notes[existingIndex] = next;
+    } else {
+      this.notes.unshift(next);
+    }
+
+    return clone(next);
   }
 
   async getSubjectsV2() {

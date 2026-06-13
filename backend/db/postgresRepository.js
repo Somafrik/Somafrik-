@@ -311,6 +311,212 @@ class PostgresRepository {
     }));
   }
 
+  async getBackOfficeState() {
+    await this.init();
+    const row = await this.one("SELECT state_payload FROM backoffice_state WHERE state_key = 'default'");
+    return row?.state_payload ?? null;
+  }
+
+  async saveBackOfficeState(payload) {
+    await this.init();
+    await this.pool.query(
+      `INSERT INTO backoffice_state (state_key, state_payload, updated_at)
+       VALUES ('default', $1, NOW())
+       ON CONFLICT (state_key) DO UPDATE SET
+         state_payload = EXCLUDED.state_payload,
+         updated_at = NOW()`,
+      [JSON.stringify(payload ?? {})]
+    );
+    this.cachedDataset = null;
+    return this.getBackOfficeState();
+  }
+
+  async getAcademicConfig(schoolCode) {
+    await this.init();
+    const normalizedSchoolCode = String(schoolCode && schoolCode !== "*" ? schoolCode : seedData.school.code).trim().toUpperCase();
+    const state = (await this.getBackOfficeState()) ?? {};
+    const storedConfig = state.academicConfigs?.[normalizedSchoolCode];
+    const school = await this.getSchoolByCode(normalizedSchoolCode);
+    const termRows = school
+      ? await this.all(
+          `SELECT t.*
+           FROM terms t
+           JOIN academic_years ay ON ay.id = t.academic_year_id
+           WHERE ay.school_id = $1
+           ORDER BY t.start_date NULLS LAST, t.created_at`,
+          [school.id]
+        )
+      : [];
+    const periods = termRows.length
+      ? termRows.map((term, index) => ({
+          name: term.name,
+          type: term.name.toLowerCase().includes("semestre") ? "Semestre" : term.name.toLowerCase().includes("trimestre") ? "Trimestre" : "Période",
+          startDate: this.formatDate(term.start_date),
+          endDate: this.formatDate(term.end_date),
+          active: index === 0,
+        }))
+      : defaultAcademicPeriods();
+
+    return {
+      schoolCode: normalizedSchoolCode,
+      periodMode: storedConfig?.periodMode ?? inferPeriodMode(periods),
+      periods: Array.isArray(storedConfig?.periods) && storedConfig.periods.length ? storedConfig.periods : periods,
+      evaluationTypes: Array.isArray(storedConfig?.evaluationTypes) && storedConfig.evaluationTypes.length
+        ? storedConfig.evaluationTypes
+        : ["Interrogation", "Devoir", "Examen", "Travail pratique", "Projet"],
+      defaultScale: Number(storedConfig?.defaultScale ?? 20),
+      reportCardMode: storedConfig?.reportCardMode ?? "period",
+      allowCustomClasses: storedConfig?.allowCustomClasses !== false,
+      allowCustomCourses: storedConfig?.allowCustomCourses !== false,
+      allowCustomReportCards: storedConfig?.allowCustomReportCards !== false,
+    };
+  }
+
+  async saveAcademicConfig(schoolCode, config) {
+    await this.init();
+    const normalizedSchoolCode = String(config.schoolCode ?? (schoolCode && schoolCode !== "*" ? schoolCode : seedData.school.code)).trim().toUpperCase();
+    const currentState = (await this.getBackOfficeState()) ?? {};
+    const academicConfigs = currentState.academicConfigs && typeof currentState.academicConfigs === "object"
+      ? currentState.academicConfigs
+      : {};
+    const savedConfig = {
+      schoolCode: normalizedSchoolCode,
+      periodMode: config.periodMode ?? "trimestre",
+      periods: Array.isArray(config.periods) && config.periods.length ? config.periods : defaultAcademicPeriods(),
+      evaluationTypes: Array.isArray(config.evaluationTypes) && config.evaluationTypes.length
+        ? config.evaluationTypes
+        : ["Interrogation", "Devoir", "Examen", "Travail pratique", "Projet"],
+      defaultScale: Number(config.defaultScale ?? 20),
+      reportCardMode: config.reportCardMode ?? "period",
+      allowCustomClasses: config.allowCustomClasses !== false,
+      allowCustomCourses: config.allowCustomCourses !== false,
+      allowCustomReportCards: config.allowCustomReportCards !== false,
+    };
+    await this.saveBackOfficeState({
+      ...currentState,
+      academicConfigs: {
+        ...academicConfigs,
+        [normalizedSchoolCode]: savedConfig,
+      },
+    });
+    return savedConfig;
+  }
+
+  async upsertGrade(payload, principal = {}) {
+    const value = Number(payload.value);
+    const scale = Number(payload.scale ?? 20);
+    if (!payload.studentId || !payload.subject || Number.isNaN(value) || value < 0 || value > scale) {
+      const error = new Error("Note invalide");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const student = await this.one(
+      `SELECT st.*, s.school_code, e.class_id, cl.name AS class_name
+       FROM students st
+       JOIN schools s ON s.id = st.school_id
+       LEFT JOIN enrollments e ON e.student_id = st.id AND e.status = 'active'
+       LEFT JOIN classes cl ON cl.id = e.class_id
+       WHERE st.student_code = $1 OR st.id::text = $1`,
+      [String(payload.studentId)]
+    );
+    if (!student) {
+      const error = new Error("Eleve introuvable");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (principal.role === "Enseignant" && !(principal.classNames ?? []).includes(student.class_name)) {
+      const error = new Error("Accès refusé: élève hors classe affectée.");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const subject = await this.one(
+      `SELECT * FROM subjects WHERE school_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1`,
+      [student.school_id, String(payload.subject)]
+    );
+    if (!subject || !student.class_id) {
+      const error = new Error("Matiere ou classe introuvable");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const teacher = await this.findTeacherForGrade(student.school_id, principal.sub, student.class_id, subject.id, principal.role);
+    const requestedPeriod = String(payload.period ?? payload.term ?? "Trimestre 1").trim() || "Trimestre 1";
+    const academicYear = await this.one(
+      `SELECT *
+       FROM academic_years
+       WHERE school_id = $1 AND status IN ('active', 'open')
+       ORDER BY is_current DESC, created_at DESC
+       LIMIT 1`,
+      [student.school_id]
+    );
+    const term = academicYear ? await this.one(
+      `SELECT t.*
+       FROM terms t
+       WHERE t.academic_year_id = $1 AND t.name = $2
+       LIMIT 1`,
+      [academicYear.id, requestedPeriod]
+    ) : null;
+    const usableTerm = term ?? (academicYear ? await this.one(
+      `INSERT INTO terms (academic_year_id, name, status)
+       VALUES ($1, $2, 'open')
+       ON CONFLICT (academic_year_id, name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING *`,
+      [academicYear.id, requestedPeriod]
+    ) : null);
+    if (!teacher || !usableTerm) {
+      const error = new Error("Enseignant ou trimestre introuvable");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const existing = isUuid(payload.id)
+      ? await this.one("SELECT * FROM grades WHERE id = $1", [payload.id])
+      : null;
+
+    if (existing) {
+      await this.pool.query(
+        `UPDATE grades
+         SET score = $1, max_score = $2, coefficient = $3, teacher_id = $4, grade_type = $5, comment = $6, updated_at = NOW()
+         WHERE id = $7`,
+        [
+          value,
+          scale,
+          Number(payload.evaluationCoefficient ?? payload.coefficient ?? 1),
+          teacher.id,
+          toDbEvaluationType(payload.evaluationType),
+          payload.evaluationTitle ?? payload.title ?? "",
+          existing.id,
+        ]
+      );
+      this.cachedDataset = null;
+      return this.getGradeById(existing.id);
+    }
+
+    const inserted = await this.one(
+      `INSERT INTO grades (school_id, student_id, class_id, subject_id, teacher_id, term_id, grade_type, score, max_score, coefficient, comment)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
+      [
+        student.school_id,
+        student.id,
+        student.class_id,
+        subject.id,
+        teacher.id,
+        usableTerm.id,
+        toDbEvaluationType(payload.evaluationType),
+        value,
+        scale,
+        Number(payload.evaluationCoefficient ?? payload.coefficient ?? 1),
+        payload.evaluationTitle ?? payload.title ?? "",
+      ]
+    );
+    this.cachedDataset = null;
+    return this.getGradeById(inserted.id);
+  }
+
   async seedIfEmpty() {
     const existing = await this.one("SELECT COUNT(*)::int AS count FROM countries");
 
@@ -1182,7 +1388,7 @@ class PostgresRepository {
 
   mapUser(user, schoolByCode) {
     const role = roleFromDb[user.role] ?? user.role;
-    const school = user.school_code ? schoolByCode.get(user.school_code) : null;
+    const school = role === "Admin Pays" ? null : user.school_code ? schoolByCode.get(user.school_code) : null;
     const identifier = this.getUserIdentifier(user, role);
     const countryCode = school?.iso_code ?? this.getCountryCodeForUser(user, role);
     const countryScope = this.getCountryScopeForUser(school, countryCode);
@@ -1201,7 +1407,7 @@ class PostgresRepository {
       scopeLevel: role === "Super Administrateur SchoolLink" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
       countryScope,
       countryCode,
-      schoolCode: user.school_code ?? "*",
+      schoolCode: role === "Admin Pays" ? "*" : user.school_code ?? "*",
       accessChannel: "Application",
       identifier,
       passwordHash: user.password_hash,
@@ -1318,6 +1524,9 @@ class PostgresRepository {
       coefficient: Number(grade.subject_coefficient ?? 1),
       date: this.formatDate(grade.created_at),
       evaluationId: grade.id,
+      evaluationTitle: grade.comment || this.fromEvaluationType(grade.grade_type),
+      evaluationType: this.fromEvaluationType(grade.grade_type),
+      period: grade.term_name,
       scale: Number(grade.max_score),
       evaluationCoefficient: Number(grade.coefficient),
       authorId: grade.teacher_code,
@@ -1387,12 +1596,14 @@ class PostgresRepository {
     const seen = new Set();
 
     gradeRows.forEach((grade) => {
-      const key = `${grade.class_name}-${grade.subject_name}`;
+      const key = `${grade.school_code}-${grade.class_name}-${grade.subject_name}`;
       if (seen.has(key)) return;
       seen.add(key);
       rows.push({
         id: `${grade.class_code}-${this.subjectCode(grade.subject_name)}`,
         publicId: `${grade.class_code}-${this.subjectCode(grade.subject_name)}`,
+        schoolId: grade.school_id,
+        schoolCode: grade.school_code,
         className: grade.class_name,
         name: grade.subject_name,
         coefficient: Number(grade.subject_coefficient ?? 1),
@@ -1405,6 +1616,8 @@ class PostgresRepository {
           rows.push({
             id: `${schoolClass.class_code}-${subject.subject_code}`,
             publicId: `${schoolClass.class_code}-${subject.subject_code}`,
+            schoolId: schoolClass.school_id,
+            schoolCode: "",
             className: schoolClass.name,
             name: subject.name,
             coefficient: Number(subject.coefficient ?? 1),
@@ -1437,6 +1650,45 @@ class PostgresRepository {
 
   getSchoolByCode(code) {
     return this.one("SELECT * FROM schools WHERE school_code = $1", [String(code ?? "").trim().toUpperCase()]);
+  }
+
+  async getGradeById(id) {
+    const grade = await this.one(
+      `SELECT g.*, st.student_code, s.school_code, cl.class_code, cl.name AS class_name, sub.name AS subject_name,
+              sub.coefficient AS subject_coefficient, t.teacher_code, term.name AS term_name
+       FROM grades g
+       JOIN schools s ON s.id = g.school_id
+       JOIN students st ON st.id = g.student_id
+       JOIN classes cl ON cl.id = g.class_id
+       JOIN subjects sub ON sub.id = g.subject_id
+       JOIN teachers t ON t.id = g.teacher_id
+       JOIN terms term ON term.id = g.term_id
+       WHERE g.id = $1`,
+      [id]
+    );
+    return grade ? this.mapGrade(grade) : null;
+  }
+
+  async findTeacherForGrade(schoolId, teacherCode, classId, subjectId, principalRole) {
+    const assignedTeacher = teacherCode
+      ? await this.one(
+          `SELECT t.*
+           FROM teachers t
+           JOIN teacher_assignments ta ON ta.teacher_id = t.id
+           WHERE t.school_id = $1
+             AND t.teacher_code = $2
+             AND ta.class_id = $3
+             AND ta.subject_id = $4
+           LIMIT 1`,
+          [schoolId, String(teacherCode), classId, subjectId]
+        )
+      : null;
+
+    if (principalRole === "Enseignant") {
+      return assignedTeacher;
+    }
+
+    return assignedTeacher ?? this.one("SELECT * FROM teachers WHERE school_id = $1 ORDER BY created_at LIMIT 1", [schoolId]);
   }
 
   mentionForScore(score) {
@@ -1472,6 +1724,14 @@ class PostgresRepository {
     if (status === "validated") return "Validé";
     if (status === "published") return "Publié";
     return status;
+  }
+
+  fromEvaluationType(type) {
+    if (type === "interrogation") return "Interrogation";
+    if (type === "examen") return "Examen";
+    if (type === "tp") return "Travail pratique";
+    if (type === "projet") return "Projet";
+    return "Devoir";
   }
 
   parseDate(value) {
@@ -1554,3 +1814,31 @@ class PostgresRepository {
 }
 
 module.exports = { PostgresRepository };
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value ?? ""));
+}
+
+function toDbEvaluationType(type) {
+  const normalized = String(type ?? "").trim().toLowerCase();
+  if (normalized.includes("interrogation")) return "interrogation";
+  if (normalized.includes("examen")) return "examen";
+  if (normalized.includes("travail") || normalized === "tp") return "tp";
+  if (normalized.includes("projet")) return "projet";
+  return "devoir";
+}
+
+function defaultAcademicPeriods() {
+  return [
+    { id: "trimestre-1", name: "Trimestre 1", type: "Trimestre", order: 1, startDate: "01-09-2025", endDate: "31-12-2025", active: true },
+    { id: "trimestre-2", name: "Trimestre 2", type: "Trimestre", order: 2, startDate: "01-01-2026", endDate: "31-03-2026", active: false },
+    { id: "trimestre-3", name: "Trimestre 3", type: "Trimestre", order: 3, startDate: "01-04-2026", endDate: "30-06-2026", active: false },
+  ];
+}
+
+function inferPeriodMode(periods) {
+  const names = periods.map((period) => String(period.name ?? "").toLowerCase());
+  if (names.some((name) => name.includes("semestre"))) return "semestre";
+  if (names.some((name) => name.includes("trimestre"))) return "trimestre";
+  return "periode";
+}

@@ -42,6 +42,13 @@ export const routeFeatureMap: Record<string, string> = {
   Announcements: "Notifications",
   Timetable: "Années Académiques",
   ReportCards: "Bulletins",
+  Documents: "Élèves",
+  Reports: "Rapports",
+  Audit: "Utilisateurs",
+  Support: "Messages",
+  MobilePayment: "Paiements",
+  OfflineMode: "Élèves",
+  Synchronization: "Élèves",
 };
 
 export function hasSecurityPermission(session: any, feature: string | undefined, action: SecurityAction = "READ") {

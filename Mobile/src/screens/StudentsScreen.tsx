@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats, getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
-import { canMutateEntity } from "../domain/security/permissions";
+import { canMutateEntity, canReadRoute } from "../domain/security/permissions";
 
 export default function StudentsScreen({ route, navigation }: any) {
   const { session } = useAuth();
@@ -46,6 +46,7 @@ export default function StudentsScreen({ route, navigation }: any) {
   const presenceStats = getPresenceStats(presencesData, classStudentIds);
   const paymentStats = getPaymentStats(paymentsData, classStudentIds);
   const canCreateStudent = canMutateEntity(session, "students", "CREATE");
+  const canOpenStudentDetail = canReadRoute(session, "StudentDetail");
   const classGroups = filteredStudents.reduce<Record<string, typeof filteredStudents>>(
     (groups, student) => {
       const key = student.className;
@@ -148,7 +149,7 @@ export default function StudentsScreen({ route, navigation }: any) {
                   activeOpacity={0.85}
                   style={styles.studentRow}
                   onPress={() =>
-                    navigation.navigate("StudentDetail", {
+                    canOpenStudentDetail && navigation.navigate("StudentDetail", {
                       studentId: student.id,
                     })
                   }

@@ -14,6 +14,8 @@ import {
   school,
 } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
+
+const schoolLinkLogo = require("../../assets/schoollink-logo.png");
 import StudentSwitcher from "../components/StudentSwitcher";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats, getPresenceStats, getStudentAcademicSummary } from "../domain/metrics/schoolMetrics";
@@ -435,7 +437,7 @@ export default function HomeScreen({ navigation }: any) {
             {currentSchool.logoUrl ? (
               <Image source={{ uri: currentSchool.logoUrl }} style={styles.schoolLogoImage} />
             ) : (
-              <Ionicons name="school-outline" size={28} color="#2563EB" />
+              <Image source={schoolLinkLogo} style={styles.schoolLogoImage} />
             )}
           </View>
 

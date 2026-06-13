@@ -4,6 +4,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +18,7 @@ import { RootStackParamList } from "../navigation/AppNavigator";
 import { SchoolInfo, getSchoolByCode } from "../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RoleSelection">;
+const schoolLinkLogo = require("../../assets/schoollink-logo.png");
 
 export default function RoleSelectionScreen({ navigation }: Props) {
   const [accessCode, setAccessCode] = useState("CD-2026-0001");
@@ -83,7 +85,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
       >
         <View style={styles.header}>
           <View style={styles.mark}>
-            <Ionicons name="school-outline" size={32} color="#FFFFFF" />
+            <Image source={schoolLinkLogo} style={styles.markLogo} />
           </View>
           <View style={styles.headerText}>
             <Text style={styles.brand}>SchoolLink</Text>
@@ -148,8 +150,8 @@ export default function RoleSelectionScreen({ navigation }: Props) {
 
         {school && (
           <View style={styles.schoolCard}>
-            <View style={styles.logo}>
-              <Ionicons name="business-outline" size={30} color="#0F766E" />
+          <View style={styles.logo}>
+              <Image source={schoolLinkLogo} style={styles.schoolLogoImage} />
             </View>
             <View style={styles.schoolCopy}>
               <Text style={styles.schoolName}>{school.name}</Text>
@@ -210,11 +212,14 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 18,
-    backgroundColor: "#0F766E",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
+  markLogo: { width: 52, height: 52, resizeMode: "contain" },
   headerText: {
     flex: 1,
   },
@@ -339,11 +344,14 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 8,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: "#D1FAE5",
   },
+  schoolLogoImage: { width: 48, height: 48, resizeMode: "contain" },
   schoolCopy: {
     flex: 1,
     minWidth: 0,

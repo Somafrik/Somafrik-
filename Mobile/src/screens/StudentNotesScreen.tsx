@@ -1,19 +1,20 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { courses, getStudentById, notes, students } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { GradeBookService } from "../domain/academics/GradeBookService";
+import { useAdminData } from "../context/AdminDataContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentNotes">;
 
 export default function StudentNotesScreen({ route, navigation }: Partial<Props>) {
   const { selectedStudentId } = useAuth();
+  const { studentsData, notesData, coursesData } = useAdminData();
   const studentId = selectedStudentId ?? route?.params?.studentId;
-  const student = studentId ? getStudentById(studentId) : undefined;
-  const gradeBook = new GradeBookService(students, notes, courses);
-  const studentNotes = notes.filter((note) => note.studentId === studentId);
+  const student = studentId ? studentsData.find((item) => item.id === studentId) : undefined;
+  const gradeBook = new GradeBookService(studentsData, notesData, coursesData);
+  const studentNotes = notesData.filter((note) => note.studentId === studentId);
   const report = studentId ? gradeBook.generateReport(studentId, "Trimestre 1", "Publié") : undefined;
 
   return (

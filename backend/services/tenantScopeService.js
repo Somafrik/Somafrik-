@@ -39,6 +39,7 @@ class TenantScopeService {
       return rows.filter((row) => {
         if (row.className) return classNames.has(row.className);
         if (row.name && row.level && row.track) return classNames.has(row.name);
+        if (row.studentClassName) return classNames.has(row.studentClassName);
         return true;
       });
     }
@@ -68,8 +69,20 @@ class TenantScopeService {
   }
 
   countryCodeFromCountry(country) {
-    if (country === "RDC") return "CD";
-    return "";
+    const normalized = String(country ?? "").trim().toUpperCase();
+    const codes = {
+      RDC: "CD",
+      "RÉPUBLIQUE DÉMOCRATIQUE DU CONGO": "CD",
+      "REPUBLIQUE DEMOCRATIQUE DU CONGO": "CD",
+      BURUNDI: "BI",
+      BI: "BI",
+      CONGO: "CG",
+      CG: "CG",
+      SENEGAL: "SN",
+      "SÉNÉGAL": "SN",
+      SN: "SN",
+    };
+    return codes[normalized] ?? (/^[A-Z]{2}$/.test(normalized) ? normalized : "");
   }
 }
 

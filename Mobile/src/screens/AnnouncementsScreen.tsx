@@ -1,30 +1,37 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAdminData } from "../context/AdminDataContext";
+import { useAuth } from "../context/AuthContext";
+import { canMutateEntity } from "../domain/security/permissions";
 
 export default function AnnouncementsScreen({ navigation }: any) {
+  const { session } = useAuth();
   const { announcementsData } = useAdminData();
+  const canCreate = canMutateEntity(session, "announcements", "CREATE");
+  const canUpdate = canMutateEntity(session, "announcements", "UPDATE");
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Annonces</Text>
       <Text style={styles.subtitle}>Communications envoyées aux familles</Text>
 
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.addButton}
-        onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
-      >
-        <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.addButtonText}>Nouvelle annonce</Text>
-      </TouchableOpacity>
+      {canCreate && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.addButton}
+          onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.addButtonText}>Nouvelle annonce</Text>
+        </TouchableOpacity>
+      )}
 
       {announcementsData.map((announcement) => (
         <TouchableOpacity
           key={announcement.id}
           activeOpacity={0.85}
           style={styles.card}
-          onPress={() => navigation.navigate("AdminCrud", { entity: "announcements" })}
+          onPress={() => canUpdate && navigation.navigate("AdminCrud", { entity: "announcements" })}
         >
           <View style={styles.iconBox}>
             <Ionicons name="megaphone-outline" size={24} color="#7C3AED" />

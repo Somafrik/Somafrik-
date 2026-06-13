@@ -2,10 +2,17 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats } from "../domain/metrics/schoolMetrics";
+import { useAuth } from "../context/AuthContext";
+import { canMutateEntity, canReadRoute } from "../domain/security/permissions";
 
 export default function PaymentsScreen({ navigation }: any) {
+  const { session } = useAuth();
   const { paymentsData, studentsData } = useAdminData();
   const paymentStats = getPaymentStats(paymentsData);
+  const canCreate = canMutateEntity(session, "payments", "CREATE");
+  const canUpdate = canMutateEntity(session, "payments", "UPDATE");
+  const canReadStudentPayments = canReadRoute(session, "StudentPayments");
+  const canOpenPaymentAdmin = canCreate || canUpdate;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -14,7 +21,7 @@ export default function PaymentsScreen({ navigation }: any) {
       <TouchableOpacity
         activeOpacity={0.85}
         style={styles.summaryCard}
-        onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+        onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })}
       >
         <Text style={styles.summaryLabel}>Montant encaissé ce mois</Text>
         <Text style={styles.summaryAmount}>{paymentStats.paidAmount.toLocaleString()} FC</Text>
@@ -25,7 +32,7 @@ export default function PaymentsScreen({ navigation }: any) {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.smallCard}
-          onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+          onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })}
         >
           <Text style={styles.smallNumber}>{paymentStats.paid}</Text>
           <Text style={styles.smallLabel}>Payés</Text>
@@ -34,7 +41,7 @@ export default function PaymentsScreen({ navigation }: any) {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.smallCard}
-          onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+          onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })}
         >
           <Text style={styles.smallNumber}>{paymentStats.pending}</Text>
           <Text style={styles.smallLabel}>Impayés</Text>
@@ -53,9 +60,9 @@ export default function PaymentsScreen({ navigation }: any) {
             activeOpacity={0.85}
             style={styles.paymentCard}
             onPress={() =>
-              student
+              student && canReadStudentPayments
                 ? navigation.navigate("StudentPayments", { studentId: student.id })
-                : navigation.navigate("AdminCrud", { entity: "payments" })
+                : canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })
             }
           >
             <View>
@@ -70,13 +77,15 @@ export default function PaymentsScreen({ navigation }: any) {
         );
       })}
 
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.button}
-        onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
-      >
-        <Text style={styles.buttonText}>Enregistrer un paiement</Text>
-      </TouchableOpacity>
+      {canCreate && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.button}
+          onPress={() => navigation.navigate("AdminCrud", { entity: "payments" })}
+        >
+          <Text style={styles.buttonText}>Enregistrer un paiement</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }

@@ -2,23 +2,30 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-nati
 import { Ionicons } from "@expo/vector-icons";
 import { getTeacherClasses, getTeacherCourses } from "../data/catalog";
 import { useAdminData } from "../context/AdminDataContext";
+import { useAuth } from "../context/AuthContext";
+import { canMutateEntity } from "../domain/security/permissions";
 
 export default function TeachersScreen({ navigation }: any) {
+  const { session } = useAuth();
   const { teachersData } = useAdminData();
+  const canCreate = canMutateEntity(session, "teachers", "CREATE");
+  const canUpdate = canMutateEntity(session, "teachers", "UPDATE");
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Enseignants</Text>
       <Text style={styles.subtitle}>Équipe pédagogique active</Text>
 
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.addButton}
-        onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
-      >
-        <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.addButtonText}>Ajouter un enseignant</Text>
-      </TouchableOpacity>
+      {canCreate && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.addButton}
+          onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
+        >
+          <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.addButtonText}>Ajouter un enseignant</Text>
+        </TouchableOpacity>
+      )}
 
       {teachersData.map((teacher) => {
         const teacherClasses = getTeacherClasses(teacher);
@@ -29,7 +36,7 @@ export default function TeachersScreen({ navigation }: any) {
             key={teacher.id}
             activeOpacity={0.85}
             style={styles.card}
-            onPress={() => navigation.navigate("AdminCrud", { entity: "teachers" })}
+            onPress={() => canUpdate && navigation.navigate("AdminCrud", { entity: "teachers" })}
           >
             <View style={styles.iconBox}>
               <Ionicons name="school-outline" size={24} color="#2563EB" />

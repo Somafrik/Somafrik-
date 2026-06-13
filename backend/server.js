@@ -61,9 +61,12 @@ app.get("/", asyncHandler(async (_req, res) => {
       "/api/backoffice/login",
       "/api/school",
       "/api/classes",
+      "/api/courses",
+      "/api/academic-config",
       "/api/students",
       "/api/students/:id",
       "/api/students/:id/notes",
+      "/api/notes",
       "/api/students/:id/report",
       "/api/students/:id/report.pdf",
       "/api/students/:id/presences",
@@ -198,6 +201,25 @@ app.get("/api/classes", requireAuth, asyncHandler(async (req, res) => {
   res.json(result);
 }));
 
+app.get("/api/courses", requireAuth, asyncHandler(async (req, res) => {
+  const { courses } = await getRuntime();
+  res.json(tenantScopeService.filterRows(courses, req.principal));
+}));
+
+app.get("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
+  const config = await repository.getAcademicConfig(req.principal.schoolCode);
+  res.json(config);
+}));
+
+app.put("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
+  if (!["Super Administrateur SchoolLink", "Admin Pays", "Admin School"].includes(req.principal.role)) {
+    throw new BusinessError(403, "Seuls les administrateurs peuvent configurer la gestion académique.");
+  }
+  const saved = await repository.saveAcademicConfig(req.principal.schoolCode, req.body ?? {});
+  await auditService.record(req, "save_academic_config", "academic_config", saved.schoolCode, saved);
+  res.json(saved);
+}));
+
 app.get("/api/students", requireAuth, asyncHandler(async (req, res) => {
   const { students } = await getRuntime();
   const { className } = req.query;
@@ -224,6 +246,20 @@ app.get("/api/students/:id/notes", requireAuth, asyncHandler(async (req, res) =>
   const { notes, students } = await getRuntime();
   const student = findStudent(tenantScopeService.filterRows(students, req.principal), req.params.id);
   res.json(student ? notes.filter((note) => note.studentId === student.id) : []);
+}));
+
+app.get("/api/notes", requireAuth, asyncHandler(async (req, res) => {
+  const { notes, students } = await getRuntime();
+  const scopedStudents = tenantScopeService.filterRows(students, req.principal);
+  const studentIds = new Set(scopedStudents.map((student) => student.id));
+  res.json(notes.filter((note) => studentIds.has(note.studentId)));
+}));
+
+app.post("/api/notes", requireAuth, asyncHandler(async (req, res) => {
+  assertCanManageNotes(req.principal);
+  const saved = await repository.upsertGrade(req.body ?? {}, req.principal);
+  await auditService.record(req, "upsert_grade", "grade", saved.id, saved);
+  res.status(201).json(saved);
 }));
 
 app.get("/api/students/:id/report", requireAuth, asyncHandler(async (req, res) => {
@@ -322,6 +358,32 @@ app.get("/api/backoffice/notifications", requireAuth, requirePermission("GET /ap
   sendList(res, tenantScopeService.filterRows(platformNotifications, req.principal), req.query, ["title", "message", "type", "status"]);
 }));
 
+app.get("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
+  assertBackOfficeManager(req.principal);
+  res.json((await repository.getBackOfficeState()) ?? {});
+}));
+
+app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
+  assertBackOfficeManager(req.principal);
+  const currentState = (await repository.getBackOfficeState()) ?? {};
+  const saved = await repository.saveBackOfficeState(sanitizeBackOfficeState({
+    ...currentState,
+    ...(req.body ?? {}),
+  }));
+  await auditService.record(req, "sync_backoffice_state", "backoffice_state", "default", {
+    schools: saved.schools?.length ?? 0,
+    users: saved.users?.length ?? 0,
+    countries: saved.countries?.length ?? 0,
+    subscriptions: saved.subscriptions?.length ?? 0,
+    notifications: saved.notifications?.length ?? 0,
+    students: saved.students?.length ?? 0,
+    teachers: saved.teachers?.length ?? 0,
+    classes: saved.classes?.length ?? 0,
+    roles: Object.keys(saved.rolePermissions ?? {}).length,
+  });
+  res.json(saved);
+}));
+
 app.get("/api/audit", requireAuth, asyncHandler(async (req, res) => {
   if (!["Super Administrateur SchoolLink", "Admin Pays"].includes(req.principal.role)) {
     throw new BusinessError(403, "Seuls les administrateurs habilités peuvent consulter l'audit.");
@@ -398,6 +460,7 @@ async function getRuntime() {
   const dataset = await repository.getDataset();
   const authService = new AuthService({
     school: dataset.school,
+    schools: dataset.platformSchools,
     teachers: dataset.teachers,
     students: dataset.students,
     userAccounts: dataset.userAccounts,
@@ -459,6 +522,56 @@ function handleBusinessAction(action) {
   }
 }
 
+function assertBackOfficeManager(principal) {
+  if (!principal || !["Super Administrateur SchoolLink", "Admin Pays", "Admin School"].includes(principal.role)) {
+    throw new BusinessError(403, "Accès BackOffice non autorisé");
+  }
+}
+
+function assertCanManageNotes(principal) {
+  const permissions = new Set(principal?.permissions ?? []);
+  if (
+    permissions.has("ALL_PRIVILEGES") ||
+    permissions.has("COUNTRY_PRIVILEGES") ||
+    permissions.has("Modifier notes") ||
+    permissions.has("Notes:CREATE") ||
+    permissions.has("Notes:UPDATE")
+  ) {
+    return;
+  }
+
+  throw new BusinessError(403, "Permission insuffisante pour modifier les notes.");
+}
+
+function sanitizeBackOfficeState(payload = {}) {
+  return {
+    schools: Array.isArray(payload.schools) ? payload.schools : [],
+    users: Array.isArray(payload.users) ? payload.users : [],
+    countries: Array.isArray(payload.countries) ? payload.countries : [],
+    subscriptions: Array.isArray(payload.subscriptions) ? payload.subscriptions : [],
+    notifications: Array.isArray(payload.notifications) ? payload.notifications : [],
+    students: Array.isArray(payload.students) ? payload.students : [],
+    teachers: Array.isArray(payload.teachers) ? payload.teachers : [],
+    classes: Array.isArray(payload.classes) ? payload.classes : [],
+    courses: Array.isArray(payload.courses) ? payload.courses : [],
+    assignments: Array.isArray(payload.assignments) ? payload.assignments : [],
+    payments: Array.isArray(payload.payments) ? payload.payments : [],
+    paymentStatuses: Array.isArray(payload.paymentStatuses) ? payload.paymentStatuses : [],
+    presences: Array.isArray(payload.presences) ? payload.presences : [],
+    notes: Array.isArray(payload.notes) ? payload.notes : [],
+    academicConfigs: isPlainObject(payload.academicConfigs) ? payload.academicConfigs : {},
+    announcements: Array.isArray(payload.announcements) ? payload.announcements : [],
+    messages: Array.isArray(payload.messages) ? payload.messages : [],
+    auditLog: Array.isArray(payload.auditLog) ? payload.auditLog.slice(0, 200) : [],
+    rolePermissions: isPlainObject(payload.rolePermissions) ? payload.rolePermissions : {},
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 async function sendAuthenticatedResponse(req, res, response, action) {
   const principal = buildPrincipal(response);
   if (action === "backoffice_login" && ["Super Administrateur SchoolLink", "Admin Pays"].includes(principal.role)) {
@@ -506,8 +619,8 @@ function buildPrincipal(response) {
   const user = response.user ?? {};
   const school = response.schoolContext ?? response.school ?? {};
   const role = user.role ?? roleLabelFromMobileRole(response.role);
-  const schoolCode = user.schoolCode ?? school.code ?? "*";
-  const countryCode = user.countryCode ?? school.countryCode ?? countryCodeFromSchoolOrCountry(schoolCode, school.country);
+  const schoolCode = role === "Admin Pays" ? "*" : user.schoolCode ?? school.code ?? "*";
+  const countryCode = user.countryCode ?? countryCodeFromScope(user.countryScope) ?? school.countryCode ?? countryCodeFromSchoolOrCountry(schoolCode, school.country);
 
   return {
     sub: user.id ?? user.publicId ?? user.matricule ?? "anonymous",
@@ -549,8 +662,26 @@ function roleLabelFromMobileRole(role) {
 }
 
 function countryCodeFromSchoolOrCountry(schoolCode, country) {
-  if (country === "RDC") return "CD";
+  const fromScope = countryCodeFromScope(country);
+  if (fromScope) return fromScope;
   return String(schoolCode ?? "").slice(0, 2).toUpperCase();
+}
+
+function countryCodeFromScope(countryScope) {
+  const normalized = String(countryScope ?? "").trim().toUpperCase();
+  const codes = {
+    RDC: "CD",
+    "RÉPUBLIQUE DÉMOCRATIQUE DU CONGO": "CD",
+    "REPUBLIQUE DEMOCRATIQUE DU CONGO": "CD",
+    BURUNDI: "BI",
+    BI: "BI",
+    CONGO: "CG",
+    CG: "CG",
+    SENEGAL: "SN",
+    "SÉNÉGAL": "SN",
+    SN: "SN",
+  };
+  return codes[normalized] ?? (/^[A-Z]{2}$/.test(normalized) ? normalized : "");
 }
 
 function requireAuth(req, _res, next) {

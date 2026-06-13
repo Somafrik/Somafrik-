@@ -4,11 +4,33 @@
     "slug": "schoollink",
     "version": "1.2.0",
     "orientation": "portrait",
+    "icon": "./assets/schoollink-logo.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/schoollink-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SchoolLink utilise vos photos pour ajouter la photo du compte.",
+          "cameraPermission": "SchoolLink utilise l'appareil photo pour prendre la photo du compte."
+        }
+      ]
+    ],
     "android": {
       "package": "com.schoollink.app",
-      "versionCode": 12
+      "versionCode": 12,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/schoollink-logo.png",
+        "backgroundColor": "#FFFFFF"
+      }
     }
   }
 }

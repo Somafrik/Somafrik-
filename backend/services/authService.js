@@ -23,8 +23,9 @@ class BusinessError extends Error {
 }
 
 class AuthService {
-  constructor({ school, teachers, students, userAccounts }) {
+  constructor({ school, schools = [school], teachers, students, userAccounts }) {
     this.school = school;
+    this.schools = schools.filter(Boolean);
     this.teachers = teachers;
     this.students = students;
     this.userAccounts = userAccounts;
@@ -65,7 +66,7 @@ class AuthService {
 
   login({ role, schoolCode, identifier, pin }) {
     this.assertRequiredFields({ role, schoolCode, identifier, pin }, "Champs manquants");
-    this.assertSchoolCanConnect(schoolCode);
+    const schoolContext = this.assertSchoolCanConnect(schoolCode);
 
     const loginKey = this.getLoginAttemptKey(schoolCode, identifier);
     this.assertLoginNotLocked(loginKey);
@@ -81,7 +82,7 @@ class AuthService {
       return {
         role,
         user: this.buildManagedMobileUser(managedUser),
-        school: this.school,
+        school: schoolContext,
       };
     }
 
@@ -101,7 +102,7 @@ class AuthService {
             assignedClasses,
             courses,
           },
-          school: this.school,
+          school: schoolContext,
         };
       }
     }
@@ -112,7 +113,7 @@ class AuthService {
       if (student) {
         const { pin: _pin, pinHash: _pinHash, ...safeStudent } = student;
         this.clearFailedLoginAttempts(loginKey);
-        return { role, user: safeStudent, school: this.school };
+        return { role, user: safeStudent, school: schoolContext };
       }
     }
 
@@ -132,7 +133,7 @@ class AuthService {
             parentPhone: firstStudent.parentPhone,
             children,
           },
-          school: this.school,
+          school: schoolContext,
         };
       }
     }
@@ -144,6 +145,7 @@ class AuthService {
   findTeacher(accountIdentifier, password) {
     return this.teachers.find(
       (teacher) =>
+        (!teacher.schoolCode || teacher.schoolCode === accountIdentifier.schoolCode) &&
         (accountIdentifier.matches(teacher.id) ||
           accountIdentifier.matches(teacher.publicId) ||
           accountIdentifier.matches(teacher.phone)) &&
@@ -195,7 +197,7 @@ class AuthService {
       scopeLevel: user.scopeLevel,
       countryScope: user.countryScope,
       countryCode: user.countryCode,
-      schoolCode: user.schoolCode,
+      schoolCode: user.role === "Admin Pays" ? "*" : user.schoolCode,
       permissions: user.permissions,
     };
   }
@@ -211,13 +213,16 @@ class AuthService {
   }
 
   assertSchoolCanConnect(schoolCode) {
-    if (!this.matchesSchoolCode(schoolCode)) {
+    const school = this.findSchoolByCode(schoolCode);
+    if (!school) {
       throw new BusinessError(401, "Code etablissement invalide");
     }
 
-    if (this.school.status === "Suspendu") {
+    if (school.status === "Suspendu") {
       throw new BusinessError(403, "Etablissement suspendu. Connexion indisponible.");
     }
+
+    return school;
   }
 
   verifyUserSecret(user, secret) {
@@ -265,9 +270,15 @@ class AuthService {
   }
 
   matchesSchoolCode(schoolCode) {
+    return Boolean(this.findSchoolByCode(schoolCode));
+  }
+
+  findSchoolByCode(schoolCode) {
     const normalizedCode = String(schoolCode).trim().toUpperCase();
-    return [this.school.code, this.school.publicId].some(
-      (value) => String(value ?? "").trim().toUpperCase() === normalizedCode
+    return this.schools.find((school) =>
+      [school.code, school.publicId].some(
+        (value) => String(value ?? "").trim().toUpperCase() === normalizedCode
+      )
     );
   }
 

@@ -59,7 +59,10 @@ export type NoteItem = {
   value: number;
   coefficient: number;
   date: string;
+  period?: string;
   evaluationId?: string;
+  evaluationTitle?: string;
+  evaluationType?: string;
   scale?: number;
   evaluationCoefficient?: number;
   authorId?: string;
@@ -79,6 +82,23 @@ export type PresenceItem = {
   date: string;
   present: boolean;
   status?: "Présent" | "Absent" | "Retard" | "Justifié" | "Present" | string;
+};
+
+export type AcademicPeriodConfig = {
+  name: string;
+  type: "Trimestre" | "Semestre" | "Période" | string;
+  startDate: string;
+  endDate: string;
+  active?: boolean;
+};
+
+export type AcademicManagementConfig = {
+  schoolCode: string;
+  periodMode: "trimestre" | "semestre" | "custom" | string;
+  periods: AcademicPeriodConfig[];
+  evaluationTypes: string[];
+  defaultScale: number;
+  reportCardMode: "period" | "semester" | "annual" | string;
 };
 
 export type PaymentItem = {
@@ -266,7 +286,28 @@ export const school: SchoolProfile = {
   createdAt: "01-09-2025",
 };
 
-export const schools: SchoolProfile[] = [school];
+export const schools: SchoolProfile[] = [
+  school,
+  {
+    ...school,
+    id: "SCHOOL-BI-2026-0002",
+    publicId: "BI-2026-0002",
+    code: "BI-2026-0002",
+    name: "Établissement SchoolLink Burundi",
+    type: "Université",
+    city: "Bujumbura",
+    country: "Burundi",
+    address: "Avenue de l'Indépendance, Bujumbura",
+    phone: "+257 710 000 000",
+    email: "contact.bi@schoollink.demo",
+    currency: "BIF",
+    timezone: "Africa/Bujumbura",
+    subscriptionPlan: "Premium",
+    status: "Actif",
+    maxStudents: 900,
+    maxTeachers: 90,
+  },
+];
 
 export const countries: CountryProfile[] = [
   {
@@ -453,24 +494,37 @@ export const rolePermissions: Record<string, string[]> = {
   Surveillant: ["Voir élèves", "Gérer appels", "Gérer discipline"],
 };
 
+export const defaultAcademicConfig: AcademicManagementConfig = {
+  schoolCode: "CD-2026-0001",
+  periodMode: "trimestre",
+  periods: [
+    { name: "Trimestre 1", type: "Trimestre", startDate: "01-09-2025", endDate: "31-12-2025", active: true },
+    { name: "Trimestre 2", type: "Trimestre", startDate: "01-01-2026", endDate: "31-03-2026" },
+    { name: "Trimestre 3", type: "Trimestre", startDate: "01-04-2026", endDate: "30-06-2026" },
+  ],
+  evaluationTypes: ["Interrogation", "Devoir", "Examen", "Travail pratique", "Projet"],
+  defaultScale: 20,
+  reportCardMode: "period",
+};
+
 const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
   "Établissements": { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "R", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Utilisateurs: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Classes: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
   Élèves: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Enseignants: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
+  Enseignants: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
   Présences: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Notes: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "R", "Élève / Étudiant": "R" },
   Bulletins: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
   Paiements: { "Super Administrateur SchoolLink": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "R", Enseignant: "-", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Notifications: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Notifications: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Messages: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "CRUD", "Élève / Étudiant": "CRUD" },
-  Documents: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Documents: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Rapports: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
   "Paramètres Établissement": { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   "Années Académiques": { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Matières: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  Examens: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Examens: { "Super Administrateur SchoolLink": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
 };
 
 function permissionsFromSecurityMatrix(role: string) {

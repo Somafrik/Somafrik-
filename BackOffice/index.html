@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SchoolLink BackOffice</title>
+    <link rel="icon" type="image/png" href="./assets/schoollink-logo.png" />
     <link rel="stylesheet" href="./styles.css?v=20260605-2" />
   </head>
   <body>
     <main class="shell">
       <section class="login-panel" id="loginPanel">
         <div class="brand-block">
-          <div class="brand-mark">SL</div>
+          <div class="brand-mark"><img src="./assets/schoollink-logo.png" alt="Logo SchoolLink" /></div>
           <div>
             <p class="eyebrow">BackOffice</p>
             <h1>SchoolLink</h1>
@@ -40,7 +41,7 @@
       <section class="app-panel hidden" id="appPanel">
         <aside class="sidebar">
           <div class="brand-mini">
-            <div class="brand-mark">SL</div>
+            <div class="brand-mark"><img src="./assets/schoollink-logo.png" alt="Logo SchoolLink" /></div>
             <div>
               <strong>SchoolLink</strong>
               <span>BackOffice</span>
@@ -54,6 +55,7 @@
             <button class="nav-item" data-view="notifications">Notifications</button>
             <button class="nav-item" data-view="users">Utilisateurs</button>
             <button class="nav-item" data-view="reports">Rapports</button>
+            <button class="nav-item" data-view="academicSettings">Configuration</button>
             <button class="nav-item" data-view="permissions">Permissions</button>
           </nav>
           <button class="logout" id="logoutButton">Déconnexion</button>
@@ -224,13 +226,67 @@
 
           <section class="view hidden" id="permissionsView">
             <div class="section-head">
-              <h3>Permissions du compte</h3>
+              <h3>Droits par rôle</h3>
               <div class="section-actions">
                 <span id="permissionCount"></span>
+                <select id="rolePermissionSelect" aria-label="Rôle à configurer"></select>
+                <button class="action-button" type="button" data-action="create-role">Créer rôle</button>
+                <button class="action-button" type="button" data-action="rename-role">Modifier rôle</button>
+                <button class="action-button danger-action" type="button" data-action="delete-role">Supprimer rôle</button>
+                <button class="action-button" type="button" data-action="save-role-permissions">Enregistrer</button>
                 <button class="action-button" type="button" data-action="export-permissions">Exporter</button>
               </div>
             </div>
-            <div class="permissions-list" id="permissionsList"></div>
+            <p class="permission-notice" id="rolePermissionNotice"></p>
+            <div class="role-permission-grid" id="rolePermissionGrid"></div>
+          </section>
+
+          <section class="view hidden" id="academicSettingsView">
+            <div class="section-head">
+              <h3>Configuration établissement</h3>
+              <div class="section-actions">
+                <span id="academicSettingsStatus"></span>
+                <button class="action-button" type="submit" form="academicSettingsForm">Enregistrer</button>
+              </div>
+            </div>
+
+            <form class="settings-panel" id="academicSettingsForm">
+              <div class="form-grid">
+                <label>Établissement
+                  <select id="academicSchoolSelect"></select>
+                </label>
+                <label>Classement des notes
+                  <select id="academicPeriodModeInput">
+                    <option value="trimestre">Trimestre</option>
+                    <option value="semestre">Semestre</option>
+                    <option value="periode">Période personnalisée</option>
+                  </select>
+                </label>
+                <label>Barème par défaut
+                  <input id="academicDefaultScaleInput" type="number" min="1" max="100" step="1" />
+                </label>
+                <label>Bulletins
+                  <select id="academicReportCardModeInput">
+                    <option value="period">Un bulletin par période</option>
+                    <option value="annual">Bulletin annuel</option>
+                    <option value="custom">Gestion personnalisée</option>
+                  </select>
+                </label>
+                <label class="form-wide">Périodes
+                  <textarea id="academicPeriodsInput" rows="4" placeholder="Trimestre 1&#10;Trimestre 2&#10;Trimestre 3"></textarea>
+                </label>
+                <label class="form-wide">Types de session de notes
+                  <textarea id="academicEvaluationTypesInput" rows="3" placeholder="Interrogation&#10;Devoir&#10;Examen"></textarea>
+                </label>
+              </div>
+
+              <div class="settings-toggles">
+                <label><input id="academicAllowClassesInput" type="checkbox" /> L'établissement configure ses classes</label>
+                <label><input id="academicAllowCoursesInput" type="checkbox" /> L'établissement configure ses cours/matières</label>
+                <label><input id="academicAllowBulletinsInput" type="checkbox" /> L'établissement configure ses bulletins</label>
+              </div>
+              <p class="permission-notice">Cette configuration pilote les notes mobile : périodes, types de session et barème disponibles pour les enseignants.</p>
+            </form>
           </section>
         </section>
       </section>
@@ -318,6 +374,28 @@
         <div class="modal-actions">
           <button class="action-button muted-action" type="button" data-action="close-school-form">Annuler</button>
           <button class="action-button" type="submit">Enregistrer</button>
+        </div>
+      </form>
+    </section>
+    <section class="modal hidden" id="roleModal" aria-modal="true" role="dialog">
+      <form class="modal-card role-modal-card" id="roleForm">
+        <div class="modal-head">
+          <div>
+            <p class="eyebrow" id="roleFormMode">Rôle</p>
+            <h3 id="roleFormTitle">Créer un rôle</h3>
+          </div>
+          <button class="icon-action" type="button" data-action="close-role-form">Fermer</button>
+        </div>
+
+        <input type="hidden" id="roleOriginalName" />
+        <label id="roleNameLabel">Nom du rôle
+          <input id="roleNameInput" required placeholder="Ex. Responsable financier" />
+        </label>
+        <p class="role-delete-warning hidden" id="roleDeleteWarning"></p>
+        <p class="error" id="roleFormError"></p>
+        <div class="modal-actions">
+          <button class="action-button muted-action" type="button" data-action="close-role-form">Annuler</button>
+          <button class="action-button" id="roleSubmitButton" type="submit">Enregistrer</button>
         </div>
       </form>
     </section>

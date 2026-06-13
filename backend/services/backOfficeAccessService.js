@@ -290,11 +290,20 @@ class BackOfficeAccessService {
   }
 
   getCountryCode(countryScope) {
-    if (countryScope === "RDC") {
-      return "CD";
-    }
-
-    return String(countryScope ?? "").slice(0, 2).toUpperCase();
+    const normalized = String(countryScope ?? "").trim().toUpperCase();
+    const codes = {
+      RDC: "CD",
+      "RÉPUBLIQUE DÉMOCRATIQUE DU CONGO": "CD",
+      "REPUBLIQUE DEMOCRATIQUE DU CONGO": "CD",
+      BURUNDI: "BI",
+      BI: "BI",
+      CONGO: "CG",
+      CG: "CG",
+      SENEGAL: "SN",
+      "SÉNÉGAL": "SN",
+      SN: "SN",
+    };
+    return codes[normalized] ?? (/^[A-Z]{2}$/.test(normalized) ? normalized : "");
   }
 
   getPaymentRate(subscriptions) {

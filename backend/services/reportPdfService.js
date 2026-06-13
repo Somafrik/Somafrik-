@@ -1,6 +1,10 @@
+const fs = require("fs");
+const path = require("path");
+
 class ReportPdfService {
   constructor({ school }) {
     this.school = school;
+    this.logo = this.loadLogo();
   }
 
   generateReportCardPdf(report) {
@@ -45,7 +49,16 @@ class ReportPdfService {
   }
 
   buildContent(lines) {
-    const commands = ["BT", "/F1 10 Tf"];
+    const commands = [];
+
+    if (this.logo) {
+      commands.push("q");
+      commands.push("88 0 0 88 450 728 cm");
+      commands.push("/Logo Do");
+      commands.push("Q");
+    }
+
+    commands.push("BT", "/F1 10 Tf");
 
     lines.forEach((line) => {
       commands.push(`/F1 ${line.size} Tf`);
@@ -58,30 +71,98 @@ class ReportPdfService {
   }
 
   createPdf(content) {
+    const resources = this.logo
+      ? "/Resources << /Font << /F1 4 0 R >> /XObject << /Logo 6 0 R >> >>"
+      : "/Resources << /Font << /F1 4 0 R >> >>";
     const objects = [
       "<< /Type /Catalog /Pages 2 0 R >>",
       "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] ${resources} /Contents 5 0 R >>`,
       "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
       `<< /Length ${Buffer.byteLength(content, "latin1")} >>\nstream\n${content}\nendstream`,
     ];
-    const chunks = ["%PDF-1.4\n"];
+
+    if (this.logo) {
+      objects.push({
+        dictionary: `<< /Type /XObject /Subtype /Image /Width ${this.logo.width} /Height ${this.logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${this.logo.buffer.length} >>`,
+        stream: this.logo.buffer,
+      });
+    }
+
+    const chunks = [Buffer.from("%PDF-1.4\n", "latin1")];
     const offsets = [0];
+    let byteLength = chunks[0].length;
 
     objects.forEach((object, index) => {
-      offsets.push(Buffer.byteLength(chunks.join(""), "latin1"));
-      chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
+      offsets.push(byteLength);
+      const objectChunks = this.buildPdfObject(index + 1, object);
+      chunks.push(...objectChunks);
+      byteLength += objectChunks.reduce((total, chunk) => total + chunk.length, 0);
     });
 
-    const xrefOffset = Buffer.byteLength(chunks.join(""), "latin1");
-    chunks.push(`xref\n0 ${objects.length + 1}\n`);
-    chunks.push("0000000000 65535 f \n");
+    const xrefOffset = byteLength;
+    chunks.push(Buffer.from(`xref\n0 ${objects.length + 1}\n`, "latin1"));
+    chunks.push(Buffer.from("0000000000 65535 f \n", "latin1"));
     offsets.slice(1).forEach((offset) => {
-      chunks.push(`${String(offset).padStart(10, "0")} 00000 n \n`);
+      chunks.push(Buffer.from(`${String(offset).padStart(10, "0")} 00000 n \n`, "latin1"));
     });
-    chunks.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+    chunks.push(
+      Buffer.from(
+        `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
+        "latin1",
+      ),
+    );
 
-    return Buffer.from(chunks.join(""), "latin1");
+    return Buffer.concat(chunks);
+  }
+
+  buildPdfObject(number, object) {
+    if (typeof object === "string") {
+      return [Buffer.from(`${number} 0 obj\n${object}\nendobj\n`, "latin1")];
+    }
+
+    return [
+      Buffer.from(`${number} 0 obj\n${object.dictionary}\nstream\n`, "latin1"),
+      object.stream,
+      Buffer.from("\nendstream\nendobj\n", "latin1"),
+    ];
+  }
+
+  loadLogo() {
+    const logoPath = path.join(__dirname, "..", "assets", "schoollink-logo.jpg");
+
+    try {
+      const buffer = fs.readFileSync(logoPath);
+      return { buffer, ...this.getJpegSize(buffer) };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  getJpegSize(buffer) {
+    let offset = 2;
+
+    while (offset < buffer.length) {
+      if (buffer[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+
+      const marker = buffer[offset + 1];
+      const length = buffer.readUInt16BE(offset + 2);
+      const isStartOfFrame = marker >= 0xc0 && marker <= 0xc3;
+
+      if (isStartOfFrame) {
+        return {
+          height: buffer.readUInt16BE(offset + 5),
+          width: buffer.readUInt16BE(offset + 7),
+        };
+      }
+
+      offset += length + 2;
+    }
+
+    return { width: 1254, height: 1254 };
   }
 
   escapePdfText(value) {

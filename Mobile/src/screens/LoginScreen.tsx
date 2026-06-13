@@ -16,6 +16,7 @@ import { IdentifyResponse, identifyAccount, login } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
+const schoolLinkLogo = require("../../assets/schoollink-logo.png");
 
 export default function LoginScreen({ navigation, route }: Props) {
   const { school, accessIdentifier, accessRole, accessRoleLabel } = route.params;
@@ -118,7 +119,7 @@ export default function LoginScreen({ navigation, route }: Props) {
         {school.logoUrl ? (
           <Image source={{ uri: school.logoUrl }} style={styles.schoolLogoImage} />
         ) : (
-          <Ionicons name="school-outline" size={38} color="#2563EB" />
+          <Image source={schoolLinkLogo} style={styles.schoolLogoImage} />
         )}
       </View>
       <Text style={styles.title}>{school.name}</Text>
@@ -197,15 +198,18 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 26,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
   schoolLogoImage: {
-    width: "100%",
-    height: "100%",
+    width: 72,
+    height: 72,
     borderRadius: 26,
+    resizeMode: "contain",
   },
   title: {
     fontSize: 26,

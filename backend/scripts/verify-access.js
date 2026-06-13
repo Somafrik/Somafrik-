@@ -1,6 +1,6 @@
 const assert = require("assert");
 
-const baseUrl = process.env.SCHOOLLINK_API_URL || "http://localhost:5000/api";
+const baseUrl = process.env.SCHOOLLINK_API_URL || "http://127.0.0.1:5000/api";
 
 const accounts = {
   superadmin: {

@@ -8,6 +8,10 @@ const state = {
   subscriptions: [],
   notifications: [],
   auditLog: [],
+  rolePermissions: {},
+  academicConfigs: {},
+  selectedPermissionRole: "",
+  syncTimeoutId: null,
   schoolPage: 1,
   pageSize: 10,
 };
@@ -38,8 +42,10 @@ const notificationCount = document.querySelector("#notificationCount");
 const coverageSummary = document.querySelector("#coverageSummary");
 const coverageGrid = document.querySelector("#coverageGrid");
 const roadmapList = document.querySelector("#roadmapList");
-const permissionsList = document.querySelector("#permissionsList");
 const permissionCount = document.querySelector("#permissionCount");
+const rolePermissionSelect = document.querySelector("#rolePermissionSelect");
+const rolePermissionGrid = document.querySelector("#rolePermissionGrid");
+const rolePermissionNotice = document.querySelector("#rolePermissionNotice");
 const schoolSearch = document.querySelector("#schoolSearch");
 const schoolCountryFilter = document.querySelector("#schoolCountryFilter");
 const schoolTypeFilter = document.querySelector("#schoolTypeFilter");
@@ -71,6 +77,27 @@ const schoolMaxStudentsInput = document.querySelector("#schoolMaxStudentsInput")
 const schoolMaxTeachersInput = document.querySelector("#schoolMaxTeachersInput");
 const schoolAddressInput = document.querySelector("#schoolAddressInput");
 const schoolLogoInput = document.querySelector("#schoolLogoInput");
+const roleModal = document.querySelector("#roleModal");
+const roleForm = document.querySelector("#roleForm");
+const roleFormMode = document.querySelector("#roleFormMode");
+const roleFormTitle = document.querySelector("#roleFormTitle");
+const roleOriginalName = document.querySelector("#roleOriginalName");
+const roleNameInput = document.querySelector("#roleNameInput");
+const roleNameLabel = document.querySelector("#roleNameLabel");
+const roleDeleteWarning = document.querySelector("#roleDeleteWarning");
+const roleFormError = document.querySelector("#roleFormError");
+const roleSubmitButton = document.querySelector("#roleSubmitButton");
+const academicSettingsForm = document.querySelector("#academicSettingsForm");
+const academicSettingsStatus = document.querySelector("#academicSettingsStatus");
+const academicSchoolSelect = document.querySelector("#academicSchoolSelect");
+const academicPeriodModeInput = document.querySelector("#academicPeriodModeInput");
+const academicDefaultScaleInput = document.querySelector("#academicDefaultScaleInput");
+const academicReportCardModeInput = document.querySelector("#academicReportCardModeInput");
+const academicPeriodsInput = document.querySelector("#academicPeriodsInput");
+const academicEvaluationTypesInput = document.querySelector("#academicEvaluationTypesInput");
+const academicAllowClassesInput = document.querySelector("#academicAllowClassesInput");
+const academicAllowCoursesInput = document.querySelector("#academicAllowCoursesInput");
+const academicAllowBulletinsInput = document.querySelector("#academicAllowBulletinsInput");
 
 const mvpCoverage = [
   ["Authentification par établissement", "Web / Mobile", "Couvert", "P0", "Code unique, logo/nom école, rôle détecté, mot de passe et blocage comptes suspendus."],
@@ -87,6 +114,71 @@ const mvpCoverage = [
   ["Séparation de données", "SaaS", "Couvert", "P0", "École, pays, parent, enseignant et élève restent dans leur périmètre."],
 ].map(([module, scope, status, priority, detail]) => ({ module, scope, status, priority, detail }));
 
+const crudActions = [
+  { key: "READ", label: "Lire" },
+  { key: "CREATE", label: "Créer" },
+  { key: "UPDATE", label: "Modifier" },
+  { key: "DELETE", label: "Supprimer" },
+];
+
+const crudPermissionModules = [
+  "Établissements",
+  "Utilisateurs",
+  "Classes",
+  "Élèves",
+  "Enseignants",
+  "Présences",
+  "Notes",
+  "Bulletins",
+  "Paiements",
+  "Notifications",
+  "Messages",
+  "Documents",
+  "Rapports",
+  "Paramètres Établissement",
+  "Années Académiques",
+  "Matières",
+  "Examens",
+];
+
+const defaultAcademicConfig = {
+  schoolCode: "CD-2026-0001",
+  periodMode: "trimestre",
+  periods: [
+    { id: "trimestre-1", name: "Trimestre 1", order: 1, active: true },
+    { id: "trimestre-2", name: "Trimestre 2", order: 2, active: false },
+    { id: "trimestre-3", name: "Trimestre 3", order: 3, active: false },
+  ],
+  evaluationTypes: ["Interrogation", "Devoir", "Examen", "Travail pratique", "Projet"],
+  defaultScale: 20,
+  reportCardMode: "period",
+  allowCustomClasses: true,
+  allowCustomCourses: true,
+  allowCustomReportCards: true,
+};
+
+const countryAdminSchoolAdminPermissions = [
+  "COUNTRY_PRIVILEGES",
+  "Gérer établissements du pays",
+  "Créer un établissement",
+  "Modifier un établissement",
+  "Suspendre un établissement",
+  "Réactiver un établissement",
+  "Valider une inscription",
+  "Gérer admins écoles du pays",
+  "Gérer administrateurs écoles",
+  "Gérer utilisateurs",
+  "Auditer utilisateurs pays",
+  "Établissements:READ",
+  "Établissements:CREATE",
+  "Établissements:UPDATE",
+  "Établissements:DELETE",
+  "Utilisateurs:READ",
+  "Utilisateurs:CREATE",
+  "Utilisateurs:UPDATE",
+  "Utilisateurs:DELETE",
+];
+
 document.querySelectorAll("[data-demo]").forEach((button) => {
   button.addEventListener("click", () => {
     identifierInput.value = button.dataset.demo;
@@ -97,8 +189,6 @@ document.querySelectorAll("[data-demo]").forEach((button) => {
 
 document.querySelectorAll(".nav-item").forEach((button) => {
   button.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
     showView(button.dataset.view);
   });
 });
@@ -124,7 +214,10 @@ loginForm.addEventListener("submit", async (event) => {
     state.subscriptions = response.subscriptions ?? [];
     state.notifications = response.notifications ?? [];
     state.auditLog = response.auditLog ?? [];
-    localStorage.setItem("schoollink-backoffice-session", JSON.stringify(response));
+    state.rolePermissions = response.rolePermissions ?? {};
+    state.academicConfigs = response.academicConfigs ?? {};
+    await refreshBackOfficeStateFromBackend();
+    persistSession({ sync: false });
     renderApp();
   } catch (error) {
     loginError.textContent = error.message;
@@ -140,6 +233,9 @@ logoutButton.addEventListener("click", () => {
   state.subscriptions = [];
   state.notifications = [];
   state.auditLog = [];
+  state.rolePermissions = {};
+  state.academicConfigs = {};
+  state.selectedPermissionRole = "";
   loginPanel.classList.remove("hidden");
   appPanel.classList.add("hidden");
 });
@@ -162,12 +258,20 @@ schoolStatusFilter.addEventListener("change", () => {
   renderSchools();
 });
 schoolForm.addEventListener("submit", handleSchoolFormSubmit);
+roleForm.addEventListener("submit", handleRoleFormSubmit);
+academicSettingsForm.addEventListener("submit", handleAcademicSettingsSubmit);
+academicSchoolSelect.addEventListener("change", () => renderAcademicSettingsForm());
 userSearch.addEventListener("input", () => renderUsers());
+rolePermissionSelect.addEventListener("change", () => {
+  state.selectedPermissionRole = rolePermissionSelect.value;
+  renderPermissions();
+});
 document.addEventListener("click", handleActionClick);
+document.addEventListener("change", handlePermissionToggle);
 
 boot();
 
-function boot() {
+async function boot() {
   const saved = localStorage.getItem("schoollink-backoffice-session");
 
   if (!saved) {
@@ -183,6 +287,11 @@ function boot() {
     state.subscriptions = session.subscriptions ?? [];
     state.notifications = session.notifications ?? [];
     state.auditLog = session.auditLog ?? [];
+    state.rolePermissions = session.rolePermissions ?? {};
+    state.academicConfigs = session.academicConfigs ?? {};
+    state.selectedPermissionRole = session.user?.role ?? "";
+    renderApp();
+    await refreshBackOfficeStateFromBackend();
     renderApp();
   } catch {
     localStorage.removeItem("schoollink-backoffice-session");
@@ -226,12 +335,14 @@ function renderApp() {
   renderNotifications();
   renderUsers();
   renderReports();
+  renderAcademicSettings();
+  initializeRolePermissions();
   renderPermissions();
   showView("overview");
 }
 
 function renderKpis() {
-  const cards = state.session.dashboard?.kpis ?? [];
+  const cards = getLiveKpis();
 
   kpiGrid.innerHTML = cards
     .map(
@@ -259,11 +370,14 @@ function renderMenus() {
     Rapports: "overview",
     "Conformité MVP": "reports",
     Paramètres: "permissions",
+    "Paramètres Établissement": "academicSettings",
+    "Années Académiques": "academicSettings",
   };
   const allowedViews = new Set([
     "overview",
     "reports",
     "permissions",
+    "academicSettings",
   ]);
 
   allowedMenus.forEach((menu) => {
@@ -278,19 +392,132 @@ function renderMenus() {
 }
 
 function renderControls() {
-  const permissions = state.session.user.permissions ?? [];
-  controlGrid.innerHTML = permissions
-    .slice(0, 8)
+  const controls = getBusinessControls();
+  controlGrid.innerHTML = controls
     .map(
-      (permission) => `
-        <button class="control-card control-action" type="button" data-action="inspect-control" data-id="${escapeHtml(permission)}">
-          <strong>${escapeHtml(permission)}</strong>
-          <p>${getControlDescription(permission)}</p>
-          <span>Voir le contrôle</span>
+      (control) => `
+        <button class="control-card control-action" type="button" data-action="open-business-control" data-view="${escapeHtml(control.view)}" data-id="${escapeHtml(control.id)}" data-label="${escapeHtml(control.title)}">
+          <strong>${escapeHtml(control.title)}</strong>
+          <p>${escapeHtml(control.description)}</p>
+          <span>${escapeHtml(control.cta)}</span>
         </button>
       `
     )
     .join("");
+}
+
+function getBusinessControls() {
+  const permissions = new Set(state.session.user.permissions ?? []);
+  const hasAny = (...items) => items.some((permission) => permissions.has(permission));
+  const hasMatch = (pattern) => [...permissions].some((permission) => normalize(permission).includes(pattern));
+  const controls = [];
+
+  if (hasAny("ALL_PRIVILEGES", "COUNTRY_PRIVILEGES") || hasMatch("pays")) {
+    controls.push({
+      id: "countries",
+      title: "Pays",
+      description: "Créer, suspendre, réactiver et affecter les administrateurs pays.",
+      view: "countries",
+      cta: "Ouvrir les pays",
+    });
+  }
+
+  if (hasAny("Établissements:READ", "Établissements:CREATE", "Établissements:UPDATE", "Établissements:DELETE") || hasMatch("établissement") || hasMatch("inscription")) {
+    controls.push({
+      id: "schools",
+      title: "Établissements",
+      description: "Valider les inscriptions, modifier les fiches et contrôler les statuts.",
+      view: "schools",
+      cta: "Ouvrir les établissements",
+    });
+  }
+
+  if (hasAny("Utilisateurs:READ", "Utilisateurs:CREATE", "Utilisateurs:UPDATE", "Utilisateurs:DELETE") || hasMatch("utilisateur") || hasMatch("admin")) {
+    controls.push({
+      id: "users",
+      title: "Utilisateurs et admins",
+      description: "Créer, suspendre, réactiver et réinitialiser les comptes.",
+      view: "users",
+      cta: "Ouvrir les utilisateurs",
+    });
+  }
+
+  if (hasAny("Paiements:READ", "Paiements:CREATE", "Paiements:UPDATE", "Paiements:DELETE") || hasMatch("abonnement") || hasMatch("paiement") || hasMatch("tarif")) {
+    controls.push({
+      id: "subscriptions",
+      title: "Abonnements",
+      description: "Renouveler, suivre les échéances et relancer les établissements.",
+      view: "subscriptions",
+      cta: "Ouvrir les abonnements",
+    });
+  }
+
+  if (hasAny("Notifications:READ", "Notifications:CREATE", "Notifications:UPDATE", "Notifications:DELETE") || hasMatch("annonce") || hasMatch("communication") || hasMatch("message")) {
+    controls.push({
+      id: "notifications",
+      title: "Notifications",
+      description: "Publier, lire et archiver les notifications BackOffice.",
+      view: "notifications",
+      cta: "Ouvrir les notifications",
+    });
+  }
+
+  if (hasAny("Rapports:READ", "Rapports:CREATE", "Rapports:UPDATE", "Rapports:DELETE") || hasMatch("rapport") || hasMatch("audit")) {
+    controls.push({
+      id: "reports",
+      title: "Rapports MVP",
+      description: "Contrôler la couverture MVP et exporter le rapport.",
+      view: "reports",
+      cta: "Ouvrir les rapports",
+    });
+  }
+
+  if (hasAny("ALL_PRIVILEGES") || hasMatch("paramètres")) {
+    controls.push({
+      id: "permissions",
+      title: "Droits par rôle",
+      description: "Attribuer les droits CRUD par rôle avec la matrice de permissions.",
+      view: "permissions",
+      cta: "Ouvrir les permissions",
+    });
+  }
+
+  if (hasAny("Paramètres Établissement:READ", "Paramètres Établissement:CREATE", "Paramètres Établissement:UPDATE", "ALL_PRIVILEGES", "COUNTRY_PRIVILEGES") || hasMatch("paramètres")) {
+    controls.push({
+      id: "academicSettings",
+      title: "Configuration établissement",
+      description: "Adapter classes, cours, périodes, notes et bulletins à la gestion interne.",
+      view: "academicSettings",
+      cta: "Configurer l'école",
+    });
+  }
+
+  return controls.slice(0, 8);
+}
+
+function getLiveKpis() {
+  const activeSchools = state.schools.filter((school) => school.status !== "Suspendu");
+  const suspendedSchools = state.schools.filter((school) => school.status === "Suspendu").length;
+  const expiredSubscriptions = state.subscriptions.filter((subscription) =>
+    subscription.paymentStatus === "En retard" || isPastDate(subscription.endDate)
+  ).length;
+  const monthlyRevenue = state.subscriptions
+    .filter((subscription) => subscription.status === "Actif" && subscription.paymentStatus === "À jour")
+    .reduce((total, subscription) => total + Number(subscription.monthlyPrice ?? 0), 0);
+  const annualRevenue = state.subscriptions
+    .filter((subscription) => subscription.status === "Actif" && subscription.paymentStatus === "À jour")
+    .reduce((total, subscription) => total + Number(subscription.annualPrice ?? Number(subscription.monthlyPrice ?? 0) * 10), 0);
+
+  return [
+    { label: "Pays", value: state.countries.length },
+    { label: "Établissements", value: state.schools.length },
+    { label: "Écoles actives", value: activeSchools.length },
+    { label: "Utilisateurs", value: state.users.length },
+    { label: "Revenus mensuels", value: monthlyRevenue, suffix: "USD" },
+    { label: "Revenus annuels", value: annualRevenue, suffix: "USD" },
+    { label: "Établissements suspendus", value: suspendedSchools },
+    { label: "Abonnements à relancer", value: expiredSubscriptions },
+  ];
 }
 
 function renderSchools() {
@@ -479,17 +706,71 @@ function renderUsers() {
 }
 
 function renderPermissions() {
-  const permissions = state.session.user.permissions ?? [];
-  permissionCount.textContent = `${permissions.length} permission(s)`;
-  permissionsList.innerHTML = permissions
-    .map(
-      (permission) => `
-        <button class="permission permission-action" type="button" data-action="inspect-permission" data-id="${escapeHtml(permission)}" aria-label="Voir la permission ${escapeHtml(permission)}">
-          <span>Autorisé</span>
-          <strong>${escapeHtml(permission)}</strong>
-        </button>
-      `
-    )
+  initializeRolePermissions();
+  enforceCountryAdminSchoolAdminCrud();
+  renderRolePermissionSelector();
+  renderRolePermissionMatrix();
+}
+
+function renderRolePermissionSelector() {
+  const roles = getPermissionRoles();
+  const currentRole = state.selectedPermissionRole && roles.includes(state.selectedPermissionRole)
+    ? state.selectedPermissionRole
+    : state.session.user.role;
+  state.selectedPermissionRole = roles.includes(currentRole) ? currentRole : roles[0] ?? "";
+
+  rolePermissionSelect.innerHTML = roles
+    .map((role) => `<option value="${escapeHtml(role)}" ${role === state.selectedPermissionRole ? "selected" : ""}>${escapeHtml(role)}</option>`)
+    .join("");
+}
+
+function renderRolePermissionMatrix() {
+  const selectedRole = state.selectedPermissionRole;
+  const permissions = new Set(state.rolePermissions[selectedRole] ?? []);
+  const editable = canManageRolePermissions();
+  const usersInRole = state.users.filter((user) => user.role === selectedRole).length;
+
+  permissionCount.textContent = selectedRole
+    ? `${permissions.size} droit(s) • ${usersInRole} compte(s)`
+    : "Aucun rôle";
+  rolePermissionNotice.textContent = editable
+    ? "Super Admin : glissez à droite pour accorder, à gauche pour refuser."
+    : "Lecture seule : seul le Super Admin peut attribuer les droits par rôle.";
+
+  rolePermissionGrid.innerHTML = crudPermissionModules
+    .map((moduleName) => {
+      const toggles = crudActions
+        .map((crudAction) => {
+          const permission = `${moduleName}:${crudAction.key}`;
+          const checked = permissions.has(permission);
+          return `
+            <label class="permission-switch ${checked ? "granted" : "denied"}">
+              <input
+                type="checkbox"
+                data-permission-toggle
+                data-role="${escapeHtml(selectedRole)}"
+                data-permission="${escapeHtml(permission)}"
+                ${checked ? "checked" : ""}
+                ${editable ? "" : "disabled"}
+              />
+              <span class="switch-track" aria-hidden="true"></span>
+              <strong>${crudAction.label}</strong>
+              <small>${checked ? "Accordé" : "Refus"}</small>
+            </label>
+          `;
+        })
+        .join("");
+
+      return `
+        <article class="role-permission-row">
+          <div>
+            <strong>${escapeHtml(moduleName)}</strong>
+            <span>CRUD</span>
+          </div>
+          <div class="permission-switches">${toggles}</div>
+        </article>
+      `;
+    })
     .join("");
 }
 
@@ -533,6 +814,154 @@ function renderReports() {
     .join("");
 }
 
+function renderAcademicSettings() {
+  renderAcademicSchoolOptions();
+  renderAcademicSettingsForm();
+}
+
+function renderAcademicSchoolOptions() {
+  const schools = getConfigurableSchools();
+  const current = academicSchoolSelect.value || getDefaultAcademicSchoolCode(schools);
+
+  academicSchoolSelect.innerHTML = schools
+    .map((school) => `<option value="${escapeHtml(school.code)}">${escapeHtml(school.name)} (${escapeHtml(school.code)})</option>`)
+    .join("");
+  academicSchoolSelect.value = schools.some((school) => school.code === current)
+    ? current
+    : getDefaultAcademicSchoolCode(schools);
+  academicSchoolSelect.disabled = schools.length <= 1;
+}
+
+function renderAcademicSettingsForm() {
+  const schoolCode = academicSchoolSelect.value || getDefaultAcademicSchoolCode(getConfigurableSchools());
+  const config = getAcademicConfigForSchool(schoolCode);
+  const periods = Array.isArray(config.periods) && config.periods.length
+    ? config.periods
+    : defaultAcademicConfig.periods;
+
+  academicSettingsStatus.textContent = schoolCode
+    ? `${schoolCode} • ${config.periodMode ?? "trimestre"}`
+    : "Aucun établissement";
+  academicPeriodModeInput.value = config.periodMode ?? "trimestre";
+  academicDefaultScaleInput.value = config.defaultScale ?? 20;
+  academicReportCardModeInput.value = config.reportCardMode ?? "period";
+  academicPeriodsInput.value = periods
+    .slice()
+    .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
+    .map((period) => period.name)
+    .join("\n");
+  academicEvaluationTypesInput.value = (config.evaluationTypes ?? defaultAcademicConfig.evaluationTypes).join("\n");
+  academicAllowClassesInput.checked = config.allowCustomClasses !== false;
+  academicAllowCoursesInput.checked = config.allowCustomCourses !== false;
+  academicAllowBulletinsInput.checked = config.allowCustomReportCards !== false;
+
+  const editable = canManageAcademicSettings();
+  academicSettingsForm.querySelectorAll("input, select, textarea, button").forEach((field) => {
+    field.disabled = !editable || (!schoolCode && field !== academicSchoolSelect);
+  });
+}
+
+async function handleAcademicSettingsSubmit(event) {
+  event.preventDefault();
+
+  if (!canManageAcademicSettings()) {
+    showToast("Vous n'avez pas le droit de modifier la configuration établissement.");
+    return;
+  }
+
+  const schoolCode = academicSchoolSelect.value;
+  if (!schoolCode) {
+    showToast("Sélectionnez un établissement.");
+    return;
+  }
+
+  const periods = linesFromTextarea(academicPeriodsInput.value).map((name, index) => ({
+    id: slugify(`${academicPeriodModeInput.value}-${index + 1}`),
+    name,
+    order: index + 1,
+    active: index === 0,
+  }));
+  const evaluationTypes = linesFromTextarea(academicEvaluationTypesInput.value);
+
+  if (!periods.length || !evaluationTypes.length) {
+    showToast("Ajoutez au moins une période et un type de session.");
+    return;
+  }
+
+  const payload = {
+    schoolCode,
+    periodMode: academicPeriodModeInput.value,
+    periods,
+    evaluationTypes,
+    defaultScale: Math.max(1, Number(academicDefaultScaleInput.value || 20)),
+    reportCardMode: academicReportCardModeInput.value,
+    allowCustomClasses: academicAllowClassesInput.checked,
+    allowCustomCourses: academicAllowCoursesInput.checked,
+    allowCustomReportCards: academicAllowBulletinsInput.checked,
+  };
+
+  try {
+    const saved = await request("/academic-config", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    state.academicConfigs[saved.schoolCode] = { ...payload, ...saved };
+    addAudit("Configuration établissement", saved.schoolCode, `${saved.periodMode} • ${saved.periods.length} période(s) • barème /${saved.defaultScale}`);
+    renderAcademicSettings();
+    persistSession();
+    showToast("Configuration établissement enregistrée et synchronisée.");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function getConfigurableSchools() {
+  const user = state.session?.user ?? {};
+  if (user.role === "Admin School" && user.schoolCode && user.schoolCode !== "*") {
+    return state.schools.filter((school) => school.code === user.schoolCode);
+  }
+
+  if (user.role === "Admin Pays" && user.countryScope) {
+    return state.schools.filter((school) => school.countryCode === user.countryScope || school.country === user.countryScope);
+  }
+
+  return state.schools;
+}
+
+function getDefaultAcademicSchoolCode(schools) {
+  const userSchool = state.session?.user?.schoolCode;
+  if (userSchool && userSchool !== "*" && schools.some((school) => school.code === userSchool)) {
+    return userSchool;
+  }
+
+  return schools[0]?.code ?? "";
+}
+
+function getAcademicConfigForSchool(schoolCode) {
+  return {
+    ...defaultAcademicConfig,
+    ...(state.academicConfigs[schoolCode] ?? {}),
+    schoolCode,
+  };
+}
+
+function canManageAcademicSettings() {
+  return ["Super Administrateur SchoolLink", "Admin Pays", "Admin School"].includes(state.session?.user?.role);
+}
+
+function linesFromTextarea(value) {
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function slugify(value) {
+  return normalize(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "periode";
+}
+
 function showView(viewName) {
   const titles = {
     overview: "Vue globale",
@@ -543,13 +972,22 @@ function showView(viewName) {
     users: "Utilisateurs",
     reports: "Rapports",
     permissions: "Permissions",
+    academicSettings: "Configuration",
   };
 
   closeDetail();
   closeSchoolForm();
+  closeRoleForm();
+  setActiveView(viewName);
   pageTitle.textContent = titles[viewName] ?? "BackOffice";
   document.querySelectorAll(".view").forEach((view) => view.classList.add("hidden"));
   document.querySelector(`#${viewName}View`)?.classList.remove("hidden");
+}
+
+function setActiveView(viewName) {
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.classList.toggle("active", item.dataset.view === viewName);
+  });
 }
 
 async function handleActionClick(event) {
@@ -562,7 +1000,7 @@ async function handleActionClick(event) {
   if (!action) return;
 
   if (action === "refresh-dashboard") {
-    renderKpis();
+    renderOperationalViews();
     renderControls();
     showToast("Tableau de bord actualisé.");
     return;
@@ -573,8 +1011,53 @@ async function handleActionClick(event) {
     return;
   }
 
+  if (action === "open-business-control") {
+    const targetView = button.dataset.view;
+    if (!targetView) return;
+    showView(targetView);
+    showToast(`Module ${button.dataset.label ?? "BackOffice"} ouvert.`);
+    return;
+  }
+
   if (action === "inspect-permission") {
     openPermissionDetail(id, "Permission du compte");
+    return;
+  }
+
+  if (action === "create-role") {
+    createRole();
+    return;
+  }
+
+  if (action === "rename-role") {
+    renameSelectedRole();
+    return;
+  }
+
+  if (action === "delete-role") {
+    deleteSelectedRole();
+    return;
+  }
+
+  if (action === "save-role-permissions") {
+    if (!canManageRolePermissions()) {
+      showToast("Seul le Super Admin peut enregistrer les droits.");
+      return;
+    }
+
+    applySelectedRolePermissions();
+    persistSession();
+    renderUsers();
+    renderControls();
+    renderPermissions();
+    showToast(`Droits du rôle ${state.selectedPermissionRole} enregistrés.`);
+    return;
+  }
+
+  if (action === "reset-role-permissions") {
+    initializeRolePermissions({ force: true });
+    renderPermissions();
+    showToast("Droits réinitialisés depuis les comptes existants.");
     return;
   }
 
@@ -600,22 +1083,13 @@ async function handleActionClick(event) {
     return;
   }
 
+  if (action === "close-role-form") {
+    closeRoleForm();
+    return;
+  }
+
   if (action === "add-country") {
-    const nextIndex = state.countries.length + 1;
-    state.countries.unshift({
-      id: `COUNTRY-TEST-${nextIndex}`,
-      name: `Pays test ${nextIndex}`,
-      code: `T${nextIndex}`,
-      phonePrefix: "+000",
-      currency: "USD",
-      timezone: "Africa/Kinshasa",
-      status: "Actif",
-      administratorId: "",
-      createdAt: formatDate(new Date()),
-    });
-    renderCountries();
-    persistSession();
-    showToast("Pays test créé.");
+    openCountryForm();
     return;
   }
 
@@ -626,8 +1100,9 @@ async function handleActionClick(event) {
       return;
     }
 
-    target.administratorId = target.administratorId || "USER-COUNTRY-RDC";
-    renderCountries();
+    target.administratorId = target.administratorId || getAvailableCountryAdminId(target);
+    addAudit("Affectation administrateur pays", target.code, `Administrateur ${target.administratorId} affecté`);
+    renderOperationalViews();
     persistSession();
     showToast(`Administrateur affecté à ${target.code}.`);
     return;
@@ -637,9 +1112,15 @@ async function handleActionClick(event) {
     const target = state.countries.find((country) => country.id === id);
     if (!target) return;
     target.status = target.status === "Suspendu" ? "Actif" : "Suspendu";
-    renderCountries();
+    addAudit("Changement statut pays", target.code, `${target.name} passé à ${target.status}`);
+    renderOperationalViews();
     persistSession();
     showToast(`Pays ${target.status.toLowerCase()}.`);
+    return;
+  }
+
+  if (action === "save-country-form") {
+    saveCountryForm();
     return;
   }
 
@@ -662,7 +1143,8 @@ async function handleActionClick(event) {
         school.validationStatus = "Validé";
       }
     });
-    renderSchools();
+    addAudit("Validation établissements", "bulk", `${count} établissement(s) validé(s)`);
+    renderOperationalViews();
     persistSession();
     showToast(`${count} établissement(s) validé(s).`);
     return;
@@ -673,7 +1155,7 @@ async function handleActionClick(event) {
     if (!target) return;
     target.validationStatus = "Validé";
     addAudit("Validation établissement", target.code, `${target.name} validé`);
-    renderSchools();
+    renderOperationalViews();
     persistSession();
     showToast(`${target.name} validé.`);
     return;
@@ -691,7 +1173,7 @@ async function handleActionClick(event) {
     if (!target) return;
     target.status = target.status === "Suspendu" ? "Actif" : "Suspendu";
     addAudit("Changement statut établissement", target.code, `${target.name} passé à ${target.status}`);
-    renderSchools();
+    renderOperationalViews();
     persistSession();
     showToast(`Établissement ${target.status.toLowerCase()}.`);
     return;
@@ -699,7 +1181,8 @@ async function handleActionClick(event) {
 
   if (action === "renew-subscriptions") {
     state.subscriptions.forEach(renewSubscription);
-    renderSubscriptions();
+    state.subscriptions.forEach((subscription) => addAudit("Renouvellement abonnement", subscription.schoolCode, `Abonnement renouvelé jusqu'au ${subscription.endDate}`));
+    renderOperationalViews();
     persistSession();
     showToast("Tous les abonnements ont été renouvelés.");
     return;
@@ -709,42 +1192,38 @@ async function handleActionClick(event) {
     const target = state.subscriptions.find((subscription) => subscription.id === id);
     if (!target) return;
     renewSubscription(target);
-    renderSubscriptions();
+    addAudit("Renouvellement abonnement", target.schoolCode, `Abonnement renouvelé jusqu'au ${target.endDate}`);
+    renderOperationalViews();
     persistSession();
     showToast(`Abonnement ${target.schoolCode} renouvelé.`);
     return;
   }
 
   if (action === "remind-subscriptions") {
-    showToast("Relances envoyées aux établissements en retard.");
+    const count = markSubscriptionReminders(state.subscriptions);
+    renderOperationalViews();
+    persistSession();
+    showToast(`${count} relance(s) abonnement enregistrée(s).`);
     return;
   }
 
   if (action === "remind-subscription") {
     const target = state.subscriptions.find((subscription) => subscription.id === id);
     if (!target) return;
-    showToast(`Relance envoyée à ${target.schoolCode}.`);
+    markSubscriptionReminders([target]);
+    renderOperationalViews();
+    persistSession();
+    showToast(`Relance enregistrée pour ${target.schoolCode}.`);
     return;
   }
 
   if (action === "add-notification") {
-    const nextIndex = state.notifications.length + 1;
-    state.notifications.unshift({
-      id: `NOTIF-TEST-${nextIndex}`,
-      audience: state.session.user.role,
-      countryCode: state.session.user.countryScope || "*",
-      title: `Notification test ${nextIndex}`,
-      message: "Notification créée depuis le BackOffice de test.",
-      type: "Support",
-      priority: "Moyenne",
-      channels: ["Web", "Mobile"],
-      status: "Non lu",
-      date: formatDate(new Date()),
-      createdBy: state.session.user.id,
-    });
-    renderNotifications();
-    persistSession();
-    showToast("Notification test créée.");
+    openNotificationForm();
+    return;
+  }
+
+  if (action === "save-notification-form") {
+    saveNotificationForm();
     return;
   }
 
@@ -752,7 +1231,8 @@ async function handleActionClick(event) {
     state.notifications.forEach((notification) => {
       notification.status = "Lu";
     });
-    renderNotifications();
+    addAudit("Lecture notifications", "bulk", "Toutes les notifications marquées comme lues");
+    renderOperationalViews();
     persistSession();
     showToast("Toutes les notifications sont marquées comme lues.");
     return;
@@ -762,41 +1242,30 @@ async function handleActionClick(event) {
     const target = state.notifications.find((notification) => notification.id === id);
     if (!target) return;
     target.status = "Lu";
-    renderNotifications();
+    addAudit("Lecture notification", target.id, target.title);
+    renderOperationalViews();
     persistSession();
     showToast("Notification marquée comme lue.");
     return;
   }
 
   if (action === "archive-notification") {
+    const target = state.notifications.find((notification) => notification.id === id);
     state.notifications = state.notifications.filter((notification) => notification.id !== id);
-    renderNotifications();
+    addAudit("Archivage notification", id, target?.title ?? "Notification archivée");
+    renderOperationalViews();
     persistSession();
     showToast("Notification archivée.");
     return;
   }
 
   if (action === "add-user") {
-    const nextIndex = state.users.length + 1;
-    state.users.unshift({
-      id: `USER-TEST-${nextIndex}`,
-      publicId: `USR-TEST-${nextIndex}`,
-      firstName: "Utilisateur",
-      lastName: `Test ${nextIndex}`,
-      identifier: `test-${nextIndex}`,
-      role: "Admin School",
-      scopeLevel: "Établissement",
-      countryScope: "RDC",
-      schoolCode: state.schools[0]?.code ?? generateSchoolCode(),
-      accessChannel: "Application",
-      status: "Actif",
-      permissions: ["Voir tableau de bord"],
-      temporaryPassword: "1234",
-      history: [`Créé le ${formatDate(new Date())}`],
-    });
-    renderUsers();
-    persistSession();
-    showToast("Utilisateur test créé avec le mot de passe 1234.");
+    openUserForm();
+    return;
+  }
+
+  if (action === "save-user-form") {
+    saveUserForm();
     return;
   }
 
@@ -804,6 +1273,8 @@ async function handleActionClick(event) {
     state.users.forEach((user) => {
       user.temporaryPassword = "1234";
     });
+    addAudit("Réinitialisation mots de passe", "bulk", `${state.users.length} mot(s) de passe temporaire réinitialisé(s)`);
+    renderOperationalViews();
     persistSession();
     showToast("Mots de passe temporaires réinitialisés à 1234.");
     return;
@@ -814,6 +1285,8 @@ async function handleActionClick(event) {
     if (!target) return;
     target.temporaryPassword = "1234";
     target.history = [...(target.history ?? []), `Mot de passe réinitialisé le ${formatDate(new Date())}`];
+    addAudit("Réinitialisation mot de passe", target.identifier, `${target.firstName} ${target.lastName}`);
+    renderOperationalViews();
     persistSession();
     showToast(`Mot de passe de ${target.identifier} réinitialisé.`);
     return;
@@ -823,15 +1296,17 @@ async function handleActionClick(event) {
     const target = state.users.find((user) => user.id === id);
     if (!target) return;
     target.status = target.status === "Suspendu" ? "Actif" : "Suspendu";
-    renderUsers();
+    addAudit("Changement statut utilisateur", target.identifier, `${target.firstName} ${target.lastName} passé à ${target.status}`);
+    renderOperationalViews();
     persistSession();
     showToast(`Utilisateur ${target.status.toLowerCase()}.`);
     return;
   }
 
   if (action === "export-permissions") {
-    const permissions = state.session.user.permissions ?? [];
-    const payload = permissions.join("\n");
+    const role = state.selectedPermissionRole;
+    const permissions = state.rolePermissions[role] ?? state.session.user.permissions ?? [];
+    const payload = [`Rôle: ${role}`, ...permissions].join("\n");
     const copied = await copyToClipboard(payload);
     if (copied) {
       showToast("Permissions exportées dans le presse-papiers.");
@@ -854,23 +1329,430 @@ async function handleActionClick(event) {
   }
 }
 
+function handlePermissionToggle(event) {
+  const input = event.target.closest("[data-permission-toggle]");
+
+  if (!input) return;
+
+  if (!canManageRolePermissions()) {
+    input.checked = !input.checked;
+    showToast("Seul le Super Admin peut modifier les droits.");
+    return;
+  }
+
+  const role = input.dataset.role;
+  const permission = input.dataset.permission;
+  const rolePermissions = new Set(state.rolePermissions[role] ?? []);
+
+  if (input.checked) {
+    rolePermissions.add(permission);
+  } else {
+    rolePermissions.delete(permission);
+  }
+
+  state.rolePermissions[role] = [...rolePermissions].sort(sortPermissions);
+  renderRolePermissionMatrix();
+}
+
 function renewSubscription(subscription) {
   subscription.status = "Actif";
   subscription.paymentStatus = "À jour";
-  subscription.endDate = "31-08-2027";
+  subscription.endDate = addOneYearDate(subscription.endDate);
   subscription.lastPaymentDate = formatDate(new Date());
+  subscription.lastReminderDate = "";
 }
 
-function persistSession() {
+function markSubscriptionReminders(subscriptions) {
+  let count = 0;
+  subscriptions.forEach((subscription) => {
+    if (subscription.paymentStatus === "En retard" || isPastDate(subscription.endDate)) {
+      subscription.lastReminderDate = formatDate(new Date());
+      subscription.paymentStatus = "En retard";
+      addAudit("Relance abonnement", subscription.schoolCode, `Relance envoyée pour l'abonnement ${subscription.plan}`);
+      count += 1;
+    }
+  });
+  return count;
+}
+
+function renderOperationalViews() {
+  renderKpis();
+  renderCountries();
+  renderSchools();
+  renderSubscriptions();
+  renderNotifications();
+  renderUsers();
+  renderReports();
+  renderAcademicSettings();
+}
+
+function persistSession({ sync = true } = {}) {
   if (!state.session) return;
 
+  enforceCountryAdminSchoolAdminCrud();
   state.session.schools = state.schools;
   state.session.users = state.users;
   state.session.countries = state.countries;
   state.session.subscriptions = state.subscriptions;
   state.session.notifications = state.notifications;
   state.session.auditLog = state.auditLog;
+  state.session.rolePermissions = state.rolePermissions;
+  state.session.academicConfigs = state.academicConfigs;
   localStorage.setItem("schoollink-backoffice-session", JSON.stringify(state.session));
+
+  if (sync) {
+    scheduleBackOfficeSync();
+  }
+}
+
+async function refreshBackOfficeStateFromBackend() {
+  try {
+    const backendState = await request("/backoffice/state");
+    applyBackOfficeState(backendState);
+    persistSession({ sync: false });
+  } catch (error) {
+    console.warn("Synchronisation BackOffice indisponible.", error);
+  }
+}
+
+function applyBackOfficeState(backendState = {}) {
+  if (Array.isArray(backendState.schools) && backendState.schools.length) state.schools = backendState.schools;
+  if (Array.isArray(backendState.users) && backendState.users.length) state.users = backendState.users;
+  if (Array.isArray(backendState.countries) && backendState.countries.length) state.countries = backendState.countries;
+  if (Array.isArray(backendState.subscriptions) && backendState.subscriptions.length) state.subscriptions = backendState.subscriptions;
+  if (Array.isArray(backendState.notifications) && backendState.notifications.length) state.notifications = backendState.notifications;
+  if (Array.isArray(backendState.auditLog) && backendState.auditLog.length) state.auditLog = backendState.auditLog;
+  if (backendState.rolePermissions && typeof backendState.rolePermissions === "object") {
+    state.rolePermissions = backendState.rolePermissions;
+  }
+  if (backendState.academicConfigs && typeof backendState.academicConfigs === "object") {
+    state.academicConfigs = backendState.academicConfigs;
+  }
+  enforceCountryAdminSchoolAdminCrud();
+}
+
+function getBackOfficeStatePayload() {
+  return {
+    schools: state.schools,
+    users: state.users,
+    countries: state.countries,
+    subscriptions: state.subscriptions,
+    notifications: state.notifications,
+    auditLog: state.auditLog,
+    rolePermissions: state.rolePermissions,
+    academicConfigs: state.academicConfigs,
+  };
+}
+
+function scheduleBackOfficeSync() {
+  clearTimeout(state.syncTimeoutId);
+  state.syncTimeoutId = setTimeout(() => {
+    syncBackOfficeState().catch((error) => {
+      console.warn("Échec de synchronisation BackOffice.", error);
+      showToast("Synchronisation backend indisponible.");
+    });
+  }, 350);
+}
+
+async function syncBackOfficeState() {
+  if (!state.session?.accessToken) return;
+  const synced = await request("/backoffice/state", {
+    method: "PUT",
+    body: JSON.stringify(getBackOfficeStatePayload()),
+  });
+  applyBackOfficeState(synced);
+  localStorage.setItem("schoollink-backoffice-session", JSON.stringify({
+    ...state.session,
+    ...getBackOfficeStatePayload(),
+  }));
+}
+
+function initializeRolePermissions({ force = false } = {}) {
+  if (!force && Object.keys(state.rolePermissions).length) {
+    return;
+  }
+
+  const matrix = {};
+  const allAccounts = [state.session?.user, ...state.users].filter(Boolean);
+
+  allAccounts.forEach((account) => {
+    if (!account.role) return;
+    const existingPermissions = matrix[account.role] ?? [];
+    matrix[account.role] = [...new Set([...existingPermissions, ...(account.permissions ?? [])])].sort(sortPermissions);
+  });
+
+  if (state.session?.user?.role && !matrix[state.session.user.role]) {
+    matrix[state.session.user.role] = [...(state.session.user.permissions ?? [])].sort(sortPermissions);
+  }
+
+  state.rolePermissions = matrix;
+  enforceCountryAdminSchoolAdminCrud();
+  state.selectedPermissionRole = state.selectedPermissionRole || state.session?.user?.role || Object.keys(matrix)[0] || "";
+}
+
+function enforceCountryAdminSchoolAdminCrud() {
+  const current = new Set(state.rolePermissions["Admin Pays"] ?? []);
+  countryAdminSchoolAdminPermissions.forEach((permission) => current.add(permission));
+  state.rolePermissions["Admin Pays"] = [...current].sort(sortPermissions);
+
+  state.users = state.users.map((user) => {
+    if (user.role !== "Admin Pays") return user;
+    const permissions = new Set(user.permissions ?? []);
+    countryAdminSchoolAdminPermissions.forEach((permission) => permissions.add(permission));
+    return {
+      ...user,
+      scopeLevel: "Pays",
+      schoolCode: "*",
+      countryScope: user.countryScope || state.session?.user?.countryScope || "",
+      permissions: [...permissions].sort(sortPermissions),
+    };
+  });
+
+  if (state.session?.user?.role === "Admin Pays") {
+    const permissions = new Set(state.session.user.permissions ?? []);
+    countryAdminSchoolAdminPermissions.forEach((permission) => permissions.add(permission));
+    state.session.user.permissions = [...permissions].sort(sortPermissions);
+    state.session.user.scopeLevel = "Pays";
+    state.session.user.schoolCode = "*";
+  }
+}
+
+function getPermissionRoles() {
+  const roles = new Set([state.session?.user?.role, ...state.users.map((user) => user.role), ...Object.keys(state.rolePermissions)]);
+  return [...roles].filter(Boolean).sort((a, b) => {
+    if (a === "Super Administrateur SchoolLink") return -1;
+    if (b === "Super Administrateur SchoolLink") return 1;
+    return a.localeCompare(b, "fr");
+  });
+}
+
+function canManageRolePermissions() {
+  return state.session?.user?.role === "Super Administrateur SchoolLink";
+}
+
+function applySelectedRolePermissions() {
+  const role = state.selectedPermissionRole;
+  const permissions = state.rolePermissions[role] ?? [];
+
+  state.users = state.users.map((user) => (
+    user.role === role ? { ...user, permissions: [...permissions] } : user
+  ));
+
+  if (state.session.user.role === role) {
+    state.session.user.permissions = [...permissions];
+  }
+}
+
+function createRole() {
+  if (!canManageRolePermissions()) {
+    showToast("Seul le Super Admin peut créer un rôle.");
+    return;
+  }
+
+  openRoleForm("create");
+}
+
+function renameSelectedRole() {
+  if (!canManageRolePermissions()) {
+    showToast("Seul le Super Admin peut modifier un rôle.");
+    return;
+  }
+
+  const currentRole = state.selectedPermissionRole;
+  if (!currentRole) return;
+
+  if (currentRole === "Super Administrateur SchoolLink") {
+    openRoleForm("rename-protected", currentRole);
+    return;
+  }
+
+  openRoleForm("rename", currentRole);
+}
+
+function deleteSelectedRole() {
+  if (!canManageRolePermissions()) {
+    showToast("Seul le Super Admin peut supprimer un rôle.");
+    return;
+  }
+
+  const role = state.selectedPermissionRole;
+  if (!role) return;
+
+  if (role === "Super Administrateur SchoolLink") {
+    openRoleForm("delete-protected", role);
+    return;
+  }
+
+  const usersInRole = state.users.filter((user) => user.role === role).length;
+  if (usersInRole > 0) {
+    openRoleForm("delete-blocked", role);
+    return;
+  }
+
+  openRoleForm("delete", role);
+}
+
+function openRoleForm(mode, role = "") {
+  closeSchoolForm();
+  roleForm.reset();
+  roleForm.dataset.mode = mode;
+  roleOriginalName.value = role;
+  roleFormError.textContent = "";
+  roleDeleteWarning.classList.add("hidden");
+  roleNameLabel.classList.remove("hidden");
+  roleNameInput.disabled = false;
+  roleNameInput.required = true;
+  roleSubmitButton.disabled = false;
+  roleSubmitButton.classList.remove("muted-action");
+
+  if (mode === "create") {
+    roleFormMode.textContent = "Création";
+    roleFormTitle.textContent = "Créer un rôle";
+    roleSubmitButton.textContent = "Créer";
+  }
+
+  if (mode === "rename") {
+    roleFormMode.textContent = "Modification";
+    roleFormTitle.textContent = "Modifier le rôle";
+    roleNameInput.value = role;
+    roleSubmitButton.textContent = "Enregistrer";
+  }
+
+  if (mode === "delete") {
+    roleFormMode.textContent = "Suppression";
+    roleFormTitle.textContent = "Supprimer le rôle";
+    roleNameInput.value = role;
+    roleNameInput.disabled = true;
+    roleNameInput.required = false;
+    roleDeleteWarning.textContent = `Confirmez la suppression du rôle "${role}". Cette action retire le rôle de la matrice des droits.`;
+    roleDeleteWarning.classList.remove("hidden");
+    roleSubmitButton.textContent = "Supprimer";
+  }
+
+  if (mode === "rename-protected") {
+    roleFormMode.textContent = "Modification";
+    roleFormTitle.textContent = "Modifier le rôle";
+    roleNameInput.value = role;
+    roleNameInput.disabled = true;
+    roleNameInput.required = false;
+    roleDeleteWarning.textContent = "Ce rôle est protégé : il garantit l'accès complet du Super Admin et ne peut pas être renommé.";
+    roleDeleteWarning.classList.remove("hidden");
+    roleSubmitButton.textContent = "Verrouillé";
+    roleSubmitButton.disabled = true;
+    roleSubmitButton.classList.add("muted-action");
+  }
+
+  if (mode === "delete-protected" || mode === "delete-blocked") {
+    const usersInRole = state.users.filter((user) => user.role === role).length;
+    roleFormMode.textContent = "Suppression";
+    roleFormTitle.textContent = "Supprimer le rôle";
+    roleNameInput.value = role;
+    roleNameInput.disabled = true;
+    roleNameInput.required = false;
+    roleDeleteWarning.textContent = mode === "delete-protected"
+      ? "Ce rôle est protégé : il garantit l'accès complet du Super Admin et ne peut pas être supprimé."
+      : `Ce rôle ne peut pas être supprimé tant que ${usersInRole} compte(s) l'utilisent.`;
+    roleDeleteWarning.classList.remove("hidden");
+    roleSubmitButton.textContent = "Suppression bloquée";
+    roleSubmitButton.disabled = true;
+    roleSubmitButton.classList.add("muted-action");
+  }
+
+  roleModal.classList.remove("hidden");
+  if (mode !== "delete") {
+    roleNameInput.focus();
+  }
+}
+
+function closeRoleForm() {
+  roleModal.classList.add("hidden");
+}
+
+function handleRoleFormSubmit(event) {
+  event.preventDefault();
+
+  if (!canManageRolePermissions()) {
+    roleFormError.textContent = "Seul le Super Admin peut gérer les rôles.";
+    return;
+  }
+
+  const mode = roleForm.dataset.mode;
+  const currentRole = roleOriginalName.value;
+
+  if (mode === "create") {
+    const roleName = normalizeRoleName(roleNameInput.value);
+    if (!roleName) {
+      roleFormError.textContent = "Le nom du rôle est obligatoire.";
+      return;
+    }
+
+    if (state.rolePermissions[roleName] || getPermissionRoles().includes(roleName)) {
+      roleFormError.textContent = "Ce rôle existe déjà.";
+      return;
+    }
+
+    state.rolePermissions[roleName] = [];
+    state.selectedPermissionRole = roleName;
+    persistSession();
+    closeRoleForm();
+    renderPermissions();
+    showToast(`Rôle ${roleName} créé.`);
+    return;
+  }
+
+  if (mode === "rename") {
+    const nextRole = normalizeRoleName(roleNameInput.value);
+    if (!nextRole) {
+      roleFormError.textContent = "Le nom du rôle est obligatoire.";
+      return;
+    }
+
+    if (nextRole === currentRole) {
+      closeRoleForm();
+      return;
+    }
+
+    if (state.rolePermissions[nextRole] || getPermissionRoles().includes(nextRole)) {
+      roleFormError.textContent = "Ce rôle existe déjà.";
+      return;
+    }
+
+    state.rolePermissions[nextRole] = state.rolePermissions[currentRole] ?? [];
+    delete state.rolePermissions[currentRole];
+    state.users = state.users.map((user) => (
+      user.role === currentRole ? { ...user, role: nextRole } : user
+    ));
+    state.selectedPermissionRole = nextRole;
+    persistSession();
+    closeRoleForm();
+    renderUsers();
+    renderPermissions();
+    showToast(`Rôle renommé en ${nextRole}.`);
+    return;
+  }
+
+  if (mode === "delete") {
+    const usersInRole = state.users.filter((user) => user.role === currentRole).length;
+    if (usersInRole > 0) {
+      roleFormError.textContent = `Impossible : ${usersInRole} compte(s) utilisent ce rôle.`;
+      return;
+    }
+
+    delete state.rolePermissions[currentRole];
+    state.selectedPermissionRole = getPermissionRoles().find((item) => item !== currentRole) ?? state.session.user.role;
+    persistSession();
+    closeRoleForm();
+    renderPermissions();
+    showToast(`Rôle ${currentRole} supprimé.`);
+  }
+}
+
+function normalizeRoleName(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function sortPermissions(a, b) {
+  return String(a).localeCompare(String(b), "fr");
 }
 
 function showToast(message) {
@@ -955,6 +1837,234 @@ function openPermissionDetail(permission, context) {
       </div>
     `
   );
+}
+
+function openCountryForm() {
+  openDetail(
+    "Pays",
+    "Créer un pays",
+    `
+      <div class="form-grid detail-form">
+        <label>Nom <input id="countryNameInput" placeholder="Ex. République Démocratique du Congo" /></label>
+        <label>Code ISO <input id="countryCodeInput" maxlength="8" placeholder="CD" /></label>
+        <label>Indicatif <input id="countryPhoneInput" placeholder="+243" /></label>
+        <label>Devise <input id="countryCurrencyInput" placeholder="CDF" /></label>
+        <label>Fuseau horaire <input id="countryTimezoneInput" placeholder="Africa/Kinshasa" /></label>
+        <label>Statut
+          <select id="countryStatusInput">
+            <option>Actif</option>
+            <option>Suspendu</option>
+          </select>
+        </label>
+      </div>
+      <p class="error" id="countryFormError"></p>
+      <div class="row-actions detail-actions">
+        <button class="icon-action" type="button" data-action="save-country-form">Enregistrer</button>
+      </div>
+    `
+  );
+}
+
+function saveCountryForm() {
+  const payload = {
+    name: document.querySelector("#countryNameInput")?.value.trim(),
+    code: document.querySelector("#countryCodeInput")?.value.trim().toUpperCase(),
+    phonePrefix: document.querySelector("#countryPhoneInput")?.value.trim(),
+    currency: document.querySelector("#countryCurrencyInput")?.value.trim().toUpperCase(),
+    timezone: document.querySelector("#countryTimezoneInput")?.value.trim() || "UTC",
+    status: document.querySelector("#countryStatusInput")?.value ?? "Actif",
+  };
+  const errorTarget = document.querySelector("#countryFormError");
+
+  if (!payload.name || !payload.code || !payload.phonePrefix || !payload.currency) {
+    errorTarget.textContent = "Nom, code, indicatif et devise sont obligatoires.";
+    return;
+  }
+
+  if (state.countries.some((country) => country.code === payload.code)) {
+    errorTarget.textContent = "Ce code pays existe déjà.";
+    return;
+  }
+
+  state.countries.unshift({
+    id: `COUNTRY-${payload.code}-${Date.now()}`,
+    ...payload,
+    administratorId: "",
+    createdAt: formatDate(new Date()),
+  });
+  addAudit("Création pays", payload.code, `${payload.name} ajouté au BackOffice`);
+  closeDetail();
+  renderOperationalViews();
+  persistSession();
+  showToast(`Pays ${payload.code} créé.`);
+}
+
+function openNotificationForm() {
+  openDetail(
+    "Notification",
+    "Créer une notification",
+    `
+      <div class="form-grid detail-form">
+        <label>Titre <input id="notificationTitleInput" placeholder="Titre de la notification" /></label>
+        <label>Type
+          <select id="notificationTypeInput">
+            <option>Support</option>
+            <option>Abonnement</option>
+            <option>Paiement</option>
+            <option>Système</option>
+          </select>
+        </label>
+        <label>Priorité
+          <select id="notificationPriorityInput">
+            <option>Moyenne</option>
+            <option>Haute</option>
+            <option>Basse</option>
+          </select>
+        </label>
+        <label>Audience <input id="notificationAudienceInput" value="${escapeHtml(state.session?.user?.role ?? "BackOffice")}" /></label>
+        <label class="form-wide">Message <input id="notificationMessageInput" placeholder="Message à envoyer" /></label>
+      </div>
+      <p class="error" id="notificationFormError"></p>
+      <div class="row-actions detail-actions">
+        <button class="icon-action" type="button" data-action="save-notification-form">Publier</button>
+      </div>
+    `
+  );
+}
+
+function saveNotificationForm() {
+  const title = document.querySelector("#notificationTitleInput")?.value.trim();
+  const message = document.querySelector("#notificationMessageInput")?.value.trim();
+  const errorTarget = document.querySelector("#notificationFormError");
+
+  if (!title || !message) {
+    errorTarget.textContent = "Le titre et le message sont obligatoires.";
+    return;
+  }
+
+  const notification = {
+    id: `NOTIF-${Date.now()}`,
+    audience: document.querySelector("#notificationAudienceInput")?.value.trim() || "BackOffice",
+    countryCode: state.session?.user?.countryCode || "*",
+    title,
+    message,
+    type: document.querySelector("#notificationTypeInput")?.value ?? "Support",
+    priority: document.querySelector("#notificationPriorityInput")?.value ?? "Moyenne",
+    channels: ["Web", "Mobile"],
+    status: "Non lu",
+    date: formatDate(new Date()),
+    createdBy: state.session?.user?.id,
+  };
+
+  state.notifications.unshift(notification);
+  addAudit("Création notification", notification.id, notification.title);
+  closeDetail();
+  renderOperationalViews();
+  persistSession();
+  showToast("Notification publiée.");
+}
+
+function openUserForm() {
+  const roleOptions = getPermissionRoles()
+    .map((role) => `<option>${escapeHtml(role)}</option>`)
+    .join("");
+  const schoolOptions = state.schools
+    .map((school) => `<option value="${escapeHtml(school.code)}">${escapeHtml(school.name)} (${escapeHtml(school.code)})</option>`)
+    .join("");
+  const countryOptions = state.countries
+    .map((country) => `<option value="${escapeHtml(country.name)}">${escapeHtml(country.name)} (${escapeHtml(country.code)})</option>`)
+    .join("");
+
+  openDetail(
+    "Utilisateur",
+    "Créer un utilisateur",
+    `
+      <div class="form-grid detail-form">
+        <label>Prénom <input id="userFirstNameInput" placeholder="Prénom" /></label>
+        <label>Nom <input id="userLastNameInput" placeholder="Nom" /></label>
+        <label>Identifiant <input id="userIdentifierInput" placeholder="identifiant" /></label>
+        <label>Rôle <select id="userRoleInput">${roleOptions}</select></label>
+        <label>Établissement <select id="userSchoolInput">${schoolOptions}</select></label>
+        <label>Pays géré <select id="userCountryInput">${countryOptions}</select></label>
+        <label>Statut
+          <select id="userStatusInput">
+            <option>Actif</option>
+            <option>Suspendu</option>
+          </select>
+        </label>
+      </div>
+      <p class="error" id="userFormError"></p>
+      <div class="row-actions detail-actions">
+        <button class="icon-action" type="button" data-action="save-user-form">Créer</button>
+      </div>
+    `
+  );
+  document.querySelector("#userRoleInput")?.addEventListener("change", syncUserScopeInputs);
+  syncUserScopeInputs();
+}
+
+function saveUserForm() {
+  const role = document.querySelector("#userRoleInput")?.value;
+  const selectedSchoolCode = document.querySelector("#userSchoolInput")?.value || state.schools[0]?.code || "*";
+  const countryScope = document.querySelector("#userCountryInput")?.value || state.session?.user?.countryScope || "";
+  const schoolCode = role === "Admin Pays" ? "*" : selectedSchoolCode;
+  const school = state.schools.find((item) => item.code === schoolCode);
+  const payload = {
+    firstName: document.querySelector("#userFirstNameInput")?.value.trim(),
+    lastName: document.querySelector("#userLastNameInput")?.value.trim(),
+    identifier: document.querySelector("#userIdentifierInput")?.value.trim(),
+    role,
+    schoolCode,
+    countryScope: role === "Admin Pays" ? countryScope : school?.country ?? state.session?.user?.countryScope ?? "",
+    status: document.querySelector("#userStatusInput")?.value ?? "Actif",
+  };
+  const errorTarget = document.querySelector("#userFormError");
+
+  if (!payload.firstName || !payload.lastName || !payload.identifier || !payload.role) {
+    errorTarget.textContent = "Prénom, nom, identifiant et rôle sont obligatoires.";
+    return;
+  }
+
+  if (payload.role === "Admin Pays" && !payload.countryScope) {
+    errorTarget.textContent = "Un Admin Pays doit être rattaché à un pays, pas à un établissement.";
+    return;
+  }
+
+  if (state.users.some((user) => normalize(user.identifier) === normalize(payload.identifier))) {
+    errorTarget.textContent = "Cet identifiant existe déjà.";
+    return;
+  }
+
+  const permissions = state.rolePermissions[payload.role] ?? ["Voir tableau de bord"];
+  const user = {
+    id: `USER-${Date.now()}`,
+    publicId: `USR-${Date.now()}`,
+    ...payload,
+    scopeLevel: payload.role === "Admin Pays" ? "Pays" : payload.schoolCode === "*" ? "Global" : "Établissement",
+    accessChannel: "Application",
+    permissions: [...permissions],
+    temporaryPassword: "1234",
+    history: [`Créé le ${formatDate(new Date())}`],
+  };
+
+  state.users.unshift(user);
+  addAudit("Création utilisateur", user.identifier, `${user.firstName} ${user.lastName} créé avec le rôle ${user.role}`);
+  closeDetail();
+  renderOperationalViews();
+  renderPermissions();
+  persistSession();
+  showToast("Utilisateur créé avec le mot de passe temporaire 1234.");
+}
+
+function syncUserScopeInputs() {
+  const role = document.querySelector("#userRoleInput")?.value;
+  const schoolInput = document.querySelector("#userSchoolInput");
+  const countryInput = document.querySelector("#userCountryInput");
+  if (!schoolInput || !countryInput) return;
+
+  const isCountryAdmin = role === "Admin Pays";
+  schoolInput.disabled = isCountryAdmin;
+  countryInput.disabled = !isCountryAdmin;
 }
 
 function openSchoolDetail(school) {
@@ -1133,6 +2243,7 @@ function validateSchoolForm(payload, originalCode) {
 
 function syncSchoolSubscription(school) {
   let subscription = state.subscriptions.find((item) => item.schoolCode === school.code);
+  const price = getPlanPrice(school.subscriptionPlan);
 
   if (!subscription) {
     subscription = {
@@ -1141,8 +2252,8 @@ function syncSchoolSubscription(school) {
       countryCode: school.code.slice(0, 2),
       country: school.country,
       plan: school.subscriptionPlan,
-      monthlyPrice: school.subscriptionPlan === "Premium" ? 120 : school.subscriptionPlan === "Standard" ? 90 : 60,
-      annualPrice: school.subscriptionPlan === "Premium" ? 1200 : school.subscriptionPlan === "Standard" ? 900 : 600,
+      monthlyPrice: price.monthly,
+      annualPrice: price.annual,
       currency: "USD",
       status: school.status,
       paymentStatus: "À jour",
@@ -1155,8 +2266,16 @@ function syncSchoolSubscription(school) {
 
   subscription.country = school.country;
   subscription.plan = school.subscriptionPlan;
+  subscription.monthlyPrice = price.monthly;
+  subscription.annualPrice = price.annual;
   subscription.status = school.status;
   subscription.endDate = school.subscriptionEndDate;
+}
+
+function getPlanPrice(plan) {
+  if (plan === "Premium") return { monthly: 120, annual: 1200 };
+  if (plan === "Standard") return { monthly: 90, annual: 900 };
+  return { monthly: 60, annual: 600 };
 }
 
 function addAudit(action, targetId, summary) {
@@ -1174,6 +2293,35 @@ function generateSchoolCode() {
   const country = state.session?.user?.countryScope === "RDC" ? "CD" : "SL";
   const next = state.schools.length + 1;
   return `${country}-2026-${String(next).padStart(4, "0")}`;
+}
+
+function getAvailableCountryAdminId(country) {
+  const countryAdmin = state.users.find((user) =>
+    user.role === "Admin Pays" &&
+    user.status === "Actif" &&
+    (!user.countryScope || user.countryScope === country.name || user.countryScope === country.code)
+  );
+  return countryAdmin?.id ?? state.session?.user?.id ?? "À affecter";
+}
+
+function parseFrenchDate(value) {
+  const match = String(value ?? "").match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+  return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+}
+
+function isPastDate(value) {
+  const date = parseFrenchDate(value);
+  if (!date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date.getTime() < today.getTime();
+}
+
+function addOneYearDate(value) {
+  const date = parseFrenchDate(value) ?? new Date();
+  date.setFullYear(date.getFullYear() + 1);
+  return formatDate(date);
 }
 
 function renderDetailItem(label, value) {

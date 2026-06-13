@@ -11,6 +11,7 @@ import { RootStackParamList } from "../navigation/AppNavigator";
 import { getStudentById, notes, payments, presences } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
+import { canReadRoute } from "../domain/security/permissions";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -23,15 +24,9 @@ export default function StudentDetailScreen({
 }: Partial<Props>) {
   const { session, selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
-  const canSeePayments =
-    session?.role === "super_admin" ||
-    session?.role === "school_admin" ||
-    session?.role === "country_admin" ||
-    session?.role === "principal" ||
-    session?.role === "prefet" ||
-    session?.role === "secretary" ||
-    session?.role === "parent_student" ||
-    session?.role === "student";
+  const canSeeNotes = canReadRoute(session, "StudentNotes");
+  const canSeePresences = canReadRoute(session, "StudentPresences");
+  const canSeePayments = canReadRoute(session, "StudentPayments");
 
   const student = studentId ? getStudentById(studentId) : undefined;
 
@@ -62,42 +57,50 @@ export default function StudentDetailScreen({
       </View>
 
       <View style={styles.statsRow}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.statCard}
-          onPress={() => navigation?.navigate("StudentNotes", { studentId: student.id })}
-        >
-          <Text style={styles.statValue}>
-            {notes.filter((item) => item.studentId === student.id).length}
-          </Text>
-          <Text style={styles.statLabel}>Notes</Text>
-        </TouchableOpacity>
+        {canSeeNotes && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.statCard}
+            onPress={() => navigation?.navigate("StudentNotes", { studentId: student.id })}
+          >
+            <Text style={styles.statValue}>
+              {notes.filter((item) => item.studentId === student.id).length}
+            </Text>
+            <Text style={styles.statLabel}>Notes</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.statCard}
-          onPress={() => navigation?.navigate("StudentPresences", { studentId: student.id })}
-        >
-          <Text style={styles.statValue}>
-            {presences.filter((item) => item.studentId === student.id && item.present).length}
-          </Text>
-          <Text style={styles.statLabel}>Présences</Text>
-        </TouchableOpacity>
+        {canSeePresences && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.statCard}
+            onPress={() => navigation?.navigate("StudentPresences", { studentId: student.id })}
+          >
+            <Text style={styles.statValue}>
+              {presences.filter((item) => item.studentId === student.id && item.present).length}
+            </Text>
+            <Text style={styles.statLabel}>Présences</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      <StudentAction
-        icon="book-outline"
-        label="Notes"
-        detail="Bulletins et évaluations"
-        onPress={() => navigation?.navigate("StudentNotes", { studentId: student.id })}
-      />
+      {canSeeNotes && (
+        <StudentAction
+          icon="book-outline"
+          label="Notes"
+          detail="Bulletins et évaluations"
+          onPress={() => navigation?.navigate("StudentNotes", { studentId: student.id })}
+        />
+      )}
 
-      <StudentAction
-        icon="calendar-outline"
-        label="Présences"
-        detail="Suivi des absences"
-        onPress={() => navigation?.navigate("StudentPresences", { studentId: student.id })}
-      />
+      {canSeePresences && (
+        <StudentAction
+          icon="calendar-outline"
+          label="Présences"
+          detail="Suivi des absences"
+          onPress={() => navigation?.navigate("StudentPresences", { studentId: student.id })}
+        />
+      )}
 
       {canSeePayments && (
         <StudentAction

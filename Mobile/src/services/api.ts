@@ -3,6 +3,7 @@ import { AuthResolver } from "../domain/auth/AuthResolver";
 import { AccountIdentifier } from "../domain/auth/AccountIdentifier";
 import {
   school as demoSchool,
+  schools as demoSchools,
   students as demoStudents,
   teachers as demoTeachers,
   userAccounts as demoUsers,
@@ -112,6 +113,36 @@ export type LoginResponse = {
   school: SchoolInfo;
 };
 
+export type BackOfficeStatePayload = Record<string, unknown> & {
+  schools?: unknown[];
+  users?: unknown[];
+  countries?: unknown[];
+  subscriptions?: unknown[];
+  notifications?: unknown[];
+  students?: unknown[];
+  teachers?: unknown[];
+  classes?: unknown[];
+  courses?: unknown[];
+  assignments?: unknown[];
+  payments?: unknown[];
+  paymentStatuses?: unknown[];
+  presences?: unknown[];
+  notes?: unknown[];
+  academicConfigs?: Record<string, unknown>;
+  announcements?: unknown[];
+  messages?: unknown[];
+  rolePermissions?: Record<string, string[]>;
+};
+
+export type AcademicConfigPayload = {
+  schoolCode: string;
+  periodMode: string;
+  periods: unknown[];
+  evaluationTypes: string[];
+  defaultScale: number;
+  reportCardMode: string;
+};
+
 type TeacherSummary = {
   id: string;
   publicId?: string;
@@ -192,6 +223,51 @@ export function getHealth() {
   return request<{ status: string }>("/health");
 }
 
+export function getNotes() {
+  return request<unknown[]>("/notes");
+}
+
+export function getStudents() {
+  return request<StudentSummary[]>("/students");
+}
+
+export function getClasses() {
+  return request<unknown[]>("/classes");
+}
+
+export function getCourses() {
+  return request<unknown[]>("/courses");
+}
+
+export function getAcademicConfig() {
+  return request<AcademicConfigPayload>("/academic-config");
+}
+
+export function saveAcademicConfig(payload: AcademicConfigPayload) {
+  return request<AcademicConfigPayload>("/academic-config", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function saveNote(payload: unknown) {
+  return request<unknown>("/notes", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getBackOfficeState() {
+  return request<BackOfficeStatePayload>("/backoffice/state");
+}
+
+export function saveBackOfficeState(payload: BackOfficeStatePayload) {
+  return request<BackOfficeStatePayload>("/backoffice/state", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getReportCardPdfUrl(studentId: string, period = "Trimestre 1") {
   const tokenQuery = accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : "";
   return `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/report.pdf?period=${encodeURIComponent(period)}${tokenQuery}`;
@@ -215,37 +291,44 @@ async function identifyAccountFromExistingEndpoints({
 
 function getDemoSchoolByCode(code: string): SchoolInfo | null {
   const normalizedCode = code.trim().toUpperCase();
+  const school = demoSchools.find((item) =>
+    [item.code, item.publicId].some(
+      (value) => String(value ?? "").trim().toUpperCase() === normalizedCode
+    )
+  ) ?? ([demoSchool.code, demoSchool.publicId].some((value) => String(value ?? "").trim().toUpperCase() === normalizedCode)
+    ? demoSchool
+    : null);
 
-  if (![demoSchool.code, demoSchool.publicId].some((value) => String(value ?? "").trim().toUpperCase() === normalizedCode)) {
+  if (!school) {
     return null;
   }
 
   return {
-    id: demoSchool.id,
-    publicId: demoSchool.publicId,
-    code: demoSchool.code,
-    name: demoSchool.name,
-    type: demoSchool.type,
-    city: demoSchool.city,
-    country: demoSchool.country,
-    address: demoSchool.address,
-    phone: demoSchool.phone,
-    email: demoSchool.email,
-    website: demoSchool.website,
-    currency: demoSchool.currency,
-    slogan: demoSchool.slogan,
-    status: demoSchool.status,
-    logoUrl: demoSchool.logoUrl,
-    schoolYear: demoSchool.schoolYear,
-    timezone: demoSchool.timezone,
-    language: demoSchool.language,
-    dateFormat: demoSchool.dateFormat,
-    primaryColor: demoSchool.primaryColor,
-    subscriptionPlan: demoSchool.subscriptionPlan,
-    subscriptionStartDate: demoSchool.subscriptionStartDate,
-    subscriptionEndDate: demoSchool.subscriptionEndDate,
-    maxStudents: demoSchool.maxStudents,
-    maxTeachers: demoSchool.maxTeachers,
+    id: school.id,
+    publicId: school.publicId,
+    code: school.code,
+    name: school.name,
+    type: school.type,
+    city: school.city,
+    country: school.country,
+    address: school.address,
+    phone: school.phone,
+    email: school.email,
+    website: school.website,
+    currency: school.currency,
+    slogan: school.slogan,
+    status: school.status,
+    logoUrl: school.logoUrl,
+    schoolYear: school.schoolYear,
+    timezone: school.timezone,
+    language: school.language,
+    dateFormat: school.dateFormat,
+    primaryColor: school.primaryColor,
+    subscriptionPlan: school.subscriptionPlan,
+    subscriptionStartDate: school.subscriptionStartDate,
+    subscriptionEndDate: school.subscriptionEndDate,
+    maxStudents: school.maxStudents,
+    maxTeachers: school.maxTeachers,
   };
 }
 
