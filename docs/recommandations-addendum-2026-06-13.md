@@ -1,10 +1,10 @@
-# Addendum recommandations SchoolLink - 2026-06-13
+# Addendum recommandations Somafrik - 2026-06-13
 
 Ce fichier complete les recommandations existantes sans les remplacer.
 
 ## Recommandations conservees
 
-Les recommandations du fichier source `Pour SchoolLink, les points faibles a corriger.txt` restent valides :
+Les recommandations du fichier source `Pour Somafrik, les points faibles a corriger.txt` restent valides :
 
 - securite JWT + RBAC ;
 - isolation multi-etablissements ;
@@ -26,8 +26,8 @@ Les recommandations du fichier source `Pour SchoolLink, les points faibles a cor
 
 ### 2. Eviter les conflits entre versions de projet
 
-- Version corrigee principale : `C:\Users\Lenovo\Desktop\Projets\SchoolLink_1.2.0`.
-- Version Expo utilisee par le telephone : `C:\Users\Lenovo\Desktop\Projets\SchoolLink\Mobile`.
+- Version corrigee principale : `C:\Users\Lenovo\Desktop\Projets\Somafrik_1.2.0`.
+- Version Expo utilisee par le telephone : `C:\Users\Lenovo\Desktop\Projets\Somafrik\Mobile`.
 - Toute correction mobile critique faite dans l'une des versions doit etre reportee explicitement dans l'autre si elle reste utilisee.
 
 ### 3. Identifiants MVP

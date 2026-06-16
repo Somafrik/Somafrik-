@@ -164,7 +164,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const data = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    throw new Error(data?.message ?? "L'API SchoolLink ne répond pas correctement. Vérifiez que le backend est lancé sur le port 5000.");
+    throw new Error(data?.message ?? "L'API Somafrik ne répond pas correctement. Vérifiez que le backend est lancé sur le port 5000.");
   }
 
   if (!isJson) {
@@ -373,7 +373,7 @@ function findDemoUser(identifier: string, schoolCode: string) {
 }
 
 function mobileRoleFromLabel(role: string): IdentifyResponse | null {
-  if (role === "Super Administrateur SchoolLink") return { role: "super_admin", roleLabel: "Super Administrateur" };
+  if (role === "Super Administrateur OKAFRIK") return { role: "super_admin", roleLabel: "Super Administrateur" };
   if (role === "Admin Pays") return { role: "country_admin", roleLabel: "Admin Pays" };
   if (role === "Admin School") return { role: "school_admin", roleLabel: "Admin Établissement" };
   if (role === "Préfet des études") return { role: "prefet", roleLabel: "Préfet des études" };
@@ -483,7 +483,7 @@ function loginWithDemoData({ role, schoolCode, identifier, pin }: LoginPayload):
         permissions: demoUsers.find((user) => user.role === "Parent")?.permissions,
         user: {
           id: `PARENT-${firstStudent.parentPhone}`,
-          name: "Parent SchoolLink",
+          name: "Parent Somafrik",
           parentPhone: firstStudent.parentPhone,
           children,
         },

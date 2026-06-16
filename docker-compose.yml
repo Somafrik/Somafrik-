@@ -1,18 +1,18 @@
 services:
   postgres:
     image: postgres:16
-    container_name: schoollink-postgres
+    container_name: somafrik-postgres
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-schoollink}
-      POSTGRES_USER: ${POSTGRES_USER:-schoollink}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-schoollink123}
+      POSTGRES_DB: ${POSTGRES_DB:-somafrik}
+      POSTGRES_USER: ${POSTGRES_USER:-somafrik}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-somafrik123}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-schoollink} -d ${POSTGRES_DB:-schoollink}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-somafrik} -d ${POSTGRES_DB:-somafrik}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: schoollink-backend
+    container_name: somafrik-backend
     restart: always
     ports:
       - "${BACKEND_PORT:-5000}:5000"
@@ -31,10 +31,10 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 5000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-schoollink}:${POSTGRES_PASSWORD:-schoollink123}@postgres:5432/${POSTGRES_DB:-schoollink}
-      JWT_SECRET: ${JWT_SECRET:-schoollink-dev-secret-change-me}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-somafrik}:${POSTGRES_PASSWORD:-somafrik123}@postgres:5432/${POSTGRES_DB:-somafrik}
+      JWT_SECRET: ${JWT_SECRET:-somafrik-dev-secret-change-me}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
-      SCHOOLLINK_DB_REQUIRED: ${SCHOOLLINK_DB_REQUIRED:-true}
+      SOMAFRIK_DB_REQUIRED: ${SOMAFRIK_DB_REQUIRED:-true}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/api/health >/dev/null 2>&1"]
       interval: 15s

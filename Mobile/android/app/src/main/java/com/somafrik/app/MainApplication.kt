@@ -1,4 +1,4 @@
-package com.schoollink.app
+package com.somafrik.app
 
 import android.app.Application
 import android.content.res.Configuration

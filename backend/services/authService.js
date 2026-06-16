@@ -6,7 +6,7 @@ const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000;
 
 const managedMobileRoles = {
-  "Super Administrateur SchoolLink": { role: "super_admin", roleLabel: "Super Administrateur" },
+  "Super Administrateur OKAFRIK": { role: "super_admin", roleLabel: "Super Administrateur" },
   "Admin Pays": { role: "country_admin", roleLabel: "Admin Pays" },
   "Admin School": { role: "school_admin", roleLabel: "Admin Établissement" },
   Proviseur: { role: "principal", roleLabel: "Proviseur" },
@@ -129,7 +129,7 @@ class AuthService {
           role,
           user: {
             id: `PARENT-${firstStudent.parentPhone}`,
-            name: "Parent SchoolLink",
+            name: "Parent Somafrik",
             parentPhone: firstStudent.parentPhone,
             children,
           },
@@ -289,11 +289,11 @@ class AuthService {
 
     if (
       user?.accessChannel === "BackOffice" &&
-      !["Super Administrateur SchoolLink", "Admin Pays", "Admin School"].includes(user.role)
+      !["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(user.role)
     ) {
       throw new BusinessError(
         403,
-        "Ce compte est reserve au BackOffice SchoolLink. Utilisez le portail PC/tablette/web."
+        "Ce compte est reserve au BackOffice Somafrik. Utilisez le portail PC/tablette/web."
       );
     }
   }

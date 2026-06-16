@@ -16,7 +16,7 @@ import { IdentifyResponse, identifyAccount, login } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
-const schoolLinkLogo = require("../../assets/schoollink-logo.png");
+const somafrikLogo = require("../../assets/somafrik-logo.png");
 
 export default function LoginScreen({ navigation, route }: Props) {
   const { school, accessIdentifier, accessRole, accessRoleLabel } = route.params;
@@ -119,7 +119,7 @@ export default function LoginScreen({ navigation, route }: Props) {
         {school.logoUrl ? (
           <Image source={{ uri: school.logoUrl }} style={styles.schoolLogoImage} />
         ) : (
-          <Image source={schoolLinkLogo} style={styles.schoolLogoImage} />
+          <Image source={somafrikLogo} style={styles.schoolLogoImage} />
         )}
       </View>
       <Text style={styles.title}>{school.name}</Text>

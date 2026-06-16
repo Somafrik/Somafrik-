@@ -18,7 +18,7 @@ import { RootStackParamList } from "../navigation/AppNavigator";
 import { SchoolInfo, getSchoolByCode } from "../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RoleSelection">;
-const schoolLinkLogo = require("../../assets/schoollink-logo.png");
+const somafrikLogo = require("../../assets/somafrik-logo.png");
 
 export default function RoleSelectionScreen({ navigation }: Props) {
   const [accessCode, setAccessCode] = useState("CD-2026-0001");
@@ -30,11 +30,14 @@ export default function RoleSelectionScreen({ navigation }: Props) {
     const normalizedAccess = accessCode.trim().toUpperCase();
 
     if (!normalizedAccess) {
-      Alert.alert("Accès SchoolLink", "Veuillez saisir un code établissement ou un identifiant admin.");
+      Alert.alert("Accès Somafrik", "Veuillez saisir un code établissement ou un identifiant admin.");
       return;
     }
 
-    if (normalizedAccess === "SUPERADMIN" || normalizedAccess === "SUPERADMIN-SCHOOLLINK") {
+    if (
+      normalizedAccess === "SUPERADMIN" ||
+      normalizedAccess === "SUPERADMIN-SOMAFRIK"
+    ) {
       navigation.navigate("Login", {
         school: getPlatformSchool("Global"),
         accessIdentifier: "superadmin",
@@ -85,11 +88,11 @@ export default function RoleSelectionScreen({ navigation }: Props) {
       >
         <View style={styles.header}>
           <View style={styles.mark}>
-            <Image source={schoolLinkLogo} style={styles.markLogo} />
+            <Image source={somafrikLogo} style={styles.markLogo} />
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.brand}>SchoolLink</Text>
-            <Text style={styles.subtitle}>Accès mobile sécurisé</Text>
+            <Text style={styles.brand}>Somafrik</Text>
+            <Text style={styles.subtitle}>ERP scolaire par OKAFRIK</Text>
           </View>
         </View>
 
@@ -151,7 +154,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
         {school && (
           <View style={styles.schoolCard}>
           <View style={styles.logo}>
-              <Image source={schoolLinkLogo} style={styles.schoolLogoImage} />
+              <Image source={somafrikLogo} style={styles.schoolLogoImage} />
             </View>
             <View style={styles.schoolCopy}>
               <Text style={styles.schoolName}>{school.name}</Text>
@@ -171,7 +174,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
         <View style={styles.helpBox}>
           <Ionicons name="information-circle-outline" size={18} color="#2563EB" />
           <Text style={styles.helpText}>
-            Si le réseau échoue pendant la démonstration, SchoolLink utilise les données locales de test.
+            Si le réseau échoue pendant la démonstration, Somafrik utilise les données locales de test.
           </Text>
         </View>
       </ScrollView>
@@ -184,10 +187,10 @@ function getPlatformSchool(scope: string): SchoolInfo {
     id: `PLATFORM-${scope}`,
     publicId: scope,
     code: "CD-2026-0001",
-    name: scope === "Global" ? "SchoolLink Global" : `SchoolLink ${scope}`,
+    name: scope === "Global" ? "Somafrik Global" : `Somafrik ${scope}`,
     city: scope === "Global" ? "Plateforme" : scope,
     country: scope,
-    slogan: "Pilotage mobile et tablette",
+    slogan: "ERP scolaire mobile et tablette par OKAFRIK",
     status: "Actif",
   };
 }

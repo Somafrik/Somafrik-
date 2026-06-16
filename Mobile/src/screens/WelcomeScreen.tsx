@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Welcome">;
-const schoolLinkLogo = require("../../assets/schoollink-logo.png");
+const somafrikLogo = require("../../assets/somafrik-logo.png");
 
 export default function WelcomeScreen({ navigation }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -25,11 +25,12 @@ export default function WelcomeScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.logoBox, { opacity, transform: [{ scale }] }]}>
-        <Image source={schoolLinkLogo} style={styles.logoImage} />
+        <Image source={somafrikLogo} style={styles.logoImage} />
       </Animated.View>
-      <Animated.Text style={[styles.brand, { opacity }]}>SchoolLink</Animated.Text>
+      <Animated.Text style={[styles.brand, { opacity }]}>Somafrik</Animated.Text>
+      <Animated.Text style={[styles.parentBrand, { opacity }]}>par OKAFRIK</Animated.Text>
       <Animated.Text style={[styles.subtitle, { opacity }]}>
-        La plateforme scolaire mobile pour tous les rôles.
+        ERP scolaire mobile et tablette pour tous les rôles.
       </Animated.Text>
       <Animated.View style={{ transform: [{ translateY: buttonOffset }], opacity }}>
         <TouchableOpacity
@@ -66,6 +67,13 @@ const styles = StyleSheet.create({
   },
   logoImage: { width: 104, height: 104, resizeMode: "contain" },
   brand: { color: "#0F172A", fontSize: 40, fontWeight: "900" },
+  parentBrand: {
+    color: "#0F766E",
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 4,
+    textTransform: "uppercase",
+  },
   subtitle: {
     color: "#64748B",
     fontSize: 16,

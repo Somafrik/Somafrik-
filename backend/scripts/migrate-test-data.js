@@ -3,7 +3,7 @@ const { hashSecret } = require("../services/credentialService");
 const seedData = require("../data");
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? "postgresql://schoollink:schoollink123@localhost:5432/schoollink";
+  process.env.DATABASE_URL ?? "postgresql://somafrik:somafrik123@localhost:5432/somafrik";
 const pool = new Pool({ connectionString: databaseUrl });
 const defaultStudentPinHash = hashSecret("1234");
 const teacherPasswordHashes = new Map(

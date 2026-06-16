@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "SchoolLink",
-    "slug": "schoollink",
+    "name": "Somafrik",
+    "slug": "somafrik",
     "version": "1.2.0",
     "orientation": "portrait",
-    "icon": "./assets/schoollink-logo.png",
+    "icon": "./assets/somafrik-logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/schoollink-logo.png",
+      "image": "./assets/somafrik-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
@@ -15,20 +15,20 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "SchoolLink utilise vos photos pour ajouter la photo du compte.",
-          "cameraPermission": "SchoolLink utilise l'appareil photo pour prendre la photo du compte."
+          "photosPermission": "Somafrik utilise vos photos pour ajouter la photo du compte.",
+          "cameraPermission": "Somafrik utilise l'appareil photo pour prendre la photo du compte."
         }
       ]
     ],
     "android": {
-      "package": "com.schoollink.app",
+      "package": "com.somafrik.app",
       "versionCode": 12,
       "permissions": [
         "CAMERA",
         "READ_MEDIA_IMAGES"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/schoollink-logo.png",
+        "foregroundImage": "./assets/somafrik-logo.png",
         "backgroundColor": "#FFFFFF"
       }
     }

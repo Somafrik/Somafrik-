@@ -1,6 +1,6 @@
-# SchoolLink MVP
+# Somafrik MVP
 
-SchoolLink est prêt à être lancé en MVP avec PostgreSQL, API backend, BackOffice web et application mobile Expo.
+Somafrik est prêt à être lancé en MVP avec PostgreSQL, API backend, Backoffice web et application mobile Expo.
 
 ## Démarrage rapide
 
@@ -39,7 +39,7 @@ BackOffice Super Admin :
 
 ```text
 Code établissement : CD-2026-0001
-Identifiant : superadmin@schoollink.app
+Identifiant : superadmin@somafrik.app
 Mot de passe : 1234
 ```
 
@@ -62,6 +62,6 @@ PIN : 1234
 ## Avant usage réel
 
 - Changez `POSTGRES_PASSWORD` et `JWT_SECRET` dans `.env`.
-- Gardez `SCHOOLLINK_DB_REQUIRED=true` pour éviter un démarrage en mode démo si PostgreSQL est indisponible.
+- Gardez `SOMAFRIK_DB_REQUIRED=true` pour éviter un démarrage en mode démo si PostgreSQL est indisponible.
 - Définissez `CORS_ORIGINS` avec les URL réellement utilisées.
 - Vérifiez que `/api/health` répond avec `database: "postgresql"`.

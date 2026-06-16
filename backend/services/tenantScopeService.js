@@ -2,7 +2,7 @@ const { BusinessError } = require("./authService");
 
 class TenantScopeService {
   filterRows(rows, principal, { schoolField = "schoolCode", countryField = "countryCode" } = {}) {
-    if (!principal || principal.role === "Super Administrateur SchoolLink") {
+    if (!principal || principal.role === "Super Administrateur OKAFRIK") {
       return rows;
     }
 
@@ -48,7 +48,7 @@ class TenantScopeService {
   }
 
   assertSchoolAccess(principal, schoolCode) {
-    if (!principal || principal.role === "Super Administrateur SchoolLink") {
+    if (!principal || principal.role === "Super Administrateur OKAFRIK") {
       return;
     }
 

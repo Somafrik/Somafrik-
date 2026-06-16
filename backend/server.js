@@ -19,7 +19,7 @@ const { AuditService } = require("./services/auditService");
 
 const app = express();
 const databaseUrl =
-  process.env.DATABASE_URL ?? "postgresql://schoollink:schoollink123@localhost:5432/schoollink";
+  process.env.DATABASE_URL ?? "postgresql://somafrik:somafrik123@localhost:5432/somafrik";
 let repository = new PostgresRepository(databaseUrl);
 const tokenService = new TokenService();
 const rbacService = new RbacService();
@@ -47,7 +47,7 @@ app.use(
 
 app.get("/", asyncHandler(async (_req, res) => {
   res.json({
-    name: "SchoolLink API",
+    name: "Somafrik API",
     status: "ok",
     database: repository.engine ?? "postgresql",
     endpoints: [
@@ -212,7 +212,7 @@ app.get("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.put("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
-  if (!["Super Administrateur SchoolLink", "Admin Pays", "Admin School"].includes(req.principal.role)) {
+  if (!["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(req.principal.role)) {
     throw new BusinessError(403, "Seuls les administrateurs peuvent configurer la gestion académique.");
   }
   const saved = await repository.saveAcademicConfig(req.principal.schoolCode, req.body ?? {});
@@ -420,7 +420,7 @@ app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/audit", requireAuth, asyncHandler(async (req, res) => {
-  if (!["Super Administrateur SchoolLink", "Admin Pays"].includes(req.principal.role)) {
+  if (!["Super Administrateur OKAFRIK", "Admin Pays"].includes(req.principal.role)) {
     throw new BusinessError(403, "Seuls les administrateurs habilités peuvent consulter l'audit.");
   }
   if (req.query.schoolCode) {
@@ -558,7 +558,7 @@ function handleBusinessAction(action) {
 }
 
 function assertBackOfficeManager(principal) {
-  if (!principal || !["Super Administrateur SchoolLink", "Admin Pays", "Admin School"].includes(principal.role)) {
+  if (!principal || !["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(principal.role)) {
     throw new BusinessError(403, "Accès BackOffice non autorisé");
   }
 }
@@ -605,7 +605,7 @@ function sanitizeBackOfficeState(payload = {}) {
 
 function scopeBackOfficeState(payload = {}, principal) {
   const state = sanitizeBackOfficeState(payload);
-  if (!principal || principal.role === "Super Administrateur SchoolLink") {
+  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
     return state;
   }
 
@@ -681,7 +681,7 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
   const current = sanitizeBackOfficeState(currentPayload);
   const requested = sanitizeBackOfficeState(requestedPayload);
 
-  if (!principal || principal.role === "Super Administrateur SchoolLink") {
+  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
     return requested;
   }
 
@@ -743,7 +743,7 @@ function isPlainObject(value) {
 
 async function sendAuthenticatedResponse(req, res, response, action) {
   const principal = buildPrincipal(response);
-  if (action === "backoffice_login" && ["Super Administrateur SchoolLink", "Admin Pays"].includes(principal.role)) {
+  if (action === "backoffice_login" && ["Super Administrateur OKAFRIK", "Admin Pays"].includes(principal.role)) {
     const auditRows = await repository.getAuditLogs({ limit: 100 });
     response.auditLog = tenantScopeService.filterRows(auditRows, principal);
   }
@@ -818,7 +818,7 @@ function getPrincipalStudentIds(response) {
 }
 
 function roleLabelFromMobileRole(role) {
-  if (role === "super_admin") return "Super Administrateur SchoolLink";
+  if (role === "super_admin") return "Super Administrateur OKAFRIK";
   if (role === "country_admin") return "Admin Pays";
   if (role === "school_admin") return "Admin School";
   if (role === "principal") return "Proviseur";
@@ -954,7 +954,7 @@ app.use((error, _req, res, _next) => {
 
   console.error(error);
   res.status(500).json({
-    message: "Erreur interne SchoolLink",
+    message: "Erreur interne Somafrik",
     detail: process.env.NODE_ENV === "production" ? undefined : error.message,
   });
 });
@@ -970,7 +970,7 @@ initRepository()
     });
   })
   .catch((error) => {
-    console.error("Impossible d'initialiser le stockage SchoolLink", error);
+    console.error("Impossible d'initialiser le stockage Somafrik", error);
     process.exit(1);
   });
 
@@ -981,7 +981,7 @@ async function initRepository() {
     repository.engine = "postgresql";
     await repository.init();
   } catch (error) {
-    if (process.env.SCHOOLLINK_DB_REQUIRED === "true") {
+    if (process.env.SOMAFRIK_DB_REQUIRED === "true") {
       throw error;
     }
 

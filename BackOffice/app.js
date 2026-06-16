@@ -289,7 +289,7 @@ loginForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", () => {
-  localStorage.removeItem("schoollink-backoffice-session");
+  localStorage.removeItem("somafrik-backoffice-session");
   state.session = null;
   state.schools = [];
   state.users = [];
@@ -336,7 +336,7 @@ document.addEventListener("change", handlePermissionToggle);
 boot();
 
 async function boot() {
-  const saved = localStorage.getItem("schoollink-backoffice-session");
+  const saved = localStorage.getItem("somafrik-backoffice-session");
 
   if (!saved) {
     return;
@@ -358,7 +358,7 @@ async function boot() {
     await refreshBackOfficeStateFromBackend();
     renderApp();
   } catch {
-    localStorage.removeItem("schoollink-backoffice-session");
+    localStorage.removeItem("somafrik-backoffice-session");
   }
 }
 
@@ -911,7 +911,7 @@ function getVisibleUsers() {
 function canManageUserRow(user, action = "READ") {
   if (!hasBackOfficePermission("Utilisateurs", action)) return false;
   const currentUser = state.session?.user;
-  if (currentUser?.role === "Super Administrateur SchoolLink") return true;
+  if (currentUser?.role === "Super Administrateur OKAFRIK") return true;
   if (currentUser?.role === "Admin Pays") {
     return user.role === "Admin School" && getVisibleUsers().some((item) => item.id === user.id);
   }
@@ -1530,7 +1530,7 @@ function persistSession({ sync = true } = {}) {
   state.session.auditLog = state.auditLog;
   state.session.rolePermissions = state.rolePermissions;
   state.session.academicConfigs = state.academicConfigs;
-  localStorage.setItem("schoollink-backoffice-session", JSON.stringify(state.session));
+  localStorage.setItem("somafrik-backoffice-session", JSON.stringify(state.session));
 
   if (sync) {
     scheduleBackOfficeSync();
@@ -1593,7 +1593,7 @@ async function syncBackOfficeState() {
     body: JSON.stringify(getBackOfficeStatePayload()),
   });
   applyBackOfficeState(synced);
-  localStorage.setItem("schoollink-backoffice-session", JSON.stringify({
+  localStorage.setItem("somafrik-backoffice-session", JSON.stringify({
     ...state.session,
     ...getBackOfficeStatePayload(),
   }));
@@ -1623,12 +1623,12 @@ function initializeRolePermissions({ force = false } = {}) {
 }
 
 function enforceCountryAdminSchoolAdminCrud() {
-  const superAdminPermissions = new Set(state.rolePermissions["Super Administrateur SchoolLink"] ?? []);
+  const superAdminPermissions = new Set(state.rolePermissions["Super Administrateur OKAFRIK"] ?? []);
   superAdminPermissions.add("ALL_PRIVILEGES");
   crudPermissionModules.forEach((moduleName) => {
     crudActions.forEach((crudAction) => superAdminPermissions.add(`${moduleName}:${crudAction.key}`));
   });
-  state.rolePermissions["Super Administrateur SchoolLink"] = [...superAdminPermissions].sort(sortPermissions);
+  state.rolePermissions["Super Administrateur OKAFRIK"] = [...superAdminPermissions].sort(sortPermissions);
 
   const countryAdminPermissions = new Set(state.rolePermissions["Admin Pays"] ?? []);
   countryAdminSchoolAdminPermissions.forEach((permission) => countryAdminPermissions.add(permission));
@@ -1655,14 +1655,14 @@ function enforceCountryAdminSchoolAdminCrud() {
 function getPermissionRoles() {
   const roles = new Set([state.session?.user?.role, ...state.users.map((user) => user.role), ...Object.keys(state.rolePermissions)]);
   return [...roles].filter(Boolean).sort((a, b) => {
-    if (a === "Super Administrateur SchoolLink") return -1;
-    if (b === "Super Administrateur SchoolLink") return 1;
+    if (a === "Super Administrateur OKAFRIK") return -1;
+    if (b === "Super Administrateur OKAFRIK") return 1;
     return a.localeCompare(b, "fr");
   });
 }
 
 function canManageRolePermissions() {
-  return state.session?.user?.role === "Super Administrateur SchoolLink";
+  return state.session?.user?.role === "Super Administrateur OKAFRIK";
 }
 
 function getCurrentRolePermissions() {
@@ -1784,7 +1784,7 @@ function renameSelectedRole() {
   const currentRole = state.selectedPermissionRole;
   if (!currentRole) return;
 
-  if (currentRole === "Super Administrateur SchoolLink") {
+  if (currentRole === "Super Administrateur OKAFRIK") {
     openRoleForm("rename-protected", currentRole);
     return;
   }
@@ -1801,7 +1801,7 @@ function deleteSelectedRole() {
   const role = state.selectedPermissionRole;
   if (!role) return;
 
-  if (role === "Super Administrateur SchoolLink") {
+  if (role === "Super Administrateur OKAFRIK") {
     openRoleForm("delete-protected", role);
     return;
   }
@@ -2623,7 +2623,7 @@ function escapeHtml(value) {
 }
 
 function getControlDescription(permission) {
-  if (permission === "ALL_PRIVILEGES") return "Accès total à la plateforme SchoolLink.";
+  if (permission === "ALL_PRIVILEGES") return "Accès total à la plateforme Somafrik.";
   if (permission === "COUNTRY_PRIVILEGES") return "Accès limité aux données du pays affecté.";
   if (permission.includes("pays")) return "Contrôle limité au périmètre pays autorisé.";
   if (permission.includes("établissement")) return "Contrôle des écoles, statuts et abonnements.";

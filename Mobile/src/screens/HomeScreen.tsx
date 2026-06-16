@@ -15,7 +15,7 @@ import {
 } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 
-const schoolLinkLogo = require("../../assets/schoollink-logo.png");
+const somafrikLogo = require("../../assets/somafrik-logo.png");
 import StudentSwitcher from "../components/StudentSwitcher";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats, getPresenceStats, getStudentAcademicSummary } from "../domain/metrics/schoolMetrics";
@@ -428,10 +428,10 @@ export default function HomeScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Header SchoolLink
+        {/* Header Somafrik
         <View style={styles.topHeader}>
           <View>
-            <Text style={styles.brand}>SchoolLink</Text>
+            <Text style={styles.brand}>Somafrik</Text>
             <Text style={styles.subtitle}>Smart Education Platform</Text>
           </View>
 
@@ -450,7 +450,7 @@ export default function HomeScreen({ navigation }: any) {
             {currentSchool.logoUrl ? (
               <Image source={{ uri: currentSchool.logoUrl }} style={styles.schoolLogoImage} />
             ) : (
-              <Image source={schoolLinkLogo} style={styles.schoolLogoImage} />
+              <Image source={somafrikLogo} style={styles.schoolLogoImage} />
             )}
           </View>
 
@@ -695,7 +695,7 @@ function getHourForTimezone(timezone?: string) {
 }
 
 function getGreetingName(userName: string, role?: string) {
-  if (!userName || /schoollink/i.test(userName)) {
+  if (!userName || /somafrik/i.test(userName)) {
     return role === "school_admin" ? "Administrateur" : "";
   }
 

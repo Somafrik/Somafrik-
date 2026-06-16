@@ -1,4 +1,4 @@
-package com.schoollink.app
+package com.somafrik.app
 
 import android.os.Build
 import android.os.Bundle

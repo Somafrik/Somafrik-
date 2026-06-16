@@ -5,7 +5,7 @@ const { hashSecret } = require("../services/credentialService");
 const seedData = require("../data");
 
 const roleToDb = {
-  "Super Administrateur SchoolLink": "SUPER_ADMIN",
+  "Super Administrateur OKAFRIK": "SUPER_ADMIN",
   "Admin Pays": "COUNTRY_ADMIN",
   "Admin School": "SCHOOL_ADMIN",
   Proviseur: "PROVISEUR",
@@ -893,7 +893,7 @@ class PostgresRepository {
     const schoolRows = await this.all("SELECT school_code, id FROM schools");
     const schoolIds = new Map(schoolRows.map((school) => [school.school_code, school.id]));
     const platformRoles = new Set([
-      "Super Administrateur SchoolLink",
+      "Super Administrateur OKAFRIK",
       "Admin Pays",
       "Admin School",
       "Proviseur",
@@ -1037,7 +1037,7 @@ class PostgresRepository {
             `${title} - ${student.student_code}`,
             `documents/${student.student_code}/${type.toLowerCase()}-v1.pdf`,
             adminUser?.id ?? null,
-            JSON.stringify({ generatedBy: "SchoolLink V2", preservedHistory: true }),
+            JSON.stringify({ generatedBy: "Somafrik V2", preservedHistory: true }),
           ]
         );
       }
@@ -1055,8 +1055,8 @@ class PostgresRepository {
 
   async ensureV2Roles(schoolId) {
     const roles = [
-      ["USR-PROVISEUR-0001", "Amina", "Proviseur", "proviseur@schoollink.app", "PROVISEUR"],
-      ["USR-PREFET-0001", "Samuel", "Préfet", "prefet@schoollink.app", "PREFET_ETUDES"],
+      ["USR-PROVISEUR-0001", "Amina", "Proviseur", "proviseur@somafrik.app", "PROVISEUR"],
+      ["USR-PREFET-0001", "Samuel", "Préfet", "prefet@somafrik.app", "PREFET_ETUDES"],
     ];
 
     for (const [code, firstName, lastName, email, role] of roles) {
@@ -1444,7 +1444,7 @@ class PostgresRepository {
       email: user.email,
       role,
       secondaryRoles: [],
-      scopeLevel: role === "Super Administrateur SchoolLink" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+      scopeLevel: role === "Super Administrateur OKAFRIK" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
       countryScope,
       countryCode,
       schoolCode: role === "Admin Pays" ? "*" : user.school_code ?? "*",
@@ -1546,7 +1546,7 @@ class PostgresRepository {
       className: student.class_name,
       schoolCode: student.school_code,
       pinHash: student.student_pin_hash,
-      parentName: "Parent SchoolLink",
+      parentName: "Parent Somafrik",
       parentPhone: student.parent_phone,
       parentEmail: student.parent_email,
       archived: student.status === "archived",

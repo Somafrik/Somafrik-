@@ -438,7 +438,7 @@ function filterAcademicConfigs(value: unknown, schoolCode: string) {
 }
 
 function roleLabelFromSession(role?: string) {
-  if (role === "super_admin") return "Super Administrateur SchoolLink";
+  if (role === "super_admin") return "Super Administrateur OKAFRIK";
   if (role === "country_admin") return "Admin Pays";
   if (role === "school_admin") return "Admin School";
   if (role === "principal" || role === "prefet") return "Préfet des études";

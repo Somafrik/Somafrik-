@@ -20,7 +20,7 @@ class ReportPdfService {
       : [{ subject: "Aucune note publiee", average: 0, coefficient: 0 }];
 
     return [
-      { text: "SchoolLink - Bulletin scolaire", size: 20, x: 54, y: 790 },
+      { text: "Somafrik - Bulletin scolaire", size: 20, x: 54, y: 790 },
       { text: this.school.name, size: 13, x: 54, y: 764 },
       { text: `Code etablissement: ${this.school.code}`, size: 10, x: 54, y: 746 },
       { text: `Periode: ${report.period}`, size: 12, x: 54, y: 710 },
@@ -44,7 +44,7 @@ class ReportPdfService {
       { text: `Rang: ${report.rankLabel ?? "-"}`, size: 13, x: 54, y: 238 },
       { text: `Appreciation: ${report.appreciation ?? "-"}`, size: 13, x: 54, y: 216 },
       { text: `Genere le: ${new Date(report.generatedAt).toLocaleDateString("fr-FR")}`, size: 9, x: 54, y: 72 },
-      { text: "Document genere automatiquement par SchoolLink.", size: 9, x: 54, y: 54 },
+      { text: "Document genere automatiquement par Somafrik.", size: 9, x: 54, y: 54 },
     ];
   }
 
@@ -129,7 +129,7 @@ class ReportPdfService {
   }
 
   loadLogo() {
-    const logoPath = path.join(__dirname, "..", "assets", "schoollink-logo.jpg");
+    const logoPath = path.join(__dirname, "..", "assets", "somafrik-logo.jpg");
 
     try {
       const buffer = fs.readFileSync(logoPath);

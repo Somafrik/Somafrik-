@@ -1,8 +1,8 @@
-# Exigences SchoolLink consolidees
+# Exigences Somafrik consolidees
 
 Date de consolidation : 2026-06-13
 
-Ce document est additif. Il consolide les exigences sources sans remplacer les recommandations existantes dans `C:\Users\Lenovo\Desktop\Projets\Exigences SchoolLink\`.
+Ce document est additif. Il consolide les exigences sources sans remplacer les recommandations existantes dans `C:\Users\Lenovo\Desktop\Projets\Exigences Somafrik\`.
 
 ## Sources prises en compte
 
@@ -10,13 +10,13 @@ Ce document est additif. Il consolide les exigences sources sans remplacer les r
 - `Exigences MVP - Acces Mobile et tablette.txt`
 - `1. Exigences generales PostgreSQL.txt`
 - `Exigences metier - Gestion des appels.txt`
-- `Exigences Metier - Gestion des Notes et Bulletins (SchoolLink).txt`
-- `Exigences metier - Gestion des notifications et messages (SchoolLink).txt`
+- `Exigences Metier - Gestion des Notes et Bulletins (Somafrik).txt`
+- `Exigences metier - Gestion des notifications et messages (Somafrik).txt`
 - `Exigences metier - Super Administrateur et admin pays.txt`
 - `Gestion des etablissements.txt`
 - `Gestion des utilisateurs.md`
 - `Structure des identifiants uniques.txt`
-- `Pour SchoolLink, les points faibles a corriger.txt`
+- `Pour Somafrik, les points faibles a corriger.txt`
 
 ## Regles de preservation
 
@@ -83,7 +83,7 @@ Ce document est additif. Il consolide les exigences sources sans remplacer les r
 
 ### Acces initial
 
-- Ecran de bienvenue avec logo SchoolLink, slogan court et bouton de connexion.
+- Ecran de bienvenue avec logo Somafrik, slogan court et bouton de connexion.
 - Ecran unique de saisie : code etablissement ou identifiant organisation.
 - Detection automatique : Super Admin, Admin Pays ou utilisateur lie a un etablissement.
 - Affichage du logo, nom, pays et ville de l'etablissement reconnu.

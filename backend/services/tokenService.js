@@ -2,10 +2,10 @@ const crypto = require("crypto");
 
 class TokenService {
   constructor({
-    issuer = "schoollink-api",
+    issuer = "somafrik-api",
     accessTokenTtlSeconds = Number(process.env.JWT_ACCESS_TTL_SECONDS || 8 * 60 * 60),
     refreshTokenTtlSeconds = 7 * 24 * 60 * 60,
-    secret = process.env.JWT_SECRET || "schoollink-dev-secret-change-me",
+    secret = process.env.JWT_SECRET || "somafrik-dev-secret-change-me",
   } = {}) {
     this.issuer = issuer;
     this.accessTokenTtlSeconds = Number(accessTokenTtlSeconds);

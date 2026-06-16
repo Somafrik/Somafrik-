@@ -1548,7 +1548,7 @@ function escapeRegExp(value: string) {
 }
 
 function isGlobalOrCountryRole(role?: string) {
-  return role === "Super Administrateur SchoolLink" || role === "Admin Pays";
+  return role === "Super Administrateur OKAFRIK" || role === "Admin Pays";
 }
 
 function shouldHideField(entity: AdminEntity, form: Record<string, string>, field: Field) {
@@ -1561,11 +1561,11 @@ function isAdminCreatedUser(item: any) {
 }
 
 function isPlatformUserRole(role?: string) {
-  return role === "Super Administrateur SchoolLink" || role === "Admin Pays";
+  return role === "Super Administrateur OKAFRIK" || role === "Admin Pays";
 }
 
 function getRoleDefaults(role?: string, schoolCode = "") {
-  if (role === "Super Administrateur SchoolLink") {
+  if (role === "Super Administrateur OKAFRIK") {
     return { scopeLevel: "Global", schoolCode: "*", accessChannel: "Application" };
   }
 

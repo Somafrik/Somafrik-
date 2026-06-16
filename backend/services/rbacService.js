@@ -1,7 +1,7 @@
 const seedData = require("../data");
 
 const roleAliases = {
-  super_admin: "Super Administrateur SchoolLink",
+  super_admin: "Super Administrateur OKAFRIK",
   country_admin: "Admin Pays",
   school_admin: "Admin School",
   prefet: "Préfet des études",
@@ -40,7 +40,10 @@ class RbacService {
   canAccess(principal, routeKey) {
     const requiredPermissions = routePermissions[routeKey];
 
-    if (!requiredPermissions || process.env.SCHOOLLINK_AUTH_OPTIONAL === "true") {
+    if (
+      !requiredPermissions ||
+      process.env.SOMAFRIK_AUTH_OPTIONAL === "true"
+    ) {
       return true;
     }
 

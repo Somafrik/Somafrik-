@@ -8,8 +8,8 @@ const school = {
   country: "RDC",
   address: "Avenue de l'Universite, Kinshasa",
   phone: "+243 810 000 000",
-  email: "contact@unikin.schoollink",
-  website: "https://unikin.schoollink",
+  email: "contact@unikin.somafrik",
+  website: "https://unikin.somafrik",
   currency: "CDF",
   slogan: "Excellence et Innovation",
   status: "Actif",
@@ -30,7 +30,7 @@ const school = {
 };
 
 const rolePermissions = {
-  "Super Administrateur SchoolLink": [
+  "Super Administrateur OKAFRIK": [
     "ALL_PRIVILEGES",
     "Contrôler tous les pays",
     "Créer un pays",
@@ -142,7 +142,7 @@ const rolePermissions = {
 
 const securityMatrix = {
   Pays: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "R",
     "Admin School": "-",
     "Préfet des études": "-",
@@ -152,7 +152,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   "Établissements": {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "R",
     "Préfet des études": "-",
@@ -162,7 +162,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Utilisateurs: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "R",
@@ -172,7 +172,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Classes: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -182,7 +182,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Élèves: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -192,7 +192,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Enseignants: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "R",
@@ -202,7 +202,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Présences: {
-    "Super Administrateur SchoolLink": "R",
+    "Super Administrateur OKAFRIK": "R",
     "Admin Pays": "R",
     "Admin School": "R",
     "Préfet des études": "CRUD",
@@ -212,7 +212,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Notes: {
-    "Super Administrateur SchoolLink": "R",
+    "Super Administrateur OKAFRIK": "R",
     "Admin Pays": "R",
     "Admin School": "R",
     "Préfet des études": "CRUD",
@@ -222,7 +222,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Bulletins: {
-    "Super Administrateur SchoolLink": "R",
+    "Super Administrateur OKAFRIK": "R",
     "Admin Pays": "R",
     "Admin School": "R",
     "Préfet des études": "CRUD",
@@ -232,7 +232,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Paiements: {
-    "Super Administrateur SchoolLink": "R",
+    "Super Administrateur OKAFRIK": "R",
     "Admin Pays": "R",
     "Admin School": "R",
     "Préfet des études": "R",
@@ -242,7 +242,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Abonnements: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "R",
     "Préfet des études": "-",
@@ -252,7 +252,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Notifications: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -262,7 +262,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Messages: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -272,7 +272,7 @@ const securityMatrix = {
     "Élève / Étudiant": "CRUD",
   },
   Documents: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -282,7 +282,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Rapports: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -292,7 +292,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   "Paramètres Établissement": {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "R",
@@ -302,7 +302,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   "Années Académiques": {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "R",
@@ -312,7 +312,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Matières: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -322,7 +322,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Examens: {
-    "Super Administrateur SchoolLink": "CRUD",
+    "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
@@ -347,7 +347,7 @@ for (const role of Object.keys(rolePermissions)) {
   rolePermissions[role] = [...new Set([...(rolePermissions[role] ?? []), ...permissionsFromSecurityMatrix(role)])];
 }
 
-rolePermissions["Super Administrateur SchoolLink"] = [
+rolePermissions["Super Administrateur OKAFRIK"] = [
   ...new Set(Object.values(rolePermissions).flat()),
 ];
 
@@ -423,10 +423,10 @@ const subscriptions = [
 const platformNotifications = [
   {
     id: "NOTIF-001",
-    audience: "Super Administrateur SchoolLink",
+    audience: "Super Administrateur OKAFRIK",
     countryCode: "*",
     title: "Nouveau pays créé",
-    message: "La République du Congo a été ajoutée au périmètre SchoolLink.",
+    message: "La République du Congo a été ajoutée au périmètre Somafrik.",
     type: "Pays",
     priority: "Moyenne",
     channels: ["Web", "Tablette", "Mobile"],
@@ -436,7 +436,7 @@ const platformNotifications = [
   },
   {
     id: "NOTIF-002",
-    audience: "Super Administrateur SchoolLink",
+    audience: "Super Administrateur OKAFRIK",
     countryCode: "*",
     title: "Abonnement expiré",
     message: "Un abonnement pays est arrivé à échéance.",
@@ -480,10 +480,10 @@ const userAccounts = [
     id: "USER-ADMIN1",
     publicId: "USR-2026-000001",
     lastName: "Administrateur",
-    firstName: "SchoolLink",
+    firstName: "Somafrik",
     gender: "Masculin",
     phone: "+243 810 000 000",
-    email: "admin@unikin.schoollink",
+    email: "admin@unikin.somafrik",
     role: "Admin School",
     secondaryRoles: [],
     scopeLevel: "Établissement",
@@ -497,18 +497,18 @@ const userAccounts = [
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
-    createdBy: "Super Administrateur SchoolLink",
+    createdBy: "Super Administrateur OKAFRIK",
     history: ["Compte initial créé le 01-09-2025"],
   },
   {
     id: "USER-SUPERADMIN",
     publicId: "USR-2026-000002",
-    lastName: "SchoolLink",
+    lastName: "Somafrik",
     firstName: "Super Admin",
     gender: "Masculin",
     phone: "+243 810 000 900",
-    email: "superadmin@schoollink.app",
-    role: "Super Administrateur SchoolLink",
+    email: "superadmin@somafrik.app",
+    role: "Super Administrateur OKAFRIK",
     secondaryRoles: [],
     scopeLevel: "Global",
     countryScope: "",
@@ -517,7 +517,7 @@ const userAccounts = [
     identifier: "superadmin",
     password: "1234",
     status: "Actif",
-    permissions: rolePermissions["Super Administrateur SchoolLink"],
+    permissions: rolePermissions["Super Administrateur OKAFRIK"],
     temporaryPassword: "1234",
     photoUrl: "",
     createdAt: "01-09-2025",
@@ -532,7 +532,7 @@ const userAccounts = [
     firstName: "RDC",
     gender: "Masculin",
     phone: "+243 810 000 901",
-    email: "admin.rdc@schoollink.app",
+    email: "admin.rdc@somafrik.app",
     role: "Admin Pays",
     secondaryRoles: [],
     scopeLevel: "Pays",
@@ -547,7 +547,7 @@ const userAccounts = [
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
-    createdBy: "Super Administrateur SchoolLink",
+    createdBy: "Super Administrateur OKAFRIK",
     history: ["Compte admin pays RDC créé le 01-09-2025"],
   },
   {
@@ -557,7 +557,7 @@ const userAccounts = [
     firstName: "Burundi",
     gender: "Masculin",
     phone: "+257 710 000 901",
-    email: "admin.bi@schoollink.app",
+    email: "admin.bi@somafrik.app",
     role: "Admin Pays",
     secondaryRoles: [],
     scopeLevel: "Pays",
@@ -572,7 +572,7 @@ const userAccounts = [
     photoUrl: "",
     createdAt: "15-05-2026",
     lastLoginAt: "",
-    createdBy: "Super Administrateur SchoolLink",
+    createdBy: "Super Administrateur OKAFRIK",
     history: ["Compte admin pays Burundi créé le 15-05-2026"],
   },
   {
@@ -582,7 +582,7 @@ const userAccounts = [
     firstName: "Samuel",
     gender: "Masculin",
     phone: "+243 810 000 902",
-    email: "prefet@schoollink.app",
+    email: "prefet@somafrik.app",
     role: "Préfet des études",
     secondaryRoles: [],
     scopeLevel: "Établissement",
@@ -607,7 +607,7 @@ const userAccounts = [
     firstName: "Amina",
     gender: "Féminin",
     phone: "+243 810 000 903",
-    email: "secretaire@schoollink.app",
+    email: "secretaire@somafrik.app",
     role: "Secrétaire",
     secondaryRoles: [],
     scopeLevel: "Établissement",
@@ -632,7 +632,7 @@ const userAccounts = [
     firstName: "Jean",
     gender: "Masculin",
     phone: "+243 810 000 101",
-    email: "jean.kabeya@schoollink.cd",
+    email: "jean.kabeya@somafrik.cd",
     role: "Enseignant",
     secondaryRoles: [],
     scopeLevel: "Établissement",
@@ -683,7 +683,7 @@ const teachers = [
     firstName: "Jean",
     gender: "Masculin",
     phone: "+243 810 000 101",
-    email: "jean.kabeya@schoollink.cd",
+    email: "jean.kabeya@somafrik.cd",
     mainSubject: "Mathematiques",
     password: "1234",
     assignments: [
@@ -699,7 +699,7 @@ const teachers = [
     firstName: "Marie",
     gender: "Féminin",
     phone: "+243 810 000 102",
-    email: "marie.mukendi@schoollink.cd",
+    email: "marie.mukendi@somafrik.cd",
     mainSubject: "Francais",
     password: "1234",
     assignments: [
@@ -714,7 +714,7 @@ const teachers = [
     firstName: "Patrick",
     gender: "Masculin",
     phone: "+243 810 000 103",
-    email: "patrick.ilunga@schoollink.cd",
+    email: "patrick.ilunga@somafrik.cd",
     mainSubject: "Sciences",
     password: "1234",
     assignments: [
@@ -729,7 +729,7 @@ const teachers = [
     firstName: "Sarah",
     gender: "Féminin",
     phone: "+243 810 000 104",
-    email: "sarah.mbuyi@schoollink.cd",
+    email: "sarah.mbuyi@somafrik.cd",
     mainSubject: "Histoire",
     password: "1234",
     assignments: [
@@ -865,13 +865,13 @@ const burundiSchool = {
   id: "SCHOOL-BI-2026-0002",
   publicId: "BI-2026-0002",
   code: "BI-2026-0002",
-  name: "Établissement SchoolLink Burundi",
+  name: "Établissement Somafrik Burundi",
   type: "Université",
   city: "Bujumbura",
   country: "Burundi",
   address: "Avenue de l'Indépendance, Bujumbura",
   phone: "+257 710 000 000",
-  email: "contact.bi@schoollink.demo",
+  email: "contact.bi@somafrik.demo",
   currency: "BIF",
   timezone: "Africa/Bujumbura",
   subscriptionPlan: "Premium",
@@ -893,12 +893,12 @@ while (platformSchools.length < 50) {
     id: `SCHOOL-${String(index).padStart(4, "0")}`,
     publicId: code,
     code,
-    name: `Établissement SchoolLink ${index}`,
+    name: `Établissement Somafrik ${index}`,
     type: ["École primaire", "Collège", "Lycée", "Université", "Institut"][index % 5],
     city: demoCities[index % demoCities.length],
     country: country.name.includes("République Démocratique") ? "RDC" : country.name,
     phone: `${country.phonePrefix} 810 ${String(index).padStart(3, "0")} ${String(index + 100).padStart(3, "0")}`,
-    email: `contact-${index}@schoollink.demo`,
+    email: `contact-${index}@somafrik.demo`,
     currency: country.currency,
     timezone: country.timezone,
     status: index % 11 === 0 ? "Suspendu" : "Actif",
@@ -941,7 +941,7 @@ while (teachers.length < 50) {
     firstName,
     gender: index % 2 === 0 ? "Féminin" : "Masculin",
     phone: `+243 810 100 ${String(index).padStart(3, "0")}`,
-    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${index}@schoollink.cd`,
+    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${index}@somafrik.cd`,
     mainSubject: subject,
     password: "1234",
     assignments: [],
@@ -1061,7 +1061,7 @@ while (announcements.length < 50) {
   const index = announcements.length + 1;
   announcements.push({
     id: `A${index}`,
-    title: `Annonce SchoolLink ${index}`,
+    title: `Annonce Somafrik ${index}`,
     message: `Communication importante numéro ${index} pour les familles et le personnel.`,
     date: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
   });
@@ -1072,10 +1072,10 @@ while (platformNotifications.length < 50) {
   const country = countries[index % countries.length];
   platformNotifications.push({
     id: `NOTIF-${String(index).padStart(3, "0")}`,
-    audience: index % 2 === 0 ? "Super Administrateur SchoolLink" : "Admin Pays",
+    audience: index % 2 === 0 ? "Super Administrateur OKAFRIK" : "Admin Pays",
     countryCode: index % 2 === 0 ? "*" : country.code,
     title: `Notification plateforme ${index}`,
-    message: `Événement SchoolLink ${index} à traiter selon le niveau de priorité.`,
+    message: `Événement Somafrik ${index} à traiter selon le niveau de priorité.`,
     type: ["Paiement", "Inscription", "Abonnement", "Maintenance", "Support"][index % 5],
     priority: ["Faible", "Moyenne", "Haute", "Critique"][index % 4],
     channels: ["Web", "Tablette", "Mobile"],
@@ -1099,12 +1099,12 @@ while (userAccounts.length < 50) {
     firstName: demoFirstNames[index % demoFirstNames.length],
     gender: index % 2 === 0 ? "Féminin" : "Masculin",
     phone: `${country.phonePrefix} 830 000 ${String(index).padStart(3, "0")}`,
-    email: `user-${index}@schoollink.demo`,
+    email: `user-${index}@somafrik.demo`,
     role,
     secondaryRoles: index % 6 === 0 ? ["Auditeur"] : [],
-    scopeLevel: role === "Super Administrateur SchoolLink" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+    scopeLevel: role === "Super Administrateur OKAFRIK" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
     countryScope: country.name.includes("République Démocratique") ? "RDC" : country.code,
-    schoolCode: role === "Super Administrateur SchoolLink" || role === "Admin Pays" ? "*" : schoolItem.code,
+    schoolCode: role === "Super Administrateur OKAFRIK" || role === "Admin Pays" ? "*" : schoolItem.code,
     accessChannel: isBackOffice ? "BackOffice" : "Application",
     identifier: isBackOffice
       ? `demo-user-${index}`
@@ -1122,7 +1122,7 @@ while (userAccounts.length < 50) {
     photoUrl: "",
     createdAt: `${String((index % 27) + 1).padStart(2, "0")}-01-2026`,
     lastLoginAt: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
-    createdBy: "Super Administrateur SchoolLink",
+    createdBy: "Super Administrateur OKAFRIK",
     history: [`Compte démo ${index} créé automatiquement`],
   });
 }

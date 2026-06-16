@@ -1,4 +1,4 @@
-# SchoolLink BackOffice
+# Somafrik BackOffice
 
 Portail web réservé aux comptes BackOffice.
 
@@ -22,7 +22,7 @@ Super Administrateur :
 
 ```text
 Code établissement : CD-2026-0001
-Identifiant : superadmin@schoollink.app
+Identifiant : superadmin@somafrik.app
 Mot de passe : 1234
 ```
 
@@ -30,6 +30,6 @@ Admin Pays RDC :
 
 ```text
 Code établissement : CD-2026-0001
-Identifiant : admin.rdc@schoollink.app
+Identifiant : admin.rdc@somafrik.app
 Mot de passe : 1234
 ```

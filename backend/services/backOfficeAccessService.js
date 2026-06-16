@@ -63,7 +63,7 @@ class BackOfficeAccessService {
   }
 
   isPlatformAdmin(user) {
-    return user.role === "Super Administrateur SchoolLink" || user.role === "Admin Pays";
+    return user.role === "Super Administrateur OKAFRIK" || user.role === "Admin Pays";
   }
 
   resolveSchoolContext(schoolCode) {
@@ -105,7 +105,7 @@ class BackOfficeAccessService {
   }
 
   assertScopeCanAccessSchool(user, school) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return;
     }
 
@@ -126,7 +126,7 @@ class BackOfficeAccessService {
   }
 
   getScopedSchools(user) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return this.schools;
     }
 
@@ -138,7 +138,7 @@ class BackOfficeAccessService {
   }
 
   getScopedCountries(user) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return this.countries;
     }
 
@@ -150,7 +150,7 @@ class BackOfficeAccessService {
   }
 
   getScopedSubscriptions(user) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return this.subscriptions;
     }
 
@@ -162,7 +162,7 @@ class BackOfficeAccessService {
   }
 
   getScopedNotifications(user) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return this.communicationService.enrichNotifications(this.notifications);
     }
 
@@ -175,7 +175,7 @@ class BackOfficeAccessService {
   }
 
   getMenus(user) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return [
         "Dashboard",
         "Pays",
@@ -209,7 +209,7 @@ class BackOfficeAccessService {
     const annualRevenue = scopedSubscriptions.reduce((total, subscription) => total + Number(subscription.annualPrice || 0), 0);
     const schoolAdmins = scopedUsers.filter((account) => account.role === "Admin School").length;
 
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return {
         profile: "Super Administrateur",
         privilegeLevel: "ALL_PRIVILEGES",
@@ -255,7 +255,7 @@ class BackOfficeAccessService {
   }
 
   getScopedUsers(user) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return this.userAccounts;
     }
 
@@ -276,7 +276,7 @@ class BackOfficeAccessService {
   }
 
   getScope(user) {
-    if (user.role === "Super Administrateur SchoolLink") {
+    if (user.role === "Super Administrateur OKAFRIK") {
       return {
         label: "Périmètre global",
         hint: "Vous contrôlez tous les pays, établissements et comptes.",

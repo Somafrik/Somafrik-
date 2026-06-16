@@ -1,5 +1,5 @@
 {
-  "name": "schoollink-workspace",
+  "name": "somafrik-workspace",
   "private": true,
   "scripts": {
     "start": "npm --prefix backend run start",

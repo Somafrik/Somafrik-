@@ -31,7 +31,7 @@ class CommunicationService {
 
   filterByAudience(audience, countryCode) {
     const notifications = this.notifications.filter((notification) => {
-      if (audience === "Super Administrateur SchoolLink") {
+      if (audience === "Super Administrateur OKAFRIK") {
         return notification.audience === audience;
       }
 

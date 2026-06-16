@@ -1,4 +1,4 @@
-# Implementation MVP SchoolLink - 2026-06-13
+# Implementation MVP Somafrik - 2026-06-13
 
 Ce rapport complete les exigences consolidees. Il ne remplace pas les recommandations d'origine.
 
@@ -13,7 +13,7 @@ Ce rapport complete les exigences consolidees. Il ne remplace pas les recommanda
 - Gestion utilisateurs avec statuts, roles, mot de passe temporaire et permissions.
 - Vue globale, KPIs, pays, etablissements, abonnements, notifications, utilisateurs, rapports, permissions.
 - Synchronisation backoffice vers backend via `/api/backoffice/state`.
-- Logo SchoolLink integre dans backoffice et favicon.
+- Logo Somafrik integre dans backoffice et favicon.
 - Rapport MVP consultable et exportable.
 
 ### Mobile / Tablette

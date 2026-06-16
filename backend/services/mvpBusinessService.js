@@ -247,7 +247,7 @@ class MvpBusinessService {
         actorId: "SYSTEM",
         entity: "School",
         entityId: school.code,
-        details: { modules: "Socle SchoolLink MVP" },
+        details: { modules: "Socle Somafrik MVP" },
         createdAt: "2026-06-01T08:00:00.000Z",
       },
     ]);
