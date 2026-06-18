@@ -51,12 +51,15 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT,
   password_hash TEXT,
   pin_hash TEXT,
+  must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
   role TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',
   last_login_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS academic_years (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

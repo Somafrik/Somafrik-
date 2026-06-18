@@ -277,6 +277,9 @@ loginForm.addEventListener("submit", async (event) => {
     });
 
     state.session = response;
+    if (response.user?.mustChangePassword) {
+      await requirePasswordChange();
+    }
     state.schools = response.schools;
     state.users = response.users;
     state.countries = response.countries ?? [];
@@ -293,6 +296,30 @@ loginForm.addEventListener("submit", async (event) => {
     loginError.textContent = error.message;
   }
 });
+
+async function requirePasswordChange() {
+  const newPassword = window.prompt("Mot de passe temporaire accepté. Saisissez votre nouveau mot de passe (minimum 6 caractères).");
+  if (!newPassword || newPassword.trim().length < 6) {
+    state.session = null;
+    throw new Error("Vous devez définir un nouveau mot de passe pour continuer.");
+  }
+
+  const confirmation = window.prompt("Confirmez le nouveau mot de passe.");
+  if (newPassword.trim() !== String(confirmation ?? "").trim()) {
+    state.session = null;
+    throw new Error("Les mots de passe ne correspondent pas.");
+  }
+
+  const response = await request("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ newPassword: newPassword.trim() }),
+  });
+  state.session.user = {
+    ...state.session.user,
+    ...response.user,
+    mustChangePassword: false,
+  };
+}
 
 logoutButton.addEventListener("click", () => {
   stopRealtimeSync();
@@ -1371,9 +1398,15 @@ async function handleActionClick(event) {
 
   if (action === "reset-passwords") {
     const targets = getVisibleUsers().filter((user) => canManageUserRow(user, "UPDATE"));
-    targets.forEach((user) => {
-      user.temporaryPassword = "1234";
-    });
+    for (const user of targets) {
+      const temporaryPassword = generateTemporaryPassword();
+      const response = await request(`/users/${encodeURIComponent(user.id)}/reset-password`, {
+        method: "POST",
+        body: JSON.stringify({ temporaryPassword }),
+      });
+      user.temporaryPassword = response.temporaryPassword ?? temporaryPassword;
+      user.mustChangePassword = true;
+    }
     addAudit("Réinitialisation mots de passe", "bulk", `${targets.length} mot(s) de passe temporaire réinitialisé(s)`);
     renderOperationalViews();
     persistSession();
@@ -1388,12 +1421,18 @@ async function handleActionClick(event) {
       showToast("Action non autorisée sur cet utilisateur.");
       return;
     }
-    target.temporaryPassword = "1234";
+    const temporaryPassword = generateTemporaryPassword();
+    const response = await request(`/users/${encodeURIComponent(target.id)}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ temporaryPassword }),
+    });
+    target.temporaryPassword = response.temporaryPassword ?? temporaryPassword;
+    target.mustChangePassword = true;
     target.history = [...(target.history ?? []), `Mot de passe réinitialisé le ${formatDate(new Date())}`];
     addAudit("Réinitialisation mot de passe", target.identifier, `${target.firstName} ${target.lastName}`);
     renderOperationalViews();
     persistSession();
-    showToast(`Mot de passe de ${target.identifier} réinitialisé.`);
+    showToast(`Mot de passe de ${target.identifier} réinitialisé : ${target.temporaryPassword}`);
     return;
   }
 
@@ -2234,7 +2273,7 @@ function openUserForm() {
       <div class="form-grid detail-form">
         <label>Prénom <input id="userFirstNameInput" placeholder="Prénom" /></label>
         <label>Nom <input id="userLastNameInput" placeholder="Nom" /></label>
-        <label>Identifiant <input id="userIdentifierInput" placeholder="identifiant" /></label>
+        <label>Identifiant unique <input id="userIdentifierInput" placeholder="USR-0001, ENS-0001, ELE-0001..." /></label>
         <label>Rôle <select id="userRoleInput">${roleOptions}</select></label>
         <label>Établissement <select id="userSchoolInput">${schoolOptions}</select></label>
         <label>Pays géré <select id="userCountryInput">${countryOptions}</select></label>
@@ -2636,6 +2675,10 @@ function closeDetail() {
 
 function formatDate(date) {
   return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+}
+
+function generateTemporaryPassword() {
+  return `SF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
 function normalize(value) {

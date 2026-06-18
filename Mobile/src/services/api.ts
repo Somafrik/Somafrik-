@@ -94,6 +94,7 @@ export type LoginResponse = {
     countryScope?: string;
     countryCode?: string;
     permissions?: string[];
+    mustChangePassword?: boolean;
     parentPhone?: string;
     children?: StudentSummary[];
     phone?: string;
@@ -186,6 +187,13 @@ export async function logout() {
   } finally {
     accessToken = null;
   }
+}
+
+export function changePassword(newPassword: string) {
+  return request<{ user: LoginResponse["user"]; message: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ newPassword }),
+  });
 }
 
 export async function getSchoolByCode(code: string) {

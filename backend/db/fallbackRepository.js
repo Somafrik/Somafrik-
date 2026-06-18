@@ -199,9 +199,51 @@ class FallbackRepository {
       passwordHash: secretHash,
       pinHash: secretHash,
       temporaryPassword,
+      mustChangePassword: true,
       history: [
         ...(sourceUser.history ?? []),
         `Mot de passe temporaire régénéré le ${new Date().toLocaleDateString("fr-FR")}. Ancien mot de passe invalidé.`,
+      ],
+    };
+
+    if (seedUserIndex !== -1) {
+      seedData.userAccounts[seedUserIndex] = updatedUser;
+    }
+
+    this.backOfficeState = {
+      ...(this.backOfficeState ?? {}),
+      users: stateUser
+        ? existingStateUsers.map((user) => (String(user.id) === String(userId) || user.publicId === userId ? updatedUser : user))
+        : [updatedUser, ...existingStateUsers],
+    };
+
+    return clone(updatedUser);
+  }
+
+  async changeUserPassword(userId, newPassword) {
+    const secretHash = hashSecret(newPassword);
+    const existingStateUsers = this.backOfficeState?.users ?? [];
+    const seedUserIndex = seedData.userAccounts.findIndex((user) => String(user.id) === String(userId) || user.publicId === userId);
+    const stateUser = existingStateUsers.find((user) => String(user.id) === String(userId) || user.publicId === userId);
+
+    if (!stateUser && seedUserIndex === -1) {
+      const error = new Error("Utilisateur introuvable");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const sourceUser = stateUser ?? seedData.userAccounts[seedUserIndex];
+    const updatedUser = {
+      ...sourceUser,
+      password: newPassword,
+      pin: newPassword,
+      passwordHash: secretHash,
+      pinHash: secretHash,
+      temporaryPassword: "",
+      mustChangePassword: false,
+      history: [
+        ...(sourceUser.history ?? []),
+        `Mot de passe personnel défini le ${new Date().toLocaleDateString("fr-FR")}.`,
       ],
     };
 

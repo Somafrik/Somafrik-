@@ -171,6 +171,26 @@ app.post("/api/auth/logout", requireAuth, asyncHandler(async (req, res) => {
   res.json({ message: "Déconnexion sécurisée effectuée" });
 }));
 
+app.post("/api/auth/change-password", requireAuth, asyncHandler(async (req, res) => {
+  const newPassword = String(req.body?.newPassword ?? "").trim();
+  if (newPassword.length < 6) {
+    throw new BusinessError(400, "Le nouveau mot de passe doit contenir au moins 6 caractères.");
+  }
+
+  const updatedUser = await repository.changeUserPassword(req.principal.sub, newPassword);
+  await auditService.record(req, "change_own_password", "user", req.principal.sub, {
+    oldTemporaryPasswordInvalidated: true,
+  });
+  const { passwordHash, pinHash, password, pin, temporaryPassword, ...safeUser } = updatedUser;
+  res.json({
+    message: "Mot de passe mis à jour.",
+    user: {
+      ...safeUser,
+      mustChangePassword: false,
+    },
+  });
+}));
+
 app.get("/api/school", requireAuth, asyncHandler(async (_req, res) => {
   const { school } = await getRuntime();
   res.json(school);

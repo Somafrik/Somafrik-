@@ -19,7 +19,7 @@ class BackOfficeAccessService {
     }
 
     const user = this.userAccounts.find((account) =>
-      [account.identifier, account.email, account.phone, account.publicId].some((value) => value === identifier)
+      [account.identifier, account.phone, account.publicId].some((value) => value === identifier)
     );
 
     if (!user || !this.verifyPassword(user, password)) {

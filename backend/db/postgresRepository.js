@@ -423,7 +423,7 @@ class PostgresRepository {
     const secretHash = hashSecret(temporaryPassword);
     const updated = await this.one(
       `UPDATE users
-       SET password_hash = $1, pin_hash = $1, updated_at = NOW()
+       SET password_hash = $1, pin_hash = $1, must_change_password = TRUE, updated_at = NOW()
        WHERE id::text = $2 OR user_code = $2
        RETURNING *`,
       [secretHash, String(userId)]
@@ -451,6 +451,34 @@ class PostgresRepository {
     );
 
     return this.mapUser(row, schoolByCode);
+  }
+
+  async changeUserPassword(userId, newPassword) {
+    await this.init();
+    const secretHash = hashSecret(newPassword);
+    const updated = await this.one(
+      `UPDATE users
+       SET password_hash = $1, pin_hash = $1, must_change_password = FALSE, updated_at = NOW()
+       WHERE id::text = $2 OR user_code = $2
+       RETURNING *`,
+      [secretHash, String(userId)]
+    );
+
+    if (!updated) {
+      const error = new Error("Utilisateur introuvable");
+      error.statusCode = 404;
+      throw error;
+    }
+    this.cachedDataset = null;
+
+    const row = await this.one(
+      `SELECT u.*, s.school_code
+       FROM users u
+       LEFT JOIN schools s ON s.id = u.school_id
+       WHERE u.id = $1`,
+      [updated.id]
+    );
+    return this.mapUser(row, new Map());
   }
 
   async upsertGrade(payload, principal = {}) {
@@ -1553,6 +1581,7 @@ class PostgresRepository {
       status: this.fromDbStatus(user.status),
       permissions: seedData.rolePermissions[role] ?? ["Voir tableau de bord"],
       temporaryPassword: "",
+      mustChangePassword: Boolean(user.must_change_password),
       photoUrl: "",
       createdAt: this.formatDate(user.created_at),
       lastLoginAt: this.formatDate(user.last_login_at),
@@ -1604,7 +1633,7 @@ class PostgresRepository {
       return user.user_code;
     }
 
-    return user.email || user.phone || user.user_code;
+    return user.user_code || user.phone || user.email;
   }
 
   mapTeacher(teacher, gradeRows, assignmentRows = []) {

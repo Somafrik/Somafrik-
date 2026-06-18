@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -12,7 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { IdentifyResponse, identifyAccount, login } from "../services/api";
+import { IdentifyResponse, changePassword, identifyAccount, login, LoginResponse } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
@@ -27,6 +28,10 @@ export default function LoginScreen({ navigation, route }: Props) {
   );
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingSession, setPendingSession] = useState<LoginResponse | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const { setSession } = useAuth();
 
   useEffect(() => {
@@ -82,10 +87,14 @@ export default function LoginScreen({ navigation, route }: Props) {
         pin: password.trim(),
       });
 
-      setSession(session);
-      navigation.navigate("Home", {
-        role: identity.role,
-      });
+      if (session.user.mustChangePassword) {
+        setPendingSession(session);
+        setNewPassword("");
+        setConfirmPassword("");
+        return;
+      }
+
+      completeLogin(session);
     } catch (error) {
       Alert.alert(
         "Connexion impossible",
@@ -113,6 +122,43 @@ export default function LoginScreen({ navigation, route }: Props) {
     setPassword("1234");
   };
 
+  const completeLogin = (session: LoginResponse) => {
+    setSession(session);
+    navigation.navigate("Home", {
+      role: session.role,
+    });
+  };
+
+  const submitNewPassword = async () => {
+    if (!pendingSession) return;
+    if (newPassword.trim().length < 6) {
+      Alert.alert("Mot de passe trop court", "Le nouveau mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+    if (newPassword.trim() !== confirmPassword.trim()) {
+      Alert.alert("Confirmation incorrecte", "Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const response = await changePassword(newPassword.trim());
+      completeLogin({
+        ...pendingSession,
+        user: {
+          ...pendingSession.user,
+          ...response.user,
+          mustChangePassword: false,
+        },
+      });
+      setPendingSession(null);
+    } catch (error) {
+      Alert.alert("Modification impossible", error instanceof Error ? error.message : "Veuillez réessayer.");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.schoolLogo}>
@@ -126,7 +172,7 @@ export default function LoginScreen({ navigation, route }: Props) {
       <Text style={styles.subtitle}>{school.city} • {school.code}</Text>
 
       <TextInput
-        placeholder="Téléphone, email ou identifiant unique"
+        placeholder="Identifiant unique utilisateur"
         value={identifier}
         onChangeText={setIdentifier}
         autoCapitalize="none"
@@ -182,6 +228,38 @@ export default function LoginScreen({ navigation, route }: Props) {
       <TouchableOpacity style={styles.demoButton} onPress={() => fillDemo("country_admin")}>
         <Text style={styles.demoButtonText}>Remplir admin pays demo</Text>
       </TouchableOpacity>
+
+      <Modal visible={Boolean(pendingSession)} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.passwordCard}>
+            <Text style={styles.passwordTitle}>Nouveau mot de passe</Text>
+            <Text style={styles.passwordHint}>
+              Votre mot de passe temporaire a été accepté. Choisissez maintenant votre mot de passe personnel.
+            </Text>
+            <TextInput
+              placeholder="Nouveau mot de passe"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="Confirmer le mot de passe"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              style={styles.input}
+            />
+            <TouchableOpacity
+              style={[styles.loginButton, isChangingPassword && styles.loginButtonDisabled]}
+              onPress={submitNewPassword}
+              disabled={isChangingPassword}
+            >
+              {isChangingPassword ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.loginButtonText}>Valider</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -284,5 +362,28 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 14,
     fontWeight: "900",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  passwordCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 18,
+  },
+  passwordTitle: {
+    color: "#0F172A",
+    fontSize: 22,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  passwordHint: {
+    color: "#64748B",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 16,
   },
 });

@@ -184,11 +184,10 @@ const configs: Record<
       { key: "firstName", label: "Prénom", placeholder: "Prénom" },
       { key: "gender", label: "Sexe", placeholder: "Choisir le sexe", type: "select" },
       { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
-      { key: "email", label: "Email", placeholder: "email@exemple.com" },
       { key: "role", label: "Rôle", placeholder: "Choisir le rôle", type: "select" },
       { key: "schoolCode", label: "Établissement", placeholder: "Choisir l'établissement", type: "select" },
       { key: "accessChannel", label: "Canal d'accès", placeholder: "BackOffice ou Application", type: "select" },
-      { key: "identifier", label: "Identifiant unique", placeholder: "USR001" },
+      { key: "identifier", label: "Identifiant unique", placeholder: "Généré par le système" },
       { key: "status", label: "Statut", placeholder: "Choisir le statut", type: "select" },
       { key: "photoUrl", label: "Photo", placeholder: "Ajouter une photo", type: "photo" },
     ],
@@ -302,7 +301,7 @@ export default function AdminCrudScreen({ route }: Props) {
         const adminCreated = isAdminCreatedUser(item);
         const matchesSearch =
           !query ||
-          [item.lastName, item.firstName, item.phone, item.email, item.identifier].some((value) =>
+          [item.lastName, item.firstName, item.phone, item.identifier].some((value) =>
             normalize(value).includes(query)
           );
         const matchesRole = userRoleFilter === "Tous" || normalize(item.role) === normalize(userRoleFilter);
@@ -550,6 +549,7 @@ export default function AdminCrudScreen({ route }: Props) {
       pin: temporaryPassword,
       passwordHash: undefined,
       pinHash: undefined,
+      mustChangePassword: true,
       history: [
         ...(item.history ?? []),
         `Mot de passe temporaire régénéré le ${formatDate(new Date())}. Ancien mot de passe invalidé.`,
@@ -684,13 +684,13 @@ export default function AdminCrudScreen({ route }: Props) {
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Rechercher nom, téléphone, email ou identifiant"
+                placeholder="Rechercher nom, téléphone ou identifiant"
                 style={styles.searchInput}
               />
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              {["Tous", ...Object.keys(rolePermissions).filter((role) => !isPlatformUserRole(role))].map((role) => (
+              {["Tous", ...getManageableSchoolUserRoles()].map((role) => (
                 <TouchableOpacity
                   key={`role-${role}`}
                   activeOpacity={0.85}
@@ -938,7 +938,10 @@ export default function AdminCrudScreen({ route }: Props) {
             : { studentId: "" }
           : {}),
         ...(entity === "users" && selectField.key === "role"
-          ? getRoleDefaults(option, form.schoolCode || getDefaultSchoolCode(schoolsData, session))
+          ? {
+              ...getRoleDefaults(option, form.schoolCode || getDefaultSchoolCode(schoolsData, session)),
+              identifier: generateUserIdentifier(usersData, option),
+            }
           : {}),
                         ...(entity === "assignments" && selectField.key === "className"
                           ? { course: "" }
@@ -1120,7 +1123,7 @@ function getInitialForm(entity: AdminEntity, context?: any): Record<string, stri
       ...getRoleDefaults(role, schoolCode),
       schoolCode,
       accessChannel: "Application",
-      identifier: generateUserIdentifier(context?.usersData ?? []),
+      identifier: generateUserIdentifier(context?.usersData ?? [], role),
       status: "Actif",
       temporaryPassword: generateTemporaryPassword(),
       createdBy: context?.session?.user?.name ?? "Administrateur",
@@ -1166,7 +1169,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       firstName: form.firstName ?? "",
       gender: form.gender || "Non renseigné",
       phone: form.phone,
-      email: form.email ?? "",
+      email: "",
       mainSubject: form.mainSubject ?? "",
       assignments: [],
     };
@@ -1321,21 +1324,21 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
   if (entity === "users") {
     const userSchoolCode = form.schoolCode || schoolCodeFromContext(context);
     const defaults = getRoleDefaults(form.role, userSchoolCode);
-    const temporaryPassword = form.temporaryPassword || generateTemporaryPassword();
+    const isCreating = !id;
+    const generatedTemporaryPassword = isCreating ? form.temporaryPassword || generateTemporaryPassword() : "";
     if (
       !form.lastName ||
       !form.firstName ||
-      !form.phone ||
       !form.role ||
       isPlatformUserRole(form.role) ||
-      !userSchoolCode ||
-      !form.identifier
+      !userSchoolCode
     ) {
       return null;
     }
 
     const permissions = rolePermissions[form.role] ?? [];
     const publicId = form.publicId || generatePublicId("USR", year, context?.usersData ?? [], 6);
+    const identifier = form.identifier?.trim() || generateUserIdentifier(context?.usersData ?? [], form.role);
 
     return {
       id: id ?? `USER-${Date.now()}`,
@@ -1344,26 +1347,27 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       firstName: form.firstName,
       gender: form.gender,
       phone: form.phone,
-      email: form.email ?? "",
+      email: "",
       role: form.role,
       secondaryRoles: splitList(form.secondaryRoles),
       scopeLevel: form.scopeLevel || defaults.scopeLevel,
       countryScope: form.countryScope ?? "",
       schoolCode: userSchoolCode,
       accessChannel: form.accessChannel || defaults.accessChannel,
-      identifier: form.identifier.trim(),
+      identifier,
       status: form.status || "Actif",
       permissions,
-      temporaryPassword,
-      password: temporaryPassword,
-      pin: temporaryPassword,
+      temporaryPassword: isCreating ? generatedTemporaryPassword : form.temporaryPassword ?? "",
+      ...(isCreating
+        ? { password: generatedTemporaryPassword, pin: generatedTemporaryPassword, mustChangePassword: true }
+        : { mustChangePassword: form.mustChangePassword === "true" }),
       photoUrl: form.photoUrl ?? "",
       createdAt: form.createdAt || formatDate(new Date()),
       lastLoginAt: form.lastLoginAt ?? "",
       createdBy: form.createdBy || context?.session?.user?.name || "Administrateur",
       history: [
         ...(splitList(form.history).length ? splitList(form.history) : []),
-        `${id ? "Compte modifié" : `Compte créé avec mot de passe temporaire ${temporaryPassword}`} le ${formatDate(new Date())}`,
+        `${id ? "Compte modifié" : `Compte créé avec identifiant ${identifier} et mot de passe temporaire ${generatedTemporaryPassword}`} le ${formatDate(new Date())}`,
       ],
     };
   }
@@ -1486,12 +1490,18 @@ function validateBusinessRules({
         normalize(user.schoolCode) === normalize(item.schoolCode) &&
         normalize(user.identifier) === identifier
     );
-    const duplicatePhone = usersData.find(
-      (user) =>
-        user.id !== editingId &&
-        normalize(user.schoolCode) === normalize(item.schoolCode) &&
-        normalize(user.phone) === phone
-    );
+    const duplicatePhone = phone
+      ? usersData.find(
+          (user) =>
+            user.id !== editingId &&
+            normalize(user.schoolCode) === normalize(item.schoolCode) &&
+            normalize(user.phone) === phone
+        )
+      : null;
+
+    if (isPlatformUserRole(item.role)) {
+      return "Utilisateur impossible : ce rôle n'est pas géré dans l'établissement.";
+    }
 
     if (item.role === "Admin Pays" && !item.countryScope) {
       return "Utilisateur impossible : un Admin Pays doit être rattaché à un pays.";
@@ -1764,7 +1774,12 @@ function shouldHideField(entity: AdminEntity, form: Record<string, string>, fiel
     return field.key === "studentId";
   }
 
-  return entity === "users" && form.role === "Admin Pays" && field.key === "schoolCode";
+  if (entity === "users") {
+    if (field.key === "identifier") return true;
+    if (form.role === "Admin Pays" && field.key === "schoolCode") return true;
+  }
+
+  return false;
 }
 
 function isAdminCreatedUser(item: any) {
@@ -1794,6 +1809,12 @@ function isPlatformUserRole(role?: string) {
   return role === "Super Administrateur OKAFRIK" || role === "Admin Pays";
 }
 
+function getManageableSchoolUserRoles() {
+  return Object.keys(rolePermissions)
+    .filter((role) => !isPlatformUserRole(role))
+    .filter((role) => !["Parent", "Élève / Étudiant"].includes(role));
+}
+
 function isActiveUserAccount(item: any) {
   const status = normalize(item?.status)
     .normalize("NFD")
@@ -1814,12 +1835,23 @@ function getRoleDefaults(role?: string, schoolCode = "") {
 }
 
 function generateTemporaryPassword() {
-  return `SL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  return `SF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
-function generateUserIdentifier(usersData: any[]) {
-  const nextNumber = usersData.length + 1;
-  return `USR-${String(nextNumber).padStart(4, "0")}`;
+function generateUserIdentifier(usersData: any[], role?: string) {
+  const prefix = getUserIdentifierPrefix(role);
+  const nextNumber = getNextSequence(usersData, new RegExp(`^${prefix}-(\\d+)$`, "i"), "identifier");
+  return `${prefix}-${String(nextNumber).padStart(4, "0")}`;
+}
+
+function getUserIdentifierPrefix(role?: string) {
+  if (role === "Enseignant") return "ENS";
+  if (role === "Élève / Étudiant" || role === "Élève" || role === "Étudiant") return "ELE";
+  if (role === "Parent") return "PAR";
+  if (role === "Admin School") return "ADM";
+  if (role === "Préfet des études") return "PRF";
+  if (role === "Secrétaire") return "SEC";
+  return "USR";
 }
 
 function getDefaultSchoolCode(schoolsData: any[], session?: any) {
@@ -1896,10 +1928,14 @@ function getSelectOptions(
   }
 
   if (key === "role") {
-    return Object.keys(rolePermissions).filter((role) => !isPlatformUserRole(role));
+    return getManageableSchoolUserRoles();
   }
 
   if (key === "schoolCode") {
+    if (entity === "users") {
+      return [form.schoolCode].filter(Boolean);
+    }
+
     return entity === "subscriptions"
       ? schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean)
       : schoolsData.map((schoolItem) => schoolItem.code).filter(Boolean);

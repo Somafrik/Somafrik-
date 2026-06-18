@@ -178,7 +178,7 @@ class AuthService {
     return this.userAccounts.find(
       (user) =>
         (user.schoolCode === "*" || user.schoolCode === normalizedSchoolCode) &&
-        [user.identifier, user.email, user.phone, user.publicId].some(
+        [user.identifier, user.phone, user.publicId].some(
           (value) => String(value ?? "").trim().toLowerCase() === normalizedIdentifier
         )
     );
