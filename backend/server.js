@@ -1,8 +1,8 @@
-require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config();
 const { AuthService, BusinessError } = require("./services/authService");
 const { BackOfficeAccessService } = require("./services/backOfficeAccessService");
 const { GradeBookService } = require("./services/gradeBookService");
@@ -18,8 +18,7 @@ const { TenantScopeService } = require("./services/tenantScopeService");
 const { AuditService } = require("./services/auditService");
 
 const app = express();
-const databaseUrl =
-  process.env.DATABASE_URL ?? "postgresql://somafrik:somafrik123@localhost:5432/somafrik";
+const databaseUrl = process.env.DATABASE_URL ?? buildDatabaseUrl();
 let repository = new PostgresRepository(databaseUrl);
 const tokenService = new TokenService();
 const rbacService = new RbacService();
@@ -67,9 +66,11 @@ app.get("/", asyncHandler(async (_req, res) => {
       "/api/students/:id",
       "/api/students/:id/notes",
       "/api/notes",
+      "/api/presences",
       "/api/students/:id/report",
       "/api/students/:id/report.pdf",
       "/api/students/:id/presences",
+      "/api/presences",
       "/api/students/:id/payments",
       "/api/teachers",
       "/api/users",
@@ -176,7 +177,7 @@ app.get("/api/school", requireAuth, asyncHandler(async (_req, res) => {
 }));
 
 app.get("/api/classes", requireAuth, asyncHandler(async (req, res) => {
-  const { classes, students, teachers, presences } = await getRuntime();
+  const { classes, students, teachers, presences } = await getAuthoritativeBackOfficeState();
   const scopedClasses = tenantScopeService.filterRows(classes, req.principal);
   const scopedStudents = tenantScopeService.filterRows(students, req.principal);
   const result = scopedClasses.map((item) => {
@@ -202,7 +203,7 @@ app.get("/api/classes", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/courses", requireAuth, asyncHandler(async (req, res) => {
-  const { courses } = await getRuntime();
+  const { courses } = await getAuthoritativeBackOfficeState();
   res.json(tenantScopeService.filterRows(courses, req.principal));
 }));
 
@@ -221,7 +222,7 @@ app.put("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/students", requireAuth, asyncHandler(async (req, res) => {
-  const { students } = await getRuntime();
+  const { students } = await getAuthoritativeBackOfficeState();
   const { className } = req.query;
   const result = tenantScopeService.filterRows(students, req.principal)
     .filter((student) => !className || student.className === className)
@@ -231,7 +232,7 @@ app.get("/api/students", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/students/:id", requireAuth, asyncHandler(async (req, res) => {
-  const { students } = await getRuntime();
+  const { students } = await getAuthoritativeBackOfficeState();
   const student = findStudent(tenantScopeService.filterRows(students, req.principal), req.params.id);
 
   if (!student) {
@@ -243,16 +244,30 @@ app.get("/api/students/:id", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/students/:id/notes", requireAuth, asyncHandler(async (req, res) => {
-  const { notes, students } = await getRuntime();
+  const { notes, students } = await getAuthoritativeBackOfficeState();
   const student = findStudent(tenantScopeService.filterRows(students, req.principal), req.params.id);
   res.json(student ? notes.filter((note) => note.studentId === student.id) : []);
 }));
 
 app.get("/api/notes", requireAuth, asyncHandler(async (req, res) => {
-  const { notes, students } = await getRuntime();
+  const { notes, students } = await getAuthoritativeBackOfficeState();
   const scopedStudents = tenantScopeService.filterRows(students, req.principal);
   const studentIds = new Set(scopedStudents.map((student) => student.id));
   res.json(notes.filter((note) => studentIds.has(note.studentId)));
+}));
+
+app.get("/api/presences", requireAuth, asyncHandler(async (req, res) => {
+  const { presences, students } = await getAuthoritativeBackOfficeState();
+  const { className, date } = req.query;
+  const scopedStudents = tenantScopeService.filterRows(students, req.principal)
+    .filter((student) => !className || student.className === className);
+  const studentIds = new Set(scopedStudents.map((student) => student.id));
+  res.json(
+    presences.filter((presence) =>
+      studentIds.has(presence.studentId) &&
+      (!date || String(presence.date) === String(date))
+    )
+  );
 }));
 
 app.post("/api/notes", requireAuth, asyncHandler(async (req, res) => {
@@ -262,8 +277,20 @@ app.post("/api/notes", requireAuth, asyncHandler(async (req, res) => {
   res.status(201).json(saved);
 }));
 
+app.post("/api/presences", requireAuth, asyncHandler(async (req, res) => {
+  assertCanManagePresences(req.principal);
+  const saved = await repository.upsertAttendanceBatch(req.body ?? {}, req.principal);
+  await auditService.record(req, "upsert_attendance", "attendance", req.body?.className ?? "batch", {
+    count: saved.length,
+    className: req.body?.className,
+    date: req.body?.date,
+  });
+  res.status(201).json(saved);
+}));
+
 app.get("/api/students/:id/report", requireAuth, asyncHandler(async (req, res) => {
-  const { students, gradeBookService } = await getRuntime();
+  const { gradeBookService } = await getRuntime();
+  const { students } = await getAuthoritativeBackOfficeState();
   const student = findStudent(tenantScopeService.filterRows(students, req.principal), req.params.id);
 
   if (!student) {
@@ -274,7 +301,8 @@ app.get("/api/students/:id/report", requireAuth, asyncHandler(async (req, res) =
 }));
 
 app.get("/api/students/:id/report.pdf", requireAuth, asyncHandler(async (req, res) => {
-  const { students, gradeBookService, reportPdfService } = await getRuntime();
+  const { gradeBookService, reportPdfService } = await getRuntime();
+  const { students } = await getAuthoritativeBackOfficeState();
   const student = findStudent(tenantScopeService.filterRows(students, req.principal), req.params.id);
 
   if (!student) {
@@ -293,30 +321,30 @@ app.get("/api/students/:id/report.pdf", requireAuth, asyncHandler(async (req, re
 }));
 
 app.get("/api/students/:id/presences", requireAuth, asyncHandler(async (req, res) => {
-  const { presences, students } = await getRuntime();
+  const { presences, students } = await getAuthoritativeBackOfficeState();
   const student = findStudent(tenantScopeService.filterRows(students, req.principal), req.params.id);
   res.json(student ? presences.filter((presence) => presence.studentId === student.id) : []);
 }));
 
 app.get("/api/students/:id/payments", requireAuth, asyncHandler(async (req, res) => {
-  const { payments, students } = await getRuntime();
+  const { payments, students } = await getAuthoritativeBackOfficeState();
   const student = findStudent(tenantScopeService.filterRows(students, req.principal), req.params.id);
   res.json(student ? payments.filter((payment) => payment.studentId === student.id) : []);
 }));
 
 app.get("/api/teachers", requireAuth, requirePermission("GET /api/teachers"), asyncHandler(async (req, res) => {
-  const { teachers } = await getRuntime();
+  const { teachers } = await getAuthoritativeBackOfficeState();
   const result = tenantScopeService.filterRows(teachers, req.principal).map(({ password, passwordHash, pinHash, ...teacher }) => ({
       ...teacher,
-      assignedClasses: [...new Set(teacher.assignments.map((item) => item.className))],
-      courses: [...new Set(teacher.assignments.map((item) => item.course))],
+      assignedClasses: [...new Set((teacher.assignments ?? []).map((item) => item.className))],
+      courses: [...new Set((teacher.assignments ?? []).map((item) => item.course))],
     }));
   sendList(res, result, req.query, ["name", "phone", "email", "mainSubject"]);
 }));
 
 app.get("/api/users", requireAuth, requirePermission("GET /api/users"), asyncHandler(async (req, res) => {
-  const { userAccounts } = await getRuntime();
-  const result = tenantScopeService.filterRows(userAccounts, req.principal).map(({ temporaryPassword, passwordHash, pinHash, ...user }) => ({
+  const { users } = await getAuthoritativeBackOfficeState();
+  const result = tenantScopeService.filterRows(users, req.principal).map(({ temporaryPassword, passwordHash, pinHash, ...user }) => ({
     ...user,
     hasTemporaryPassword: Boolean(temporaryPassword),
   }));
@@ -329,8 +357,8 @@ app.post("/api/users/:id/reset-password", requireAuth, asyncHandler(async (req, 
     throw new BusinessError(403, "Permission insuffisante pour réinitialiser le mot de passe.");
   }
 
-  const { userAccounts } = await getRuntime();
-  const scopedUsers = tenantScopeService.filterRows(userAccounts, req.principal);
+  const { users } = await getAuthoritativeBackOfficeState();
+  const scopedUsers = tenantScopeService.filterRows(users, req.principal);
   const target = scopedUsers.find((user) =>
     [user.id, user.publicId, user.identifier].some((value) => String(value ?? "") === String(req.params.id))
   );
@@ -360,7 +388,7 @@ app.post("/api/users/:id/reset-password", requireAuth, asyncHandler(async (req, 
 }));
 
 app.get("/api/payments", requireAuth, requirePermission("GET /api/payments"), asyncHandler(async (req, res) => {
-  const { payments, students } = await getRuntime();
+  const { payments, students } = await getAuthoritativeBackOfficeState();
   const scopedPayments = tenantScopeService.filterRows(payments, req.principal);
   const result = scopedPayments.map((payment) => {
     const student = students.find((item) => item.id === payment.studentId);
@@ -374,9 +402,9 @@ app.get("/api/payments", requireAuth, requirePermission("GET /api/payments"), as
   sendList(res, result, req.query, ["studentName", "className", "status", "method"]);
 }));
 
-app.get("/api/announcements", requireAuth, asyncHandler(async (_req, res) => {
-  const { announcements } = await getRuntime();
-  res.json(announcements);
+app.get("/api/announcements", requireAuth, asyncHandler(async (req, res) => {
+  const { announcements } = await getAuthoritativeBackOfficeState();
+  res.json(tenantScopeService.filterRows(announcements, req.principal));
 }));
 
 app.get("/api/backoffice/countries", requireAuth, requirePermission("GET /api/backoffice/countries"), asyncHandler(async (req, res) => {
@@ -396,12 +424,13 @@ app.get("/api/backoffice/notifications", requireAuth, requirePermission("GET /ap
 
 app.get("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
   assertBackOfficeManager(req.principal);
-  res.json(scopeBackOfficeState((await repository.getBackOfficeState()) ?? {}, req.principal));
+  const state = await getAuthoritativeBackOfficeState();
+  res.json(scopeBackOfficeState(state, req.principal));
 }));
 
 app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
   assertBackOfficeManager(req.principal);
-  const currentState = (await repository.getBackOfficeState()) ?? {};
+  const currentState = await getAuthoritativeBackOfficeState();
   const requestedState = sanitizeBackOfficeState(req.body ?? {});
   const nextState = mergeScopedBackOfficeState(currentState, requestedState, req.principal);
   const saved = await repository.saveBackOfficeState(nextState);
@@ -578,8 +607,24 @@ function assertCanManageNotes(principal) {
   throw new BusinessError(403, "Permission insuffisante pour modifier les notes.");
 }
 
+function assertCanManagePresences(principal) {
+  const permissions = new Set(principal?.permissions ?? []);
+  if (
+    permissions.has("ALL_PRIVILEGES") ||
+    permissions.has("COUNTRY_PRIVILEGES") ||
+    permissions.has("Faire appel") ||
+    permissions.has("Gérer appels") ||
+    permissions.has("Présences:CREATE") ||
+    permissions.has("Présences:UPDATE")
+  ) {
+    return;
+  }
+
+  throw new BusinessError(403, "Permission insuffisante pour enregistrer l'appel.");
+}
+
 function sanitizeBackOfficeState(payload = {}) {
-  return {
+  const state = {
     schools: Array.isArray(payload.schools) ? payload.schools : [],
     users: Array.isArray(payload.users) ? payload.users : [],
     countries: Array.isArray(payload.countries) ? payload.countries : [],
@@ -599,8 +644,137 @@ function sanitizeBackOfficeState(payload = {}) {
     messages: Array.isArray(payload.messages) ? payload.messages : [],
     auditLog: Array.isArray(payload.auditLog) ? payload.auditLog.slice(0, 200) : [],
     rolePermissions: isPlainObject(payload.rolePermissions) ? payload.rolePermissions : {},
+    deletedRows: sanitizeDeletedRows(payload.deletedRows),
     updatedAt: new Date().toISOString(),
   };
+  return applyDeletedRows(state, state.deletedRows);
+}
+
+const backOfficeDeletableEntities = [
+  "schools",
+  "users",
+  "countries",
+  "subscriptions",
+  "notifications",
+  "students",
+  "teachers",
+  "classes",
+  "courses",
+  "assignments",
+  "payments",
+  "paymentStatuses",
+  "presences",
+  "notes",
+  "announcements",
+  "messages",
+];
+
+async function getAuthoritativeBackOfficeState() {
+  const storedState = await repository.getBackOfficeState();
+  if (hasUserBackOfficeState(storedState)) {
+    return sanitizeBackOfficeState(storedState);
+  }
+
+  const runtime = await getRuntime();
+  return sanitizeBackOfficeState(buildInitialBackOfficeState(runtime));
+}
+
+function hasUserBackOfficeState(state) {
+  if (!isPlainObject(state)) {
+    return false;
+  }
+
+  return backOfficeDeletableEntities.some((entity) => Array.isArray(state[entity]));
+}
+
+function buildInitialBackOfficeState(runtime = {}) {
+  return {
+    schools: runtime.platformSchools ?? [],
+    users: runtime.userAccounts ?? [],
+    countries: runtime.countries ?? [],
+    subscriptions: runtime.subscriptions ?? [],
+    notifications: runtime.platformNotifications ?? [],
+    students: runtime.students ?? [],
+    teachers: runtime.teachers ?? [],
+    classes: runtime.classes ?? [],
+    courses: runtime.courses ?? [],
+    assignments: runtime.teacherAssignments ?? [],
+    payments: runtime.payments ?? [],
+    paymentStatuses: [],
+    presences: runtime.presences ?? [],
+    notes: runtime.notes ?? [],
+    academicConfigs: {},
+    announcements: runtime.announcements ?? [],
+    messages: [],
+    auditLog: [],
+    rolePermissions: {},
+    deletedRows: {},
+  };
+}
+
+function mergeBackOfficeRuntimeState(runtime = {}, storedState = {}) {
+  const storedDeletedRows = sanitizeDeletedRows(storedState.deletedRows);
+  const runtimeState = {
+    schools: runtime.platformSchools ?? [],
+    users: runtime.userAccounts ?? [],
+    countries: runtime.countries ?? [],
+    subscriptions: runtime.subscriptions ?? [],
+    notifications: runtime.platformNotifications ?? [],
+    students: runtime.students ?? [],
+    teachers: runtime.teachers ?? [],
+    classes: runtime.classes ?? [],
+    courses: runtime.courses ?? [],
+    assignments: runtime.teacherAssignments ?? [],
+    payments: runtime.payments ?? [],
+    paymentStatuses: storedState.paymentStatuses ?? [],
+    presences: runtime.presences ?? [],
+    notes: runtime.notes ?? [],
+    academicConfigs: storedState.academicConfigs ?? {},
+    announcements: runtime.announcements ?? [],
+    messages: storedState.messages ?? [],
+    auditLog: storedState.auditLog ?? [],
+    rolePermissions: storedState.rolePermissions ?? {},
+    deletedRows: storedDeletedRows,
+  };
+  const deletedRows = mergeDeletedRows(storedDeletedRows, inferDeletedRowsFromStoredSnapshot(runtimeState, storedState));
+
+  const merged = {
+    ...runtimeState,
+    ...storedState,
+    schools: mergeRowsByIdentity(runtimeState.schools, storedState.schools),
+    users: mergeRowsByIdentity(runtimeState.users, storedState.users),
+    countries: mergeRowsByIdentity(runtimeState.countries, storedState.countries),
+    subscriptions: mergeRowsByIdentity(runtimeState.subscriptions, storedState.subscriptions),
+    notifications: mergeRowsByIdentity(runtimeState.notifications, storedState.notifications),
+    students: mergeRowsByIdentity(runtimeState.students, storedState.students),
+    teachers: mergeRowsByIdentity(runtimeState.teachers, storedState.teachers),
+    classes: mergeRowsByIdentity(runtimeState.classes, storedState.classes),
+    courses: mergeRowsByIdentity(runtimeState.courses, storedState.courses),
+    payments: mergeRowsByIdentity(runtimeState.payments, storedState.payments),
+    presences: mergeRowsByIdentity(runtimeState.presences, storedState.presences),
+    notes: mergeRowsByIdentity(runtimeState.notes, storedState.notes),
+    announcements: mergeRowsByIdentity(runtimeState.announcements, storedState.announcements),
+    rolePermissions: {
+      ...runtimeState.rolePermissions,
+      ...(storedState.rolePermissions ?? {}),
+    },
+    academicConfigs: {
+      ...runtimeState.academicConfigs,
+      ...(storedState.academicConfigs ?? {}),
+    },
+    deletedRows,
+  };
+
+  return applyDeletedRows(merged, merged.deletedRows);
+}
+
+function mergeRowsByIdentity(primaryRows = [], secondaryRows = []) {
+  const rows = new Map();
+  [...primaryRows, ...secondaryRows].forEach((row, index) => {
+    const key = row?.id ?? row?.publicId ?? row?.code ?? row?.studentId ?? `row-${index}`;
+    rows.set(String(key), row);
+  });
+  return [...rows.values()];
 }
 
 function scopeBackOfficeState(payload = {}, principal) {
@@ -621,7 +795,7 @@ function scopeBackOfficeState(payload = {}, principal) {
   }
 
   const schoolCodes = new Set([principal.schoolCode].filter(Boolean));
-  return scopeStateWithSchools(state, schoolCodes);
+  return scopeStateWithSchools(state, schoolCodes, { subscriptions: [] });
 }
 
 function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
@@ -648,11 +822,12 @@ function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
   const users = state.users.filter((item) => hasSchoolScope(item, schoolCodes));
   const schools = state.schools.filter((item) => schoolCodes.has(item.code));
   const subscriptions = state.subscriptions.filter((item) => hasSchoolScope(item, schoolCodes));
-  const payments = state.payments.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
-  const presences = state.presences.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
-  const notes = state.notes.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
+  const payments = state.payments.filter((item) => belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
+  const paymentStatuses = state.paymentStatuses.filter((item) => hasSchoolScope(item, schoolCodes));
+  const presences = state.presences.filter((item) => belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
+  const notes = state.notes.filter((item) => belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
   const announcements = state.announcements.filter((item) => hasSchoolScope(item, schoolCodes));
-  const messages = state.messages.filter((item) => hasSchoolScope(item, schoolCodes) || studentIds.has(item.studentId));
+  const messages = state.messages.filter((item) => !item.studentId ? hasSchoolScope(item, schoolCodes) : belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
   const academicConfigs = Object.fromEntries(
     Object.entries(state.academicConfigs).filter(([schoolCode]) => schoolCodes.has(schoolCode))
   );
@@ -667,7 +842,8 @@ function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
     courses,
     assignments,
     payments,
-    subscriptions,
+    paymentStatuses,
+    subscriptions: overrides.subscriptions ?? subscriptions,
     presences,
     notes,
     announcements,
@@ -682,18 +858,29 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
   const requested = sanitizeBackOfficeState(requestedPayload);
 
   if (!principal || principal.role === "Super Administrateur OKAFRIK") {
-    return requested;
+    return applyDeletedRows({
+      ...requested,
+      deletedRows: mergeDeletedRows(
+        current.deletedRows,
+        detectDeletedRows(current, requested, backOfficeDeletableEntities)
+      ),
+    });
   }
 
   const scopedCurrent = scopeBackOfficeState(current, principal);
   const scopedRequested = scopeBackOfficeState(requested, principal);
+  const editableEntities = getEditableEntitiesForPrincipal(principal);
+  const deletedRows = mergeDeletedRows(
+    current.deletedRows,
+    detectDeletedRows(scopedCurrent, scopedRequested, editableEntities)
+  );
 
-  return {
+  return applyDeletedRows({
     ...current,
     schools: mergeScopedRows(current.schools, scopedRequested.schools, scopedCurrent.schools),
     users: mergeScopedRows(current.users, scopedRequested.users, scopedCurrent.users),
     countries: principal.role === "Admin Pays" ? mergeScopedRows(current.countries, scopedRequested.countries, scopedCurrent.countries) : current.countries,
-    subscriptions: mergeScopedRows(current.subscriptions, scopedRequested.subscriptions, scopedCurrent.subscriptions),
+    subscriptions: principal.role === "Admin School" ? current.subscriptions : mergeScopedRows(current.subscriptions, scopedRequested.subscriptions, scopedCurrent.subscriptions),
     notifications: current.notifications,
     students: mergeScopedRows(current.students, scopedRequested.students, scopedCurrent.students),
     teachers: mergeScopedRows(current.teachers, scopedRequested.teachers, scopedCurrent.teachers),
@@ -701,7 +888,7 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
     courses: mergeScopedRows(current.courses, scopedRequested.courses, scopedCurrent.courses),
     assignments: mergeScopedRows(current.assignments, scopedRequested.assignments, scopedCurrent.assignments),
     payments: mergeScopedRows(current.payments, scopedRequested.payments, scopedCurrent.payments),
-    paymentStatuses: requested.paymentStatuses.length ? requested.paymentStatuses : current.paymentStatuses,
+    paymentStatuses: mergeScopedRows(current.paymentStatuses, scopedRequested.paymentStatuses, scopedCurrent.paymentStatuses),
     presences: mergeScopedRows(current.presences, scopedRequested.presences, scopedCurrent.presences),
     notes: mergeScopedRows(current.notes, scopedRequested.notes, scopedCurrent.notes),
     announcements: mergeScopedRows(current.announcements, scopedRequested.announcements, scopedCurrent.announcements),
@@ -712,8 +899,9 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
       ...scopedRequested.academicConfigs,
     },
     auditLog: current.auditLog,
+    deletedRows,
     updatedAt: new Date().toISOString(),
-  };
+  });
 }
 
 function mergeScopedRows(currentRows, requestedScopedRows, currentScopedRows) {
@@ -729,12 +917,120 @@ function rowKey(row = {}) {
   return String(row.id ?? row.publicId ?? row.code ?? row.schoolCode ?? row.value ?? JSON.stringify(row));
 }
 
+function getEditableEntitiesForPrincipal(principal) {
+  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
+    return backOfficeDeletableEntities;
+  }
+
+  if (principal.role === "Admin Pays") {
+    return ["schools", "users", "countries", "subscriptions"];
+  }
+
+  return [
+    "users",
+    "students",
+    "teachers",
+    "classes",
+    "courses",
+    "assignments",
+    "payments",
+    "paymentStatuses",
+    "presences",
+    "notes",
+    "announcements",
+    "messages",
+  ];
+}
+
+function detectDeletedRows(currentState = {}, requestedState = {}, entities = []) {
+  return entities.reduce((deletedRows, entity) => {
+    const currentRows = Array.isArray(currentState[entity]) ? currentState[entity] : [];
+    const requestedRows = Array.isArray(requestedState[entity]) ? requestedState[entity] : [];
+    const requestedKeys = new Set(requestedRows.map(rowKey));
+    const deletedKeys = currentRows
+      .map(rowKey)
+      .filter((key) => key && !requestedKeys.has(key));
+
+    if (deletedKeys.length) {
+      deletedRows[entity] = deletedKeys;
+    }
+
+    return deletedRows;
+  }, {});
+}
+
+function mergeDeletedRows(...sources) {
+  const merged = {};
+  sources.forEach((source) => {
+    const normalized = sanitizeDeletedRows(source);
+    Object.entries(normalized).forEach(([entity, keys]) => {
+      merged[entity] = [...new Set([...(merged[entity] ?? []), ...keys])];
+    });
+  });
+  return merged;
+}
+
+function inferDeletedRowsFromStoredSnapshot(runtimeState = {}, storedState = {}) {
+  return backOfficeDeletableEntities.reduce((deletedRows, entity) => {
+    if (!Object.prototype.hasOwnProperty.call(storedState, entity) || !Array.isArray(storedState[entity])) {
+      return deletedRows;
+    }
+
+    const runtimeRows = Array.isArray(runtimeState[entity]) ? runtimeState[entity] : [];
+    const storedKeys = new Set(storedState[entity].map(rowKey));
+    const missingKeys = runtimeRows
+      .map(rowKey)
+      .filter((key) => key && !storedKeys.has(key));
+
+    if (missingKeys.length) {
+      deletedRows[entity] = missingKeys;
+    }
+
+    return deletedRows;
+  }, {});
+}
+
+function sanitizeDeletedRows(value = {}) {
+  if (!isPlainObject(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([entity, keys]) => backOfficeDeletableEntities.includes(entity) && Array.isArray(keys))
+      .map(([entity, keys]) => [entity, [...new Set(keys.map((key) => String(key)).filter(Boolean))]])
+  );
+}
+
+function applyDeletedRows(state = {}, deletedRows = state.deletedRows ?? {}) {
+  const normalizedDeletedRows = sanitizeDeletedRows(deletedRows);
+  const nextState = { ...state, deletedRows: normalizedDeletedRows };
+
+  backOfficeDeletableEntities.forEach((entity) => {
+    const rows = Array.isArray(nextState[entity]) ? nextState[entity] : [];
+    const deletedKeys = new Set(normalizedDeletedRows[entity] ?? []);
+    if (deletedKeys.size) {
+      nextState[entity] = rows.filter((row) => !deletedKeys.has(rowKey(row)));
+    }
+  });
+
+  return nextState;
+}
+
 function hasSchoolScope(row = {}, schoolCodes) {
   return (
     schoolCodes.has(row.schoolCode) ||
     schoolCodes.has(row.code) ||
     schoolCodes.has(row.publicId)
   );
+}
+
+function belongsToScopedStudentOrSchool(row = {}, schoolCodes, studentIds) {
+  if (row.studentId) {
+    return studentIds.has(row.studentId);
+  }
+
+  return hasSchoolScope(row, schoolCodes);
 }
 
 function isPlainObject(value) {
@@ -776,6 +1072,7 @@ async function sendAuthenticatedResponse(req, res, response, action) {
 
   res.json({
     ...response,
+    user: response.user ? { ...response.user, permissions: principal.permissions } : response.user,
     accessToken,
     refreshToken: refreshSession.token,
     tokenType: "Bearer",
@@ -790,16 +1087,40 @@ function buildPrincipal(response) {
   const role = user.role ?? roleLabelFromMobileRole(response.role);
   const schoolCode = role === "Admin Pays" ? "*" : user.schoolCode ?? school.code ?? "*";
   const countryCode = user.countryCode ?? countryCodeFromScope(user.countryScope) ?? school.countryCode ?? countryCodeFromSchoolOrCountry(schoolCode, school.country);
+  const permissions = enforceBusinessRolePermissions(role, user.permissions ?? rbacService.permissionsFor(role));
 
   return {
     sub: user.id ?? user.publicId ?? user.matricule ?? "anonymous",
     role,
     schoolCode,
     countryCode,
-    permissions: user.permissions ?? rbacService.permissionsFor(role),
+    permissions,
     studentIds: getPrincipalStudentIds(response),
     classNames: user.assignedClasses ?? [],
   };
+}
+
+function enforceBusinessRolePermissions(role, permissions = []) {
+  if (role !== "Admin School") {
+    return permissions;
+  }
+
+  const forbiddenFeatures = ["Établissements", "Abonnements", "Paramètres Établissement"];
+  const forbiddenKeywords = ["abonnement", "etablissement", "établissement", "inscription", "tarif"];
+  return permissions.filter((permission) => {
+    const normalizedPermission = normalizeBusinessPermission(permission);
+    return (
+      !forbiddenFeatures.some((feature) => String(permission).startsWith(feature)) &&
+      !forbiddenKeywords.some((keyword) => normalizedPermission.includes(keyword))
+    );
+  });
+}
+
+function normalizeBusinessPermission(permission) {
+  return String(permission ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function getPrincipalStudentIds(response) {
@@ -1001,4 +1322,13 @@ function warnIfUnsafeConfiguration() {
   if (!process.env.JWT_SECRET) {
     console.warn("JWT_SECRET non défini: utilisation du secret de développement.");
   }
+}
+
+function buildDatabaseUrl() {
+  const user = encodeURIComponent(process.env.POSTGRES_USER ?? "somafrik");
+  const password = encodeURIComponent(process.env.POSTGRES_PASSWORD ?? "somafrik123");
+  const host = process.env.POSTGRES_HOST ?? "localhost";
+  const port = process.env.POSTGRES_PORT ?? "5432";
+  const database = encodeURIComponent(process.env.POSTGRES_DB ?? "somafrik");
+  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
 }

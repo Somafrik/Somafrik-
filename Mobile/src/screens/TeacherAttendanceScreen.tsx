@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
 import { canReadRoute, hasSecurityPermission } from "../domain/security/permissions";
+import { savePresences } from "../services/api";
 
 type AttendanceStatus = "Présent" | "Absent" | "Retard" | "Justifié";
 
@@ -57,6 +58,10 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
 
   const todayLabel = formatDate(new Date());
   const currentHour = formatHour(new Date());
+  const todayCallGroups = groupAttendanceCalls(
+    presencesData.filter((presence) => sameDay(presence.date, todayLabel)),
+    studentsData
+  );
   const selectedRows = selectedClass
     ? classStudents.filter((student) => student.className === selectedClass)
     : [];
@@ -114,13 +119,21 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
     }));
   };
 
-  const saveCall = (className: string) => {
+  const saveCall = async (className: string) => {
     if (!canUpdatePresences) {
       Alert.alert("Accès refusé", "Votre rôle ne permet pas d'enregistrer l'appel.");
       return;
     }
 
     const rows = classStudents.filter((student) => student.className === className);
+    if (!rows.length) {
+      Alert.alert(
+        "Aucun élève chargé",
+        "Impossible d'enregistrer l'appel: aucun élève n'est rattaché à cette classe dans la synchronisation."
+      );
+      return;
+    }
+
     const classAssignments = assignments.filter((assignment) => assignment.className === className);
     const entries = Object.fromEntries(
       rows.map((student) => [student.id, attendance[student.id] ?? { status: "Présent" }])
@@ -129,36 +142,56 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
     const lateCount = Object.values(entries).filter((entry) => entry.status === "Retard").length;
     const justifiedCount = Object.values(entries).filter((entry) => entry.status === "Justifié").length;
 
-    setSavedCalls((current) => [
-      {
-        id: `CALL-${Date.now()}`,
-        className,
-        course: classAssignments[0]?.course ?? "Cours non renseigné",
-        teacherId: session?.user.id ?? "",
-        date: todayLabel,
-        hour: currentHour,
-        entries,
-      },
-      ...current,
-    ]);
-    upsertPresenceItems(
-      rows.map((student) => {
+    const presencePayload = rows.map((student) => {
         const entry = entries[student.id] ?? { status: "Présent" };
         return {
           id: `PRE-${todayLabel}-${student.id}`,
           publicId: `PRE-${todayLabel}-${student.id}`,
+          schoolCode: student.schoolCode,
           studentId: student.id,
+          className: student.className,
           date: todayLabel,
           present: entry.status === "Présent" || entry.status === "Retard",
           status: entry.status,
+          reason: entry.reason,
         };
-      })
-    );
+      });
 
-    Alert.alert(
-      "Appel enregistré",
-      `${className} • ${rows.length} élève(s)\n${absentCount} absent(s), ${lateCount} retard(s), ${justifiedCount} justifié(s).\nLes parents concernés seront notifiés.`
-    );
+    try {
+      const savedPresences = await savePresences({
+        className,
+        date: todayLabel,
+        hour: currentHour,
+        items: presencePayload,
+      });
+      if (!savedPresences.length) {
+        throw new Error("Aucune présence n'a été enregistrée par le backend.");
+      }
+
+      setSavedCalls((current) => [
+        {
+          id: `CALL-${Date.now()}`,
+          className,
+          course: classAssignments[0]?.course ?? "Cours non renseigné",
+          teacherId: session?.user.id ?? "",
+          date: todayLabel,
+          hour: currentHour,
+          entries,
+        },
+        ...current,
+      ]);
+      upsertPresenceItems(savedPresences as any);
+
+      Alert.alert(
+        "Appel enregistré",
+        `${className} • ${rows.length} élève(s)\n${absentCount} absent(s), ${lateCount} retard(s), ${justifiedCount} justifié(s).\nLes parents concernés seront notifiés.`
+      );
+    } catch (error) {
+      Alert.alert(
+        "Appel non enregistré",
+        error instanceof Error ? error.message : "Impossible d'enregistrer l'appel dans la base."
+      );
+    }
   };
 
   return (
@@ -176,7 +209,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
             const classCourses = assignments
               .filter((assignment) => assignment.className === className)
               .map((assignment) => assignment.course);
-            const savedCount = savedCalls.filter((call) => call.className === className).length;
+            const savedCount = todayCallGroups.filter((call) => call.className === className).length;
 
             return (
               <TouchableOpacity
@@ -297,10 +330,18 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
 
       {selectedClass && (
         <View style={styles.reportCard}>
-          <Text style={styles.reportTitle}>Historique local</Text>
+          <Text style={styles.reportTitle}>Historique synchronisé</Text>
           <Text style={styles.meta}>
-            {savedCalls.filter((call) => call.className === selectedClass).length} appel(s) enregistré(s) pour {selectedClass}
+            {todayCallGroups.filter((call) => call.className === selectedClass).length} appel(s) enregistré(s) pour {selectedClass}
           </Text>
+          {todayCallGroups
+            .filter((call) => call.className === selectedClass)
+            .slice(0, 3)
+            .map((call) => (
+              <Text key={call.id} style={styles.auditRow}>
+                {call.date} • {call.className} • {call.total} élève(s) • {call.attended} présent(s)
+              </Text>
+            ))}
           {auditLog.slice(0, 3).map((row) => (
             <Text key={row} style={styles.auditRow}>{row}</Text>
           ))}
@@ -353,6 +394,38 @@ function formatHour(date: Date) {
 
 function uniqueValues(values: string[]) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function groupAttendanceCalls(presences: any[], students: any[]) {
+  const studentClassById = new Map(students.map((student) => [student.id, student.className]));
+  const groups = new Map<string, { id: string; date: string; className: string; total: number; attended: number }>();
+
+  presences.forEach((presence) => {
+    const date = normalizeDateKey(presence.date);
+    const className = presence.className ?? studentClassById.get(presence.studentId) ?? "Classe inconnue";
+    const key = `${date}-${className}`;
+    const current = groups.get(key) ?? { id: key, date, className, total: 0, attended: 0 };
+    current.total += 1;
+    if (presence.present || ["present", "présent", "retard", "late"].includes(String(presence.status ?? "").trim().toLowerCase())) {
+      current.attended += 1;
+    }
+    groups.set(key, current);
+  });
+
+  return [...groups.values()];
+}
+
+function sameDay(left?: string, right?: string) {
+  return normalizeDateKey(left) === normalizeDateKey(right);
+}
+
+function normalizeDateKey(value?: string) {
+  const text = String(value ?? "").trim();
+  const localMatch = text.match(/^(\d{2})-(\d{2})-(\d{4})/);
+  if (localMatch) return `${localMatch[3]}-${localMatch[2]}-${localMatch[1]}`;
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  return text;
 }
 
 function getStatusStyle(status: AttendanceStatus) {

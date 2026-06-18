@@ -174,7 +174,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
         <View style={styles.helpBox}>
           <Ionicons name="information-circle-outline" size={18} color="#2563EB" />
           <Text style={styles.helpText}>
-            Si le réseau échoue pendant la démonstration, Somafrik utilise les données locales de test.
+            Connexion obligatoire à l'API Somafrik. Vérifiez le backend si le réseau échoue.
           </Text>
         </View>
       </ScrollView>

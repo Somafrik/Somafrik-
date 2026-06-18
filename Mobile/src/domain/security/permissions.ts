@@ -3,6 +3,7 @@ import type { AdminEntity } from "../../context/AdminDataContext";
 export type SecurityAction = "READ" | "CREATE" | "UPDATE" | "DELETE";
 
 const crudActions: SecurityAction[] = ["READ", "CREATE", "UPDATE", "DELETE"];
+const schoolAdminForbiddenFeatures = new Set(["Établissements", "Abonnements", "Paramètres Établissement"]);
 
 export const entityFeatureMap: Partial<Record<AdminEntity, string>> = {
   schools: "Établissements",
@@ -17,7 +18,7 @@ export const entityFeatureMap: Partial<Record<AdminEntity, string>> = {
   messages: "Messages",
   announcements: "Notifications",
   courses: "Matières",
-  assignments: "Enseignants",
+  assignments: "Affectations",
 };
 
 export const routeFeatureMap: Record<string, string> = {
@@ -56,6 +57,10 @@ export function hasSecurityPermission(session: any, feature: string | undefined,
     return true;
   }
 
+  if ((session?.role === "school_admin" || session?.user?.role === "Admin School") && schoolAdminForbiddenFeatures.has(feature)) {
+    return false;
+  }
+
   const permissions = new Set(session?.permissions ?? session?.user?.permissions ?? []);
 
   if (permissions.has("ALL_PRIVILEGES") || permissions.has("COUNTRY_PRIVILEGES")) {
@@ -76,6 +81,13 @@ export function hasSecurityPermission(session: any, feature: string | undefined,
 
   if (feature === "Abonnements") {
     return permissions.has("Gérer abonnements") || permissions.has("Suivre abonnements pays") || permissions.has(`Abonnements:${action}`);
+  }
+
+  if (feature === "Affectations") {
+    return permissions.has("Gérer affectations") ||
+      permissions.has("Gérer enseignants") ||
+      permissions.has("Enseignants:CRUD") ||
+      permissions.has(`Affectations:${action}`);
   }
 
   return permissions.has(`${feature}:${action}`);

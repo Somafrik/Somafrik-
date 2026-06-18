@@ -14,6 +14,7 @@ const state = {
   syncTimeoutId: null,
   schoolPage: 1,
   pageSize: 10,
+  realtimeIntervalId: null,
 };
 
 const loginPanel = document.querySelector("#loginPanel");
@@ -130,6 +131,7 @@ const crudPermissionModules = [
   "Classes",
   "Élèves",
   "Enseignants",
+  "Affectations",
   "Présences",
   "Notes",
   "Bulletins",
@@ -143,6 +145,9 @@ const crudPermissionModules = [
   "Matières",
   "Examens",
 ];
+
+const schoolAdminForbiddenFeatures = new Set(["Établissements", "Abonnements", "Paramètres Établissement"]);
+const schoolAdminForbiddenPermissionKeywords = ["abonnement", "etablissement", "établissement", "inscription", "tarif"];
 
 const defaultAcademicConfig = {
   schoolCode: "CD-2026-0001",
@@ -193,7 +198,7 @@ const viewPermissionFeatures = {
   overview: null,
   countries: "Pays",
   schools: "Établissements",
-  subscriptions: ["Abonnements", "Paiements"],
+  subscriptions: "Abonnements",
   notifications: "Notifications",
   users: "Utilisateurs",
   reports: "Rapports",
@@ -211,10 +216,10 @@ const actionPermissions = {
   "validate-schools": ["Établissements", "UPDATE"],
   "validate-school": ["Établissements", "UPDATE"],
   "toggle-school": ["Établissements", "SUSPEND"],
-  "renew-subscriptions": [["Abonnements", "Paiements"], "UPDATE"],
-  "renew-subscription": [["Abonnements", "Paiements"], "UPDATE"],
-  "remind-subscriptions": [["Abonnements", "Paiements"], "UPDATE"],
-  "remind-subscription": [["Abonnements", "Paiements"], "UPDATE"],
+  "renew-subscriptions": ["Abonnements", "UPDATE"],
+  "renew-subscription": ["Abonnements", "UPDATE"],
+  "remind-subscriptions": ["Abonnements", "UPDATE"],
+  "remind-subscription": ["Abonnements", "UPDATE"],
   "add-notification": ["Notifications", "CREATE"],
   "save-notification-form": ["Notifications", "CREATE"],
   "read-all-notifications": ["Notifications", "UPDATE"],
@@ -283,13 +288,14 @@ loginForm.addEventListener("submit", async (event) => {
     await refreshBackOfficeStateFromBackend();
     persistSession({ sync: false });
     renderApp();
+    startRealtimeSync();
   } catch (error) {
     loginError.textContent = error.message;
   }
 });
 
 logoutButton.addEventListener("click", () => {
-  localStorage.removeItem("somafrik-backoffice-session");
+  stopRealtimeSync();
   state.session = null;
   state.schools = [];
   state.users = [];
@@ -336,30 +342,7 @@ document.addEventListener("change", handlePermissionToggle);
 boot();
 
 async function boot() {
-  const saved = localStorage.getItem("somafrik-backoffice-session");
-
-  if (!saved) {
-    return;
-  }
-
-  try {
-    const session = JSON.parse(saved);
-    state.session = session;
-    state.schools = session.schools ?? [];
-    state.users = session.users ?? [];
-    state.countries = session.countries ?? [];
-    state.subscriptions = session.subscriptions ?? [];
-    state.notifications = session.notifications ?? [];
-    state.auditLog = session.auditLog ?? [];
-    state.rolePermissions = session.rolePermissions ?? {};
-    state.academicConfigs = session.academicConfigs ?? {};
-    state.selectedPermissionRole = session.user?.role ?? "";
-    renderApp();
-    await refreshBackOfficeStateFromBackend();
-    renderApp();
-  } catch {
-    localStorage.removeItem("somafrik-backoffice-session");
-  }
+  stopRealtimeSync();
 }
 
 async function request(path, options = {}) {
@@ -509,7 +492,7 @@ function getBusinessControls() {
     });
   }
 
-  if (hasAny("Paiements:READ", "Paiements:CREATE", "Paiements:UPDATE", "Paiements:DELETE") || hasMatch("abonnement") || hasMatch("paiement") || hasMatch("tarif")) {
+  if (hasAny("Abonnements:READ", "Abonnements:CREATE", "Abonnements:UPDATE", "Abonnements:DELETE") || hasMatch("abonnement") || hasMatch("tarif")) {
     controls.push({
       id: "subscriptions",
       title: "Abonnements",
@@ -564,6 +547,7 @@ function getBusinessControls() {
 
 function getLiveKpis() {
   const activeSchools = state.schools.filter((school) => school.status !== "Suspendu");
+  const activeUsers = state.users.filter(isActiveUserAccount);
   const suspendedSchools = state.schools.filter((school) => school.status === "Suspendu").length;
   const expiredSubscriptions = state.subscriptions.filter((subscription) =>
     subscription.paymentStatus === "En retard" || isPastDate(subscription.endDate)
@@ -579,7 +563,7 @@ function getLiveKpis() {
     { label: "Pays", value: state.countries.length },
     { label: "Établissements", value: state.schools.length },
     { label: "Écoles actives", value: activeSchools.length },
-    { label: "Utilisateurs", value: state.users.length },
+    { label: "Utilisateurs actifs", value: activeUsers.length },
     { label: "Revenus mensuels", value: monthlyRevenue, suffix: "USD" },
     { label: "Revenus annuels", value: annualRevenue, suffix: "USD" },
     { label: "Établissements suspendus", value: suspendedSchools },
@@ -807,10 +791,10 @@ function renderRolePermissionMatrix() {
   const selectedRole = state.selectedPermissionRole;
   const permissions = new Set(state.rolePermissions[selectedRole] ?? []);
   const editable = canManageRolePermissions();
-  const usersInRole = state.users.filter((user) => user.role === selectedRole).length;
+  const activeUsersInRole = state.users.filter((user) => user.role === selectedRole && isActiveUserAccount(user)).length;
 
   permissionCount.textContent = selectedRole
-    ? `${permissions.size} droit(s) • ${usersInRole} compte(s)`
+    ? `${permissions.size} droit(s) • ${activeUsersInRole} compte(s) actif(s)`
     : "Aucun rôle";
   rolePermissionNotice.textContent = editable
     ? "Super Admin : glissez à droite pour accorder, à gauche pour refuser."
@@ -1530,7 +1514,6 @@ function persistSession({ sync = true } = {}) {
   state.session.auditLog = state.auditLog;
   state.session.rolePermissions = state.rolePermissions;
   state.session.academicConfigs = state.academicConfigs;
-  localStorage.setItem("somafrik-backoffice-session", JSON.stringify(state.session));
 
   if (sync) {
     scheduleBackOfficeSync();
@@ -1542,6 +1525,7 @@ async function refreshBackOfficeStateFromBackend() {
     const backendState = await request("/backoffice/state");
     applyBackOfficeState(backendState);
     persistSession({ sync: false });
+    renderOperationalViews();
   } catch (error) {
     console.warn("Synchronisation BackOffice indisponible.", error);
   }
@@ -1593,10 +1577,22 @@ async function syncBackOfficeState() {
     body: JSON.stringify(getBackOfficeStatePayload()),
   });
   applyBackOfficeState(synced);
-  localStorage.setItem("somafrik-backoffice-session", JSON.stringify({
-    ...state.session,
-    ...getBackOfficeStatePayload(),
-  }));
+  renderOperationalViews();
+}
+
+function startRealtimeSync() {
+  stopRealtimeSync();
+  state.realtimeIntervalId = setInterval(() => {
+    if (!state.session?.accessToken) return;
+    refreshBackOfficeStateFromBackend();
+  }, 5000);
+}
+
+function stopRealtimeSync() {
+  if (state.realtimeIntervalId) {
+    clearInterval(state.realtimeIntervalId);
+    state.realtimeIntervalId = null;
+  }
 }
 
 function initializeRolePermissions({ force = false } = {}) {
@@ -1634,7 +1630,24 @@ function enforceCountryAdminSchoolAdminCrud() {
   countryAdminSchoolAdminPermissions.forEach((permission) => countryAdminPermissions.add(permission));
   state.rolePermissions["Admin Pays"] = [...countryAdminPermissions].sort(sortPermissions);
 
+  const schoolAdminPermissions = new Set(state.rolePermissions["Admin School"] ?? []);
+  [...schoolAdminForbiddenFeatures].forEach((featureName) => {
+    [...schoolAdminPermissions].forEach((permission) => {
+      if (String(permission).startsWith(featureName) || isSchoolAdminForbiddenPermission(permission)) {
+        schoolAdminPermissions.delete(permission);
+      }
+    });
+  });
+  state.rolePermissions["Admin School"] = [...schoolAdminPermissions].sort(sortPermissions);
+
   state.users = state.users.map((user) => {
+    if (user.role === "Admin School") {
+      return {
+        ...user,
+        permissions: [...(state.rolePermissions["Admin School"] ?? user.permissions ?? [])].sort(sortPermissions),
+      };
+    }
+
     if (user.role !== "Admin Pays") return user;
     return {
       ...user,
@@ -1650,6 +1663,18 @@ function enforceCountryAdminSchoolAdminCrud() {
     state.session.user.scopeLevel = "Pays";
     state.session.user.schoolCode = "*";
   }
+
+  if (state.session?.user?.role === "Admin School") {
+    state.session.user.permissions = [...(state.rolePermissions["Admin School"] ?? state.session.user.permissions ?? [])].sort(sortPermissions);
+  }
+}
+
+function isSchoolAdminForbiddenPermission(permission) {
+  const normalizedPermission = normalize(permission);
+  return (
+    [...schoolAdminForbiddenFeatures].some((featureName) => String(permission).startsWith(featureName)) ||
+    schoolAdminForbiddenPermissionKeywords.some((keyword) => normalizedPermission.includes(keyword))
+  );
 }
 
 function getPermissionRoles() {
@@ -1680,6 +1705,10 @@ function hasBackOfficePermission(features, action = "READ") {
   const normalizedAction = action === "R" ? "READ" : action;
   const featureList = Array.isArray(features) ? features : [features];
   const permissions = new Set(getCurrentRolePermissions());
+
+  if (state.session.user.role === "Admin School" && featureList.some((feature) => schoolAdminForbiddenFeatures.has(feature))) {
+    return false;
+  }
 
   if (permissions.has("ALL_PRIVILEGES")) return true;
   if (featureList.includes("Droits par rôle")) return canManageRolePermissions();
@@ -2611,6 +2640,19 @@ function formatDate(date) {
 
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase();
+}
+
+function isActiveUserAccount(user) {
+  const status = normalizeUserStatus(user?.status);
+  return !["suspendu", "desactive", "disabled", "inactive", "inactif"].includes(status);
+}
+
+function normalizeUserStatus(value) {
+  return String(value ?? "Actif")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 function escapeHtml(value) {

@@ -58,6 +58,7 @@ class PostgresRepository {
       classRows,
       subjectRows,
       teacherRows,
+      teacherAssignmentRows,
       studentRows,
       gradeRows,
       attendanceRows,
@@ -104,6 +105,15 @@ class PostgresRepository {
         ORDER BY t.created_at, t.teacher_code
       `),
       this.all(`
+        SELECT t.teacher_code, cl.name AS class_name, sub.name AS subject_name
+        FROM teacher_assignments ta
+        JOIN teachers t ON t.id = ta.teacher_id
+        JOIN classes cl ON cl.id = ta.class_id
+        JOIN subjects sub ON sub.id = ta.subject_id
+        WHERE ta.status = 'active'
+        ORDER BY t.teacher_code, cl.name, sub.name
+      `),
+      this.all(`
         SELECT st.*, s.school_code, e.class_id, cl.name AS class_name, u.pin_hash AS student_pin_hash
         FROM students st
         JOIN schools s ON s.id = st.school_id
@@ -125,10 +135,11 @@ class PostgresRepository {
         ORDER BY g.created_at
       `),
       this.all(`
-        SELECT a.*, st.student_code, s.school_code
+        SELECT a.*, st.student_code, s.school_code, cl.name AS class_name
         FROM attendance a
         JOIN schools s ON s.id = a.school_id
         JOIN students st ON st.id = a.student_id
+        LEFT JOIN classes cl ON cl.id = a.class_id
         ORDER BY a.attendance_date, a.created_at
       `),
       this.all(`
@@ -168,7 +179,7 @@ class PostgresRepository {
       "id"
     );
     const courses = this.buildCourses(classRows, subjectRows, gradeRows);
-    const teachers = teacherRows.map((teacher) => this.mapTeacher(teacher, gradeRows));
+    const teachers = teacherRows.map((teacher) => this.mapTeacher(teacher, gradeRows, teacherAssignmentRows));
     const notes = gradeRows.map((grade) => this.mapGrade(grade));
     const payments = paymentRows.map((payment) => this.mapPayment(payment));
     const primarySchoolRow = schoolRows.find((row) => row.school_code === seedData.school.code) ?? schoolRows[0];
@@ -555,6 +566,93 @@ class PostgresRepository {
     );
     this.cachedDataset = null;
     return this.getGradeById(inserted.id);
+  }
+
+  async upsertAttendanceBatch(payload = {}, principal = {}) {
+    await this.init();
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    if (!items.length) {
+      return [];
+    }
+
+    const saved = [];
+    for (const item of items) {
+      saved.push(await this.upsertAttendance(item, principal));
+    }
+
+    this.cachedDataset = null;
+    return saved;
+  }
+
+  async upsertAttendance(payload, principal = {}) {
+    const attendanceDate = this.parseDate(payload.date);
+    if (!payload.studentId || !attendanceDate) {
+      const error = new Error("Présence invalide");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const student = await this.one(
+      `SELECT st.*, s.school_code, e.class_id, cl.name AS class_name
+       FROM students st
+       JOIN schools s ON s.id = st.school_id
+       LEFT JOIN enrollments e ON e.student_id = st.id AND e.status = 'active'
+       LEFT JOIN classes cl ON cl.id = e.class_id
+       WHERE st.student_code = $1 OR st.id::text = $1`,
+      [String(payload.studentId)]
+    );
+    if (!student || !student.class_id) {
+      const error = new Error("Élève ou classe introuvable pour l'appel");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (principal.role === "Enseignant" && !(principal.classNames ?? []).includes(student.class_name)) {
+      const error = new Error("Accès refusé: élève hors classe affectée.");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const teacher = await this.findTeacherForAttendance(student.school_id, principal.sub, student.class_id, principal.role);
+    const status = this.toAttendanceStatus(payload.status, payload.present);
+    const reason = payload.reason ?? (status === "excused" ? "Justifié" : null);
+    const existing = await this.one(
+      `SELECT id FROM attendance
+       WHERE student_id = $1 AND attendance_date = $2
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      [student.id, attendanceDate]
+    );
+
+    const row = existing
+      ? await this.one(
+          `UPDATE attendance
+           SET status = $1, reason = $2, teacher_id = $3, class_id = $4, updated_at = NOW()
+           WHERE id = $5
+           RETURNING id`,
+          [status, reason, teacher?.id ?? null, student.class_id, existing.id]
+        )
+      : await this.one(
+          `INSERT INTO attendance (school_id, student_id, class_id, teacher_id, attendance_date, status, reason)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id`,
+          [student.school_id, student.id, student.class_id, teacher?.id ?? null, attendanceDate, status, reason]
+        );
+
+    return this.getAttendanceById(row.id);
+  }
+
+  async getAttendanceById(id) {
+    const attendance = await this.one(
+      `SELECT a.*, st.student_code, s.school_code, cl.name AS class_name
+       FROM attendance a
+       JOIN schools s ON s.id = a.school_id
+       JOIN students st ON st.id = a.student_id
+       LEFT JOIN classes cl ON cl.id = a.class_id
+       WHERE a.id = $1`,
+      [id]
+    );
+    return attendance ? this.mapAttendance(attendance) : null;
   }
 
   async seedIfEmpty() {
@@ -1127,7 +1225,7 @@ class PostgresRepository {
     await this.init();
     const school = await this.getSchoolByCode(payload.schoolCode ?? seedData.school.code);
     if (!school) throw new Error("Établissement introuvable");
-    for (const field of ["name", "code", "coefficient", "level", "description", "status"]) {
+    for (const field of ["name", "code"]) {
       if (!payload[field]) throw new Error(`Champ obligatoire: ${field}`);
     }
 
@@ -1146,10 +1244,10 @@ class PostgresRepository {
         school.id,
         String(payload.code).trim().toUpperCase(),
         String(payload.name).trim(),
-        Number(payload.coefficient),
-        String(payload.level).trim(),
-        String(payload.description).trim(),
-        this.toAcademicStatus(payload.status),
+        Number(payload.coefficient ?? 1),
+        String(payload.level ?? "Tous niveaux").trim(),
+        String(payload.description ?? "").trim(),
+        this.toAcademicStatus(payload.status ?? "Actif"),
       ]
     );
     this.cachedDataset = null;
@@ -1165,7 +1263,7 @@ class PostgresRepository {
 
   async deleteSubject(subjectCode) {
     await this.init();
-    const subject = await this.one("SELECT id, subject_code FROM subjects WHERE subject_code = $1", [subjectCode]);
+    const subject = await this.one("SELECT id, subject_code FROM subjects WHERE subject_code = $1", [String(subjectCode).trim().toUpperCase()]);
     if (!subject) throw new Error("Matière introuvable");
     const usage = await this.one("SELECT COUNT(*)::int AS count FROM grades WHERE subject_id = $1", [subject.id]);
     if (usage.count > 0) {
@@ -1509,14 +1607,14 @@ class PostgresRepository {
     return user.email || user.phone || user.user_code;
   }
 
-  mapTeacher(teacher, gradeRows) {
-    const assignments = this.uniqueBy(
-      gradeRows
-        .filter((grade) => grade.teacher_code === teacher.teacher_code)
-        .map((grade) => ({ className: grade.class_name, course: grade.subject_name })),
-      "className",
-      "course"
-    );
+  mapTeacher(teacher, gradeRows, assignmentRows = []) {
+    const officialAssignments = assignmentRows
+      .filter((assignment) => assignment.teacher_code === teacher.teacher_code)
+      .map((assignment) => ({ className: assignment.class_name, course: assignment.subject_name }));
+    const gradeAssignments = gradeRows
+      .filter((grade) => grade.teacher_code === teacher.teacher_code)
+      .map((grade) => ({ className: grade.class_name, course: grade.subject_name }));
+    const assignments = this.uniqueBy([...officialAssignments, ...gradeAssignments], "className", "course");
     return {
       id: teacher.teacher_code,
       schoolId: teacher.school_id,
@@ -1583,7 +1681,9 @@ class PostgresRepository {
       schoolCode: attendance.school_code,
       publicId: attendance.id,
       studentId: attendance.student_code,
+      className: attendance.class_name,
       date: this.formatIsoDate(attendance.attendance_date),
+      savedAt: this.formatIsoDateTime(attendance.updated_at ?? attendance.created_at),
       present: status === "Présent" || status === "Retard",
       status,
     };
@@ -1732,6 +1832,27 @@ class PostgresRepository {
     return assignedTeacher ?? this.one("SELECT * FROM teachers WHERE school_id = $1 ORDER BY created_at LIMIT 1", [schoolId]);
   }
 
+  async findTeacherForAttendance(schoolId, teacherCode, classId, principalRole) {
+    const assignedTeacher = teacherCode
+      ? await this.one(
+          `SELECT t.*
+           FROM teachers t
+           JOIN teacher_assignments ta ON ta.teacher_id = t.id
+           WHERE t.school_id = $1
+             AND t.teacher_code = $2
+             AND ta.class_id = $3
+           LIMIT 1`,
+          [schoolId, String(teacherCode), classId]
+        )
+      : null;
+
+    if (principalRole === "Enseignant") {
+      return assignedTeacher;
+    }
+
+    return assignedTeacher ?? this.one("SELECT * FROM teachers WHERE school_id = $1 ORDER BY created_at LIMIT 1", [schoolId]);
+  }
+
   mentionForScore(score) {
     if (score >= 16) return "Très bien";
     if (score >= 14) return "Bien";
@@ -1796,7 +1917,18 @@ class PostgresRepository {
     if (!value) return "";
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toISOString().slice(0, 10);
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  formatIsoDateTime(value) {
+    if (!value) return "";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toISOString();
   }
 
   toDbStatus(status) {

@@ -10,6 +10,7 @@
     "mobile:web": "npm --prefix Mobile run web",
     "mobile:android": "npm --prefix Mobile run android",
     "mobile:ios": "npm --prefix Mobile run ios",
-    "check": "node -c backend/server.js && node -c backend/db/postgresRepository.js && node --check BackOffice/app.js && cd Mobile && npx tsc --noEmit"
+    "check": "node -c backend/server.js && node -c backend/db/postgresRepository.js && node --check BackOffice/app.js && cd Mobile && npx tsc --noEmit",
+    "check:api": "node scripts/verify-api-connections.js"
   }
 }

@@ -154,7 +154,7 @@ const securityMatrix = {
   "Établissements": {
     "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
-    "Admin School": "R",
+    "Admin School": "-",
     "Préfet des études": "-",
     Enseignant: "-",
     Secrétaire: "-",
@@ -244,7 +244,7 @@ const securityMatrix = {
   Abonnements: {
     "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
-    "Admin School": "R",
+    "Admin School": "-",
     "Préfet des études": "-",
     Enseignant: "-",
     Secrétaire: "R",
@@ -294,7 +294,7 @@ const securityMatrix = {
   "Paramètres Établissement": {
     "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
-    "Admin School": "CRUD",
+    "Admin School": "-",
     "Préfet des études": "R",
     Enseignant: "-",
     Secrétaire: "-",

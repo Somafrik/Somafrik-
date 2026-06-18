@@ -101,6 +101,7 @@ export type RootStackParamList = {
   Synchronization: undefined;
   AdminCrud: {
     entity: AdminEntity;
+    filter?: "paid" | "pending";
   };
 };
 
@@ -154,7 +155,7 @@ export default function AppNavigator() {
 
         {canOpenAdminCrud && (
           <>
-            {canReadRoute(session, "SchoolManagement") && <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />}
+            {session?.role !== "school_admin" && canReadRoute(session, "SchoolManagement") && <Stack.Screen name="SchoolManagement" component={SchoolManagementScreen} />}
             {canReadRoute(session, "Teachers") && <Stack.Screen name="Teachers" component={TeachersScreen} />}
             {canReadRoute(session, "Payments") && <Stack.Screen name="Payments" component={PaymentsScreen} />}
             <Stack.Screen name="AdminCrud" component={AdminCrudScreen} options={{ title: "Administration" }} />

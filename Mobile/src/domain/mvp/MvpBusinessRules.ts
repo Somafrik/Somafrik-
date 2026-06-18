@@ -97,7 +97,7 @@ export class MvpBusinessRules {
       this.module("Internat", "À formaliser", ["Chambres", "Occupation", "Paiements"]),
       this.module("Rapports", "Partiel", ["Académique", "Financier", "Présence", "Export"]),
       this.module("Rôles mobiles", "Formalisé", ["Enseignant", "Parent", "Élève / Étudiant"]),
-      this.module("Mode hors connexion", "À formaliser", ["Consultation locale", "Synchronisation", "Conflits"]),
+      this.module("Synchronisation API", "Formalisé", ["Lecture backend", "Écriture backend", "Rafraîchissement périodique"]),
       this.module("Audit", "Formalisé", ["Journal actions", "Historique modifications", "Connexions"]),
       this.module("Paramètres établissement", "Partiel", ["Logo", "Devise", "Langue", "Fuseau", "Académique", "Financier"]),
       this.module("Sécurité", "Partiel", ["Authentification", "Mot de passe", "Sessions", "Permissions"]),

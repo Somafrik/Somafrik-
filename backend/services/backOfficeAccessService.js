@@ -158,7 +158,7 @@ class BackOfficeAccessService {
       return this.subscriptions.filter((subscription) => subscription.countryCode === this.getCountryCode(user.countryScope));
     }
 
-    return this.subscriptions.filter((subscription) => subscription.schoolCode === user.schoolCode);
+    return [];
   }
 
   getScopedNotifications(user) {
@@ -193,7 +193,7 @@ class BackOfficeAccessService {
       return ["Dashboard", "Établissements", "Validations", "Paiements", "Rapports", "Support", "Paramètres"];
     }
 
-    return ["Dashboard", "Établissements", "Utilisateurs", "Paramètres"];
+    return ["Dashboard", "Utilisateurs", "Paramètres"];
   }
 
   getDashboard(user) {
@@ -247,7 +247,7 @@ class BackOfficeAccessService {
       profile: "Administrateur École",
       privilegeLevel: "SCHOOL_PRIVILEGES",
       kpis: [
-        { label: "Établissements", value: scopedSchools.length },
+        { label: "Établissement", value: scopedSchools.length },
         { label: "Utilisateurs", value: scopedUsers.length },
         { label: "Permissions", value: user.permissions?.length ?? 0 },
       ],

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-nati
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats } from "../domain/metrics/schoolMetrics";
 import { useAuth } from "../context/AuthContext";
-import { canMutateEntity, canReadEntity, canReadRoute } from "../domain/security/permissions";
+import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
 
 export default function PaymentsScreen({ navigation }: any) {
   const { session } = useAuth();
@@ -12,7 +12,6 @@ export default function PaymentsScreen({ navigation }: any) {
   const canCreate = canMutateEntity(session, "payments", "CREATE");
   const canUpdate = canMutateEntity(session, "payments", "UPDATE");
   const canReadPayments = canReadEntity(session, "payments");
-  const canReadStudentPayments = canReadRoute(session, "StudentPayments");
   const canOpenPaymentAdmin = canReadPayments || canCreate || canUpdate;
 
   return (
@@ -24,16 +23,22 @@ export default function PaymentsScreen({ navigation }: any) {
         style={styles.summaryCard}
         onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })}
       >
-        <Text style={styles.summaryLabel}>Montant encaissé ce mois</Text>
-        <Text style={styles.summaryAmount}>{paymentStats.paidAmount.toLocaleString()} FC</Text>
-        <Text style={styles.summarySub}>{paymentStats.rate}% des paiements réglés</Text>
+        <Text style={styles.summaryLabel}>Frais de scolarité estimés</Text>
+        <Text style={styles.summaryAmount}>{(paymentStats.paidAmount + paymentStats.pendingAmount).toLocaleString()} FC</Text>
+        <Text style={styles.summarySub}>Reste estimé : {paymentStats.pendingAmount.toLocaleString()} FC</Text>
       </TouchableOpacity>
+
+      <View style={styles.summaryCardSecondary}>
+        <Text style={styles.summaryLabelDark}>Montant encaissé</Text>
+        <Text style={styles.summaryAmountDark}>{paymentStats.paidAmount.toLocaleString()} FC</Text>
+        <Text style={styles.summarySubDark}>{paymentStats.rate}% des paiements réglés</Text>
+      </View>
 
       <View style={styles.row}>
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.smallCard}
-          onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })}
+          onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments", filter: "paid" })}
         >
           <Text style={styles.smallNumber}>{paymentStats.paid}</Text>
           <Text style={styles.smallLabel}>Payés</Text>
@@ -42,7 +47,7 @@ export default function PaymentsScreen({ navigation }: any) {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.smallCard}
-          onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })}
+          onPress={() => canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments", filter: "pending" })}
         >
           <Text style={styles.smallNumber}>{paymentStats.pending}</Text>
           <Text style={styles.smallLabel}>Impayés</Text>
@@ -58,17 +63,16 @@ export default function PaymentsScreen({ navigation }: any) {
         return (
           <TouchableOpacity
             key={payment.id}
-            activeOpacity={0.85}
             style={styles.paymentCard}
-            onPress={() =>
-              student && canReadStudentPayments
-                ? navigation.navigate("StudentPayments", { studentId: student.id })
-                : canOpenPaymentAdmin && navigation.navigate("AdminCrud", { entity: "payments" })
-            }
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate("StudentPayments", { studentId: payment.studentId })}
           >
-            <View>
+            <View style={styles.paymentContent}>
               <Text style={styles.name}>{student?.name ?? "Élève inconnu"}</Text>
-              <Text style={styles.subtitle}>{payment.amount.toLocaleString()} FC • {payment.date}</Text>
+              <Text style={styles.subtitle}>Montant : {payment.amount.toLocaleString()} FC</Text>
+              <Text style={styles.subtitle}>Date : {payment.date} • Mode : {payment.method ?? "Non renseigné"}</Text>
+              <Text style={styles.subtitle}>Référence : {payment.publicId ?? payment.id}</Text>
+              <Text style={styles.historyHint}>Ouvrir l'historique et le reste à payer</Text>
             </View>
 
             <Text style={[styles.badge, isPending && styles.badgeDanger]}>
@@ -103,7 +107,16 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { color: "#DBEAFE", fontSize: 15 },
   summaryAmount: { color: "#FFFFFF", fontSize: 32, fontWeight: "800", marginTop: 8 },
+  summaryAmountDark: { color: "#0F172A", fontSize: 32, fontWeight: "800", marginTop: 8 },
   summarySub: { color: "#E5E7EB", marginTop: 8 },
+  summaryCardSecondary: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 18,
+  },
+  summaryLabelDark: { color: "#64748B", fontSize: 15, fontWeight: "700" },
+  summarySubDark: { color: "#64748B", marginTop: 8 },
   row: { flexDirection: "row", justifyContent: "space-between" },
   smallCard: {
     width: "48%",
@@ -122,10 +135,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 12,
   },
+  paymentContent: { flex: 1, minWidth: 0 },
   name: { fontSize: 16, fontWeight: "700", color: "#111827" },
   subtitle: { marginTop: 5, color: "#6B7280" },
+  historyHint: { marginTop: 8, color: "#2563EB", fontWeight: "800" },
   badge: {
     backgroundColor: "#DCFCE7",
     color: "#166534",
@@ -133,6 +149,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     fontWeight: "700",
+    overflow: "hidden",
   },
   badgeDanger: { backgroundColor: "#FEE2E2", color: "#991B1B" },
   button: {

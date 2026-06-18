@@ -30,8 +30,11 @@ export default function HomeScreen({ navigation }: any) {
     schoolsData[0] ??
     school;
   const studentIds = studentsData.map((student) => student.id);
-  const presenceStats = getPresenceStats(presencesData, studentIds);
+  const todayPresenceRows = presencesData.filter((presence) => isTodayPresence(presence.date));
+  const presenceStats = getPresenceStats(todayPresenceRows, studentIds);
+  const attendanceCallCount = countAttendanceCalls(todayPresenceRows, studentsData);
   const paymentStats = getPaymentStats(paymentsData, studentIds);
+  const activeUsersCount = usersData.filter(isActiveUserAccount).length;
   const userName = session?.user.name ?? "Administrateur";
   const welcomeGreeting = buildTimeGreeting(currentSchool.timezone);
   const welcomeName = getGreetingName(userName, session?.role);
@@ -49,7 +52,9 @@ export default function HomeScreen({ navigation }: any) {
     const courses = session.user.courses ?? [];
     const teacherStudents = studentsData.filter((student) => assignedClasses.includes(student.className));
     const teacherStudentIds = teacherStudents.map((student) => student.id);
-    const teacherPresenceStats = getPresenceStats(presencesData, teacherStudentIds);
+    const teacherTodayPresenceRows = presencesData.filter((presence) => isTodayPresence(presence.date));
+    const teacherPresenceStats = getPresenceStats(teacherTodayPresenceRows, teacherStudentIds);
+    const teacherAttendanceCallCount = countAttendanceCalls(teacherTodayPresenceRows, teacherStudents);
     const teacherNotes = notes.filter(
       (note) => teacherStudentIds.includes(note.studentId) && courses.includes(note.subject)
     );
@@ -119,6 +124,7 @@ export default function HomeScreen({ navigation }: any) {
               icon="checkmark-circle-outline"
               value={`${teacherPresenceStats.rate}%`}
               label="Présence"
+              meta={`${teacherAttendanceCallCount} appel(s) • ${teacherPresenceStats.attended}/${teacherPresenceStats.total} élève(s)`}
               color="#16A34A"
               bg="#ECFDF5"
               onPress={() => navigation.navigate("TeacherAttendance")}
@@ -397,7 +403,15 @@ export default function HomeScreen({ navigation }: any) {
               <StatCard icon="people-outline" value={String(studentsData.length)} label="Élèves" color="#7C3AED" bg="#F5F3FF" onPress={() => navigation.navigate("TeacherStudents")} />
             )}
             {canReadRoute(session, "TeacherAttendance") && (
-              <StatCard icon="checkmark-circle-outline" value={`${presenceStats.rate}%`} label="Présence" color="#16A34A" bg="#ECFDF5" onPress={() => navigation.navigate("TeacherAttendance")} />
+              <StatCard
+                icon="checkmark-circle-outline"
+                value={`${presenceStats.rate}%`}
+                label="Présence"
+                meta={`${attendanceCallCount} appel(s) • ${presenceStats.attended}/${presenceStats.total} élève(s)`}
+                color="#16A34A"
+                bg="#ECFDF5"
+                onPress={() => navigation.navigate("TeacherAttendance")}
+              />
             )}
             {canReadEntity(session, "payments") && (
               <StatCard icon="card-outline" value={`${paymentStats.rate}%`} label="Paiements" color="#EA580C" bg="#FFF7ED" onPress={() => navigation.navigate("Payments")} />
@@ -499,8 +513,9 @@ export default function HomeScreen({ navigation }: any) {
           {canReadUsers && (
             <StatCard
               icon="person-outline"
-              value={String(usersData.length)}
+              value={String(activeUsersCount)}
               label="Utilisateurs"
+              meta="Comptes actifs"
               color="#7C3AED"
               bg="#F5F3FF"
               onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
@@ -512,6 +527,7 @@ export default function HomeScreen({ navigation }: any) {
               icon="checkmark-circle-outline"
               value={`${presenceStats.rate}%`}
               label="Présence"
+              meta={`${attendanceCallCount} appel(s) • ${presenceStats.attended}/${presenceStats.total} élève(s)`}
               color="#16A34A"
               bg="#ECFDF5"
               onPress={() => navigation.navigate("TeacherAttendance")}
@@ -694,6 +710,56 @@ function getHourForTimezone(timezone?: string) {
   }
 }
 
+function isActiveUserAccount(user: any) {
+  const status = normalizeStatus(user?.status);
+  return !["suspendu", "desactive", "désactivé", "disabled", "inactive", "inactif"].includes(status);
+}
+
+function normalizeStatus(value?: string) {
+  return String(value ?? "Actif")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isTodayPresence(dateValue?: string) {
+  return toDateKey(dateValue) === toDateKey(new Date());
+}
+
+function countAttendanceCalls(presenceRows: any[], students: any[]) {
+  const studentClassById = new Map(students.map((student) => [student.id, student.className]));
+  const callKeys = new Set(
+    presenceRows.map((presence) => {
+      const className = presence.className ?? studentClassById.get(presence.studentId) ?? "Classe inconnue";
+      return `${toDateKey(presence.date)}-${className}`;
+    })
+  );
+  return callKeys.size;
+}
+
+function toDateKey(value?: string | Date) {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return [
+      value.getFullYear(),
+      String(value.getMonth() + 1).padStart(2, "0"),
+      String(value.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  const text = String(value).trim();
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const localMatch = text.match(/^(\d{2})-(\d{2})-(\d{4})/);
+  if (localMatch) return `${localMatch[3]}-${localMatch[2]}-${localMatch[1]}`;
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return toDateKey(parsed);
+}
+
 function getGreetingName(userName: string, role?: string) {
   if (!userName || /somafrik/i.test(userName)) {
     return role === "school_admin" ? "Administrateur" : "";
@@ -744,12 +810,13 @@ type StatCardProps = {
   icon: keyof typeof Ionicons.glyphMap;
   value: string;
   label: string;
+  meta?: string;
   color: string;
   bg: string;
   onPress?: () => void;
 };
 
-function StatCard({ icon, value, label, color, bg, onPress }: StatCardProps) {
+function StatCard({ icon, value, label, meta, color, bg, onPress }: StatCardProps) {
   return (
     <TouchableOpacity activeOpacity={0.85} style={styles.statCard} onPress={onPress}>
       <View style={[styles.statIconBox, { backgroundColor: bg }]}>
@@ -758,6 +825,7 @@ function StatCard({ icon, value, label, color, bg, onPress }: StatCardProps) {
 
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
+      {meta ? <Text style={styles.statMeta}>{meta}</Text> : null}
     </TouchableOpacity>
   );
 }
@@ -1045,6 +1113,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     color: "#64748B",
+  },
+
+  statMeta: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#94A3B8",
   },
 
   activityCard: {

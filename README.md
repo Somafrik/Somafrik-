@@ -27,11 +27,18 @@ Mobile Expo :
 npm --prefix Mobile run start -- --clear
 ```
 
-Pour le mobile, configurez l'API si besoin :
+Mobile Expo avec Docker Desktop :
 
 ```powershell
-$env:EXPO_PUBLIC_API_URL="http://ADRESSE_IP_DU_PC:5000"
+docker compose up -d postgres backend mobile
+docker compose logs -f mobile
 ```
+
+Dans `.env`, remplacez `ADRESSE_IP_DU_PC` par l'adresse Wi-Fi du PC, par exemple `192.168.1.141`. Le téléphone doit être sur le même Wi-Fi et ouvrir le QR Code affiché dans les logs du service `somafrik-mobile`.
+
+Gardez `EXPO_PUBLIC_DEMO_MODE=false` pour forcer l'application mobile à utiliser l'API et PostgreSQL. Le mode `true` sert uniquement aux démonstrations hors connexion.
+
+Si le port Expo `8081` ou `8082` est déjà utilisé, gardez `EXPO_PORT=8083` dans `.env` puis relancez le service mobile.
 
 ## Comptes de démonstration
 

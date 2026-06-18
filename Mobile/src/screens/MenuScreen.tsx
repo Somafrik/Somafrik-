@@ -22,7 +22,7 @@ const adminMenuItems: MenuItem[] = [
   { label: "👨‍🏫 Enseignants", entity: "teachers" },
   { label: "📚 Classes", entity: "classes" },
   { label: "📖 Cours", entity: "courses" },
-  { label: "🔁 Affectations profs", entity: "assignments" },
+  { label: "🔁 Affectations", entity: "assignments" },
   { label: "💰 Paiements", entity: "payments" },
   { label: "⚙️ Statuts paiement", entity: "paymentStatuses" },
   { label: "💬 Messages parents", route: "Messages" },

@@ -30,6 +30,9 @@ type Field = {
   type?: "text" | "select" | "date" | "photo";
 };
 
+const teacherCourseAssignmentType = "Professeur → cours";
+const studentClassAssignmentType = "Élève → classe";
+
 const configs: Record<
   AdminEntity,
   {
@@ -97,10 +100,12 @@ const configs: Record<
     ],
   },
   assignments: {
-    title: "Affectations profs",
-    addLabel: "Affecter un cours",
+    title: "Gestion des affectations",
+    addLabel: "Nouvelle affectation",
     fields: [
-      { key: "teacherId", label: "ID enseignant", placeholder: "Choisir un enseignant", type: "select" },
+      { key: "assignmentType", label: "Type d'affectation", placeholder: "Choisir le type", type: "select" },
+      { key: "teacherId", label: "Enseignant", placeholder: "Choisir un enseignant", type: "select" },
+      { key: "studentId", label: "Élève", placeholder: "Choisir un élève", type: "select" },
       { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
       { key: "course", label: "Cours", placeholder: "Choisir un cours", type: "select" },
     ],
@@ -214,7 +219,7 @@ const configs: Record<
 };
 
 export default function AdminCrudScreen({ route }: Props) {
-  const { entity } = route.params;
+  const { entity, filter } = route.params;
   const { session } = useAuth();
   const {
     getItems,
@@ -247,6 +252,7 @@ export default function AdminCrudScreen({ route }: Props) {
   const [userStatusFilter, setUserStatusFilter] = useState("Tous");
   const [dateField, setDateField] = useState<Field | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarStep, setCalendarStep] = useState<"year" | "month" | "day">("year");
   const canCreate = canMutateEntity(session, entity, "CREATE");
   const canRead = canReadEntity(session, entity);
   const canUpdate = canMutateEntity(session, entity, "UPDATE");
@@ -302,13 +308,21 @@ export default function AdminCrudScreen({ route }: Props) {
         const matchesRole = userRoleFilter === "Tous" || normalize(item.role) === normalize(userRoleFilter);
         const matchesStatus = userStatusFilter === "Tous" || normalize(item.status) === normalize(userStatusFilter);
 
-        return adminCreated && !isPlatformUserRole(item.role) && matchesSearch && matchesRole && matchesStatus;
+        return canShowUserForSession(item, session) && matchesSearch && matchesRole && matchesStatus;
+      });
+    }
+
+    if (entity === "payments" && filter) {
+      return items.filter((item: any) => {
+        const isPaid = item.status === "PAYE";
+        return filter === "paid" ? isPaid : !isPaid;
       });
     }
 
     return items;
   }, [
     entity,
+    filter,
     items,
     schoolCountryFilter,
     schoolTypeFilter,
@@ -318,7 +332,12 @@ export default function AdminCrudScreen({ route }: Props) {
     userStatusFilter,
   ]);
 
-  const statsLabel = useMemo(() => `${visibleItems.length} élément(s)`, [visibleItems.length]);
+  const statsLabel = useMemo(() => {
+    if (entity === "payments" && filter === "pending") return `${visibleItems.length} impayé(s)`;
+    if (entity === "payments" && filter === "paid") return `${visibleItems.length} paiement(s) payé(s)`;
+    if (entity === "users") return `${visibleItems.filter(isActiveUserAccount).length} utilisateur(s) actif(s)`;
+    return `${visibleItems.length} élément(s)`;
+  }, [entity, filter, visibleItems]);
 
   const openCreate = () => {
     if (!canCreate) {
@@ -366,6 +385,30 @@ export default function AdminCrudScreen({ route }: Props) {
       return;
     }
 
+    if (entity === "assignments" && form.assignmentType === studentClassAssignmentType) {
+      const studentId = parseSelectId(form.studentId);
+      const className = form.className;
+      const student = studentsData.find((item) => matchesEntityId(item, studentId));
+      const classExists = classesData.some((schoolClass) => normalize(schoolClass.name) === normalize(className));
+
+      if (!studentId || !className || !student || !classExists) {
+        Alert.alert("Affectation impossible", "Choisissez un élève et une classe de votre établissement.");
+        return;
+      }
+
+      updateItem("students", {
+        ...student,
+        className,
+        history: [
+          ...((student as any).history ?? []),
+          `Affecté à la classe ${className} le ${formatDate(new Date())}`,
+        ],
+      });
+      setVisible(false);
+      Alert.alert("Affectation enregistrée", `${student.name} est maintenant dans la classe ${className}.`);
+      return;
+    }
+
     const nextItem = formToItem(entity, form, editingItem?.id, {
       studentsData,
       teachersData,
@@ -410,6 +453,10 @@ export default function AdminCrudScreen({ route }: Props) {
       createItem(entity as any, nextItem as any);
     }
 
+    if (entity === "assignments") {
+      syncTeacherCourseAssignment(nextItem, editingItem);
+    }
+
     if (entity === "courses") {
       setSelectedCourseClass(String(nextItem.className ?? ""));
     }
@@ -428,9 +475,55 @@ export default function AdminCrudScreen({ route }: Props) {
       {
         text: "Supprimer",
         style: "destructive",
-        onPress: () => deleteItem(entity, item.id),
+        onPress: () => {
+          deleteItem(entity, item.id);
+          if (entity === "assignments") {
+            removeTeacherCourseAssignment(item);
+          }
+        },
       },
     ]);
+  };
+
+  const syncTeacherCourseAssignment = (assignment: any, previousAssignment?: any) => {
+    if (previousAssignment) {
+      removeTeacherCourseAssignment(previousAssignment);
+    }
+
+    const teacher = teachersData.find((item) => matchesEntityId(item, assignment.teacherId));
+    if (!teacher) return;
+
+    const nextTeacherAssignments = [
+      ...(teacher.assignments ?? []).filter(
+        (item: any) =>
+          normalize(item.className) !== normalize(assignment.className) ||
+          normalize(item.course) !== normalize(assignment.course)
+      ),
+      { className: assignment.className, course: assignment.course, teacherId: teacher.id },
+    ];
+
+    updateItem("teachers", {
+      ...teacher,
+      assignments: nextTeacherAssignments,
+      assignedClasses: [...new Set(nextTeacherAssignments.map((item: any) => item.className))],
+    });
+  };
+
+  const removeTeacherCourseAssignment = (assignment: any) => {
+    const teacher = teachersData.find((item) => matchesEntityId(item, assignment.teacherId));
+    if (!teacher) return;
+
+    const nextTeacherAssignments = (teacher.assignments ?? []).filter(
+      (item: any) =>
+        normalize(item.className) !== normalize(assignment.className) ||
+        normalize(item.course) !== normalize(assignment.course)
+    );
+
+    updateItem("teachers", {
+      ...teacher,
+      assignments: nextTeacherAssignments,
+      assignedClasses: [...new Set(nextTeacherAssignments.map((item: any) => item.className))],
+    });
   };
 
   const resetUserPassword = async (item: any) => {
@@ -529,7 +622,7 @@ export default function AdminCrudScreen({ route }: Props) {
         <>
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.title}>{config.title}</Text>
+            <Text style={styles.title}>{getScreenTitle(config.title, entity, filter)}</Text>
             <Text style={styles.subtitle}>{statsLabel}</Text>
           </View>
           {canCreate && (
@@ -734,7 +827,8 @@ export default function AdminCrudScreen({ route }: Props) {
                       style={styles.selectInput}
                       activeOpacity={0.85}
                       onPress={() => {
-                        setCalendarMonth(parseDisplayDate(form[field.key]) ?? new Date());
+                        setCalendarMonth(getInitialCalendarDate(field, form[field.key]));
+                        setCalendarStep("year");
                         setDateField(field);
                       }}
                     >
@@ -838,6 +932,11 @@ export default function AdminCrudScreen({ route }: Props) {
                       setForm((current) => ({
                         ...current,
                         [selectField.key]: option,
+        ...(entity === "assignments" && selectField.key === "assignmentType"
+          ? option === studentClassAssignmentType
+            ? { teacherId: "", course: "" }
+            : { studentId: "" }
+          : {}),
         ...(entity === "users" && selectField.key === "role"
           ? getRoleDefaults(option, form.schoolCode || getDefaultSchoolCode(schoolsData, session))
           : {}),
@@ -875,42 +974,107 @@ export default function AdminCrudScreen({ route }: Props) {
             <View style={styles.calendarHeader}>
               <TouchableOpacity
                 style={styles.calendarNav}
-                onPress={() => setCalendarMonth(addMonths(calendarMonth, -1))}
+                onPress={() => {
+                  if (calendarStep === "year") {
+                    setDateField(null);
+                    return;
+                  }
+                  setCalendarStep(calendarStep === "day" ? "month" : "year");
+                }}
               >
-                <Ionicons name="chevron-back" size={20} color="#0F172A" />
+                <Ionicons name={calendarStep === "year" ? "close" : "chevron-back"} size={20} color="#0F172A" />
               </TouchableOpacity>
-              <Text style={styles.selectorTitle}>{formatMonth(calendarMonth)}</Text>
+              <View style={styles.calendarTitleBox}>
+                <Text style={styles.selectorTitle}>{getCalendarStepTitle(calendarStep, calendarMonth)}</Text>
+                <Text style={styles.calendarSubtitle}>{getCalendarStepSubtitle(calendarStep)}</Text>
+              </View>
               <TouchableOpacity
                 style={styles.calendarNav}
-                onPress={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+                onPress={() => setDateField(null)}
               >
-                <Ionicons name="chevron-forward" size={20} color="#0F172A" />
+                <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.weekRow}>
-              {["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"].map((day) => (
-                <Text key={day} style={styles.weekDay}>{day}</Text>
-              ))}
-            </View>
+            {calendarStep === "year" && (
+              <ScrollView style={styles.calendarStepScroll} showsVerticalScrollIndicator={false}>
+                <View style={styles.yearGrid}>
+                  {buildYearOptions(dateField, calendarMonth).map((year) => {
+                    const selected = year === calendarMonth.getFullYear();
+                    return (
+                      <TouchableOpacity
+                        key={`year-${year}`}
+                        style={[styles.yearChip, selected && styles.yearChipActive]}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          setCalendarMonth(setCalendarYear(calendarMonth, year));
+                          setCalendarStep("month");
+                        }}
+                      >
+                        <Text style={[styles.yearChipText, selected && styles.yearChipTextActive]}>
+                          {year}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
 
-            <View style={styles.daysGrid}>
-              {buildCalendarDays(calendarMonth).map((day, index) => (
-                <TouchableOpacity
-                  key={`${day?.toISOString() ?? "empty"}-${index}`}
-                  disabled={!day}
-                  style={[styles.dayCell, !day && styles.dayCellEmpty]}
-                  onPress={() => {
-                    if (day && dateField) {
-                      setForm((current) => ({ ...current, [dateField.key]: formatDate(day) }));
-                    }
-                    setDateField(null);
-                  }}
-                >
-                  <Text style={styles.dayText}>{day ? day.getDate() : ""}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {calendarStep === "month" && (
+              <View style={styles.monthGrid}>
+                {monthNames.map((month, index) => {
+                  const selected = index === calendarMonth.getMonth();
+                  return (
+                    <TouchableOpacity
+                      key={month}
+                      style={[styles.monthChip, selected && styles.monthChipActive]}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setCalendarMonth(setCalendarMonthIndex(calendarMonth, index));
+                        setCalendarStep("day");
+                      }}
+                    >
+                      <Text style={[styles.monthChipText, selected && styles.monthChipTextActive]}>
+                        {month}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {calendarStep === "day" && (
+              <>
+                <View style={styles.weekRow}>
+                  {["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"].map((day) => (
+                    <Text key={day} style={styles.weekDay}>{day}</Text>
+                  ))}
+                </View>
+
+                <View style={styles.daysGrid}>
+                  {buildCalendarDays(calendarMonth).map((day, index) => {
+                    const selectedDate = dateField ? parseDisplayDate(form[dateField.key]) : null;
+                    const selected = Boolean(day && selectedDate && isSameDate(day, selectedDate));
+                    return (
+                      <TouchableOpacity
+                        key={`${day?.toISOString() ?? "empty"}-${index}`}
+                        disabled={!day}
+                        style={[styles.dayCell, !day && styles.dayCellEmpty]}
+                        onPress={() => {
+                          if (day && dateField) {
+                            setForm((current) => ({ ...current, [dateField.key]: formatDate(day) }));
+                          }
+                          setDateField(null);
+                        }}
+                      >
+                        <Text style={[styles.dayText, selected && styles.dayTextActive]}>{day ? day.getDate() : ""}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
             <TouchableOpacity style={styles.selectorCancel} onPress={() => setDateField(null)}>
               <Text style={styles.cancelText}>Fermer</Text>
@@ -923,6 +1087,13 @@ export default function AdminCrudScreen({ route }: Props) {
 }
 
 function itemToForm(entity: AdminEntity, item: any) {
+  if (entity === "assignments") {
+    return {
+      ...Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value ?? "")])),
+      assignmentType: teacherCourseAssignmentType,
+    };
+  }
+
   if (entity === "users") {
     return {
       ...Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value ?? "")])),
@@ -936,6 +1107,10 @@ function itemToForm(entity: AdminEntity, item: any) {
 }
 
 function getInitialForm(entity: AdminEntity, context?: any): Record<string, string> {
+  if (entity === "assignments") {
+    return { assignmentType: teacherCourseAssignmentType };
+  }
+
   if (entity === "users") {
     const schoolCode = getDefaultSchoolCode(context?.schoolsData ?? [], context?.session);
     const role = "Secrétaire";
@@ -966,13 +1141,13 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     return {
       id: nextId,
       publicId,
+      schoolCode,
       name: form.name,
       firstName: form.firstName ?? "",
       matricule: publicId,
       gender: form.gender || "Non renseigné",
       birthDate: form.birthDate || "",
       className: form.className,
-      schoolCode,
       parentName: form.parentName ?? "",
       parentPhone: form.parentPhone ?? "",
       parentEmail: form.parentEmail ?? "",
@@ -986,6 +1161,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     return {
       id: nextId,
       publicId,
+      schoolCode,
       name: form.name,
       firstName: form.firstName ?? "",
       gender: form.gender || "Non renseigné",
@@ -1001,6 +1177,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     return {
       id: nextId,
       publicId: form.publicId || generatePublicId("CLS", year, context?.classesData ?? [], 6),
+      schoolCode,
       name: form.name,
       level: form.level ?? "",
       track: form.track ?? "",
@@ -1030,6 +1207,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     return {
       id: nextId,
       publicId: form.publicId || generatePublicId("COU", year, context?.coursesData ?? [], 6),
+      schoolCode,
       className: form.className,
       name: form.name,
       coefficient: Number(form.coefficient) || 1,
@@ -1038,9 +1216,11 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
 
   if (entity === "assignments") {
     if (!form.teacherId || !form.className || !form.course) return null;
+    const teacherId = parseSelectId(form.teacherId);
     return {
       id: nextId,
-      teacherId: form.teacherId,
+      schoolCode,
+      teacherId,
       className: form.className,
       course: form.course,
     };
@@ -1051,6 +1231,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     return {
       id: nextId,
       publicId: form.publicId || generatePublicId("PAY", year, context?.paymentsData ?? [], 6),
+      schoolCode,
       studentId: form.studentId,
       amount: Number(form.amount) || 0,
       date: form.date || formatDate(new Date()),
@@ -1087,6 +1268,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     if (!form.label || !form.value) return null;
     return {
       id: nextId,
+      schoolCode,
       label: form.label,
       value: form.value.trim().toUpperCase().replace(/\s+/g, "_"),
     };
@@ -1190,6 +1372,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
     if (!form.parentPhone || !form.theme || !form.message) return null;
     return {
       id: nextId,
+      schoolCode,
       parentPhone: form.parentPhone,
       studentId: form.studentId ?? "",
       teacherId: "",
@@ -1214,6 +1397,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
   if (!form.title || !form.message) return null;
   return {
     id: nextId,
+    schoolCode,
     title: form.title,
     message: form.message,
     date: form.date || formatDate(new Date()),
@@ -1231,6 +1415,12 @@ function getPrimaryText(entity: AdminEntity, item: any) {
   if (entity === "assignments") return `${item.className} - ${item.course}`;
   if (entity === "messages") return item.theme;
   return item.name;
+}
+
+function getScreenTitle(baseTitle: string, entity: AdminEntity, filter?: string) {
+  if (entity === "payments" && filter === "pending") return "Gestion des impayés";
+  if (entity === "payments" && filter === "paid") return "Paiements payés";
+  return baseTitle;
 }
 
 function getSecondaryText(entity: AdminEntity, item: any) {
@@ -1463,6 +1653,19 @@ function normalize(value: unknown) {
     .toLowerCase();
 }
 
+function parseSelectId(value?: string) {
+  return String(value ?? "").split(" • ")[0].trim();
+}
+
+function formatSelectOption(id: string | undefined, label: string) {
+  return id ? `${id}${label ? ` • ${label}` : ""}` : "";
+}
+
+function matchesEntityId(item: any, id: string) {
+  const normalizedId = normalize(id);
+  return [item?.id, item?.publicId, item?.matricule, item?.identifier].some((value) => normalize(value) === normalizedId);
+}
+
 function isValidPhotoReference(value: string) {
   return /^(https?:\/\/|file:\/\/|content:\/\/|data:image\/)/i.test(value);
 }
@@ -1552,6 +1755,15 @@ function isGlobalOrCountryRole(role?: string) {
 }
 
 function shouldHideField(entity: AdminEntity, form: Record<string, string>, field: Field) {
+  if (entity === "assignments") {
+    const assignmentType = form.assignmentType || teacherCourseAssignmentType;
+    if (assignmentType === studentClassAssignmentType) {
+      return field.key === "teacherId" || field.key === "course";
+    }
+
+    return field.key === "studentId";
+  }
+
   return entity === "users" && form.role === "Admin Pays" && field.key === "schoolCode";
 }
 
@@ -1560,8 +1772,33 @@ function isAdminCreatedUser(item: any) {
   return Boolean(creator) && !["systeme", "système", "postgresql", "seed", "migration"].includes(creator);
 }
 
+function canShowUserForSession(item: any, session: any) {
+  if (isPlatformUserRole(item.role)) {
+    return false;
+  }
+
+  const sessionSchoolCode = normalize(
+    session?.user?.schoolCode && session.user.schoolCode !== "*"
+      ? session.user.schoolCode
+      : session?.school?.code
+  );
+
+  if (session?.role === "school_admin") {
+    return normalize(item.schoolCode) === sessionSchoolCode;
+  }
+
+  return isAdminCreatedUser(item) || Boolean(item.schoolCode);
+}
+
 function isPlatformUserRole(role?: string) {
   return role === "Super Administrateur OKAFRIK" || role === "Admin Pays";
+}
+
+function isActiveUserAccount(item: any) {
+  const status = normalize(item?.status)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return !["suspendu", "desactive", "disabled", "inactive", "inactif"].includes(status);
 }
 
 function getRoleDefaults(role?: string, schoolCode = "") {
@@ -1615,8 +1852,14 @@ function getSelectOptions(
     return ["Masculin", "Féminin"];
   }
 
+  if (key === "assignmentType") {
+    return [teacherCourseAssignmentType, studentClassAssignmentType];
+  }
+
   if (key === "teacherId") {
-    return teachersData.map((teacher) => teacher.publicId ?? teacher.id).filter(Boolean);
+    return teachersData
+      .map((teacher) => formatSelectOption(teacher.publicId ?? teacher.id, [teacher.name, teacher.mainSubject].filter(Boolean).join(" • ")))
+      .filter(Boolean);
   }
 
   if (key === "parentPhone") {
@@ -1624,6 +1867,12 @@ function getSelectOptions(
   }
 
   if (key === "studentId") {
+    if (entity === "assignments") {
+      return studentsData
+        .map((student) => formatSelectOption(student.id, [student.publicId ?? student.matricule, student.name, student.className].filter(Boolean).join(" • ")))
+        .filter(Boolean);
+    }
+
     return studentsData
       .filter((student) => !form.parentPhone || student.parentPhone === form.parentPhone)
       .map((student) => student.id)
@@ -1728,7 +1977,8 @@ function getSelectOptions(
       return ["Envoyé", "Distribué", "Lu", "Archivé", "Nouveau", "En cours", "Traité"];
     }
 
-    return paymentStatusesData.map((status) => status.value).filter(Boolean);
+    const configuredStatuses = paymentStatusesData.map((status) => status.value).filter(Boolean);
+    return configuredStatuses.length ? configuredStatuses : ["PAYE", "EN_ATTENTE", "IMPAYE"];
   }
 
   return [];
@@ -1750,6 +2000,58 @@ function parseDisplayDate(value?: string) {
 
 function addMonths(date: Date, amount: number) {
   return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+
+function getInitialCalendarDate(field: Field, value?: string) {
+  const parsed = parseDisplayDate(value);
+  if (parsed) return parsed;
+
+  const today = new Date();
+  if (field.key === "birthDate") {
+    return new Date(today.getFullYear() - 10, today.getMonth(), 1);
+  }
+
+  return today;
+}
+
+function buildYearOptions(field: Field | null, selectedDate: Date) {
+  const currentYear = new Date().getFullYear();
+  if (field?.key === "birthDate") {
+    const startYear = currentYear - 80;
+    return Array.from({ length: currentYear - startYear + 1 }, (_, index) => currentYear - index);
+  }
+
+  const selectedYear = selectedDate.getFullYear();
+  const startYear = selectedYear - 5;
+  return Array.from({ length: 11 }, (_, index) => startYear + index);
+}
+
+function getCalendarStepTitle(step: "year" | "month" | "day", date: Date) {
+  if (step === "year") return "Choisir l'année";
+  if (step === "month") return String(date.getFullYear());
+  return formatMonth(date);
+}
+
+function getCalendarStepSubtitle(step: "year" | "month" | "day") {
+  if (step === "year") return "Les années récentes sont affichées en premier";
+  if (step === "month") return "Choisissez le mois";
+  return "Choisissez le jour";
+}
+
+function setCalendarYear(date: Date, year: number) {
+  return new Date(year, date.getMonth(), 1);
+}
+
+function setCalendarMonthIndex(date: Date, monthIndex: number) {
+  return new Date(date.getFullYear(), monthIndex, 1);
+}
+
+function isSameDate(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
 }
 
 function formatMonth(date: Date) {
@@ -2097,13 +2399,24 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 20,
     fontWeight: "900",
-    marginBottom: 12,
   },
   calendarHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  calendarTitleBox: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 10,
+  },
+  calendarSubtitle: {
+    marginTop: 4,
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
   },
   calendarNav: {
     width: 38,
@@ -2112,6 +2425,61 @@ const styles = StyleSheet.create({
     backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
+  },
+  calendarStepScroll: {
+    maxHeight: 360,
+    marginBottom: 12,
+  },
+  yearGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingBottom: 4,
+  },
+  yearChip: {
+    width: "31%",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  yearChipActive: {
+    backgroundColor: "#2563EB",
+  },
+  yearChipText: {
+    color: "#334155",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  yearChipTextActive: {
+    color: "#FFFFFF",
+  },
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  monthChip: {
+    width: "31%",
+    paddingVertical: 18,
+    borderRadius: 18,
+    backgroundColor: "#F8FAFC",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  monthChipActive: {
+    backgroundColor: "#DBEAFE",
+  },
+  monthChipText: {
+    color: "#475569",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  monthChipTextActive: {
+    color: "#1D4ED8",
   },
   weekRow: {
     flexDirection: "row",
@@ -2148,6 +2516,10 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "center",
     lineHeight: 34,
+  },
+  dayTextActive: {
+    backgroundColor: "#2563EB",
+    color: "#FFFFFF",
   },
   selectorList: {
     marginBottom: 12,

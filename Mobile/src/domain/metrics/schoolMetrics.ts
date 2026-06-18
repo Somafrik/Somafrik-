@@ -25,10 +25,11 @@ export type PaymentStats = {
 export function normalizePresenceStatus(presence?: Pick<PresenceItem, "present" | "status">): PresenceStatus {
   if (!presence) return "Absent";
 
-  if (presence.status === "Present" || presence.status === "Présent") return "Présent";
-  if (presence.status === "Retard") return "Retard";
-  if (presence.status === "Justifié") return "Justifié";
-  if (presence.status === "Absent") return "Absent";
+  const status = String(presence.status ?? "").trim().toLowerCase();
+  if (["present", "présent", "present."].includes(status)) return "Présent";
+  if (["late", "retard"].includes(status)) return "Retard";
+  if (["excused", "justifié", "justifie"].includes(status)) return "Justifié";
+  if (["absent", "absence"].includes(status)) return "Absent";
 
   return presence.present ? "Présent" : "Absent";
 }

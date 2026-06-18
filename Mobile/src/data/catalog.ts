@@ -79,7 +79,9 @@ export type PresenceItem = {
   id: string;
   publicId: string;
   studentId: string;
+  className?: string;
   date: string;
+  savedAt?: string;
   present: boolean;
   status?: "Présent" | "Absent" | "Retard" | "Justifié" | "Present" | string;
 };
@@ -418,7 +420,8 @@ export const rolePermissions: Record<string, string[]> = {
     "Gérer enseignants",
     "Voir classes",
     "Gérer classes",
-    "Gérer cours",
+  "Gérer cours",
+    "Gérer affectations",
     "Voir notes",
     "Modifier notes",
     "Voir présences",
@@ -509,7 +512,7 @@ export const defaultAcademicConfig: AcademicManagementConfig = {
 
 const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
   Pays: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "R", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  "Établissements": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "R", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  "Établissements": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Utilisateurs: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Classes: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
   Élèves: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
@@ -518,14 +521,15 @@ const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
   Notes: { "Super Administrateur OKAFRIK": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "R", "Élève / Étudiant": "R" },
   Bulletins: { "Super Administrateur OKAFRIK": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
   Paiements: { "Super Administrateur OKAFRIK": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "R", Enseignant: "-", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Abonnements: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "R", "Préfet des études": "-", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
+  Abonnements: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
   Notifications: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Messages: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "CRUD", "Élève / Étudiant": "CRUD" },
   Documents: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Rapports: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
-  "Paramètres Établissement": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  "Paramètres Établissement": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   "Années Académiques": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Matières: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Affectations: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "R", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
   Examens: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
 };
 
