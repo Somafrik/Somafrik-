@@ -7,10 +7,23 @@ const state = {
   countries: [],
   subscriptions: [],
   notifications: [],
+  students: [],
+  teachers: [],
+  classes: [],
+  courses: [],
+  assignments: [],
+  payments: [],
+  presences: [],
+  notes: [],
+  announcements: [],
+  messages: [],
+  paymentStatuses: [],
   auditLog: [],
   rolePermissions: {},
   academicConfigs: {},
   selectedPermissionRole: "",
+  selectedSchoolPilotageRole: "",
+  selectedSchoolPilotageFeature: "",
   syncTimeoutId: null,
   schoolPage: 1,
   pageSize: 10,
@@ -23,6 +36,10 @@ const loginForm = document.querySelector("#loginForm");
 const loginError = document.querySelector("#loginError");
 const identifierInput = document.querySelector("#identifierInput");
 const passwordInput = document.querySelector("#passwordInput");
+const loginSchoolCodeField = document.querySelector("#loginSchoolCodeField");
+const loginSchoolCodeInput = document.querySelector("#loginSchoolCodeInput");
+const openLoginButton = document.querySelector("#openLoginButton");
+const heroLoginButton = document.querySelector("#heroLoginButton");
 const logoutButton = document.querySelector("#logoutButton");
 const pageTitle = document.querySelector("#pageTitle");
 const scopeLabel = document.querySelector("#scopeLabel");
@@ -30,6 +47,7 @@ const userName = document.querySelector("#userName");
 const userRole = document.querySelector("#userRole");
 const userInitials = document.querySelector("#userInitials");
 const kpiGrid = document.querySelector("#kpiGrid");
+const roleDashboard = document.querySelector("#roleDashboard");
 const controlGrid = document.querySelector("#controlGrid");
 const controlHint = document.querySelector("#controlHint");
 const schoolsTable = document.querySelector("#schoolsTable");
@@ -37,6 +55,14 @@ const usersTable = document.querySelector("#usersTable");
 const countriesTable = document.querySelector("#countriesTable");
 const subscriptionsTable = document.querySelector("#subscriptionsTable");
 const notificationsList = document.querySelector("#notificationsList");
+const establishmentScopeLabel = document.querySelector("#establishmentScopeLabel");
+const establishmentSummary = document.querySelector("#establishmentSummary");
+const schoolRolePilotage = document.querySelector("#schoolRolePilotage");
+const schoolConfigPanel = document.querySelector("#schoolConfigPanel");
+const schoolConfigPeriodMode = document.querySelector("#schoolConfigPeriodMode");
+const schoolConfigDefaultScale = document.querySelector("#schoolConfigDefaultScale");
+const schoolConfigReportMode = document.querySelector("#schoolConfigReportMode");
+const schoolConfigEvaluationTypes = document.querySelector("#schoolConfigEvaluationTypes");
 const countryCount = document.querySelector("#countryCount");
 const subscriptionCount = document.querySelector("#subscriptionCount");
 const notificationCount = document.querySelector("#notificationCount");
@@ -99,6 +125,7 @@ const academicEvaluationTypesInput = document.querySelector("#academicEvaluation
 const academicAllowClassesInput = document.querySelector("#academicAllowClassesInput");
 const academicAllowCoursesInput = document.querySelector("#academicAllowCoursesInput");
 const academicAllowBulletinsInput = document.querySelector("#academicAllowBulletinsInput");
+let selectedLoginProfile = "superadmin";
 
 const mvpCoverage = [
   ["Authentification par établissement", "Web / Mobile", "Couvert", "P0", "Code unique, logo/nom école, rôle détecté, mot de passe et blocage comptes suspendus."],
@@ -146,7 +173,7 @@ const crudPermissionModules = [
   "Examens",
 ];
 
-const schoolAdminForbiddenFeatures = new Set(["Établissements", "Abonnements", "Paramètres Établissement"]);
+const schoolAdminForbiddenFeatures = new Set(["Établissements", "Abonnements"]);
 const schoolAdminForbiddenPermissionKeywords = ["abonnement", "etablissement", "établissement", "inscription", "tarif"];
 
 const defaultAcademicConfig = {
@@ -194,6 +221,138 @@ const countryAdminSchoolAdminPermissions = [
   "Abonnements:DELETE",
 ];
 
+const internalRoleDefaultPermissions = {
+  "Admin School": [
+    "Utilisateurs:READ",
+    "Utilisateurs:CREATE",
+    "Utilisateurs:UPDATE",
+    "Utilisateurs:DELETE",
+    "Utilisateurs:SUSPEND",
+    "Classes:READ",
+    "Classes:CREATE",
+    "Classes:UPDATE",
+    "Classes:DELETE",
+    "Élèves:READ",
+    "Élèves:CREATE",
+    "Élèves:UPDATE",
+    "Élèves:DELETE",
+    "Élèves:SUSPEND",
+    "Enseignants:READ",
+    "Enseignants:CREATE",
+    "Enseignants:UPDATE",
+    "Affectations:READ",
+    "Affectations:CREATE",
+    "Affectations:UPDATE",
+    "Présences:READ",
+    "Notes:READ",
+    "Bulletins:READ",
+    "Paiements:READ",
+    "Notifications:READ",
+    "Notifications:CREATE",
+    "Notifications:UPDATE",
+    "Messages:READ",
+    "Messages:CREATE",
+    "Messages:UPDATE",
+    "Documents:READ",
+    "Documents:CREATE",
+    "Documents:UPDATE",
+    "Rapports:READ",
+    "Paramètres Établissement:READ",
+    "Paramètres Établissement:UPDATE",
+    "Années Académiques:READ",
+    "Années Académiques:CREATE",
+    "Années Académiques:UPDATE",
+    "Matières:READ",
+    "Matières:CREATE",
+    "Matières:UPDATE",
+    "Examens:READ",
+    "Examens:CREATE",
+    "Examens:UPDATE",
+  ],
+  "Secrétaire": [
+    "Utilisateurs:READ",
+    "Classes:READ",
+    "Élèves:READ",
+    "Élèves:CREATE",
+    "Élèves:UPDATE",
+    "Enseignants:READ",
+    "Affectations:READ",
+    "Présences:READ",
+    "Présences:CREATE",
+    "Présences:UPDATE",
+    "Paiements:READ",
+    "Paiements:CREATE",
+    "Paiements:UPDATE",
+    "Notifications:READ",
+    "Notifications:CREATE",
+    "Messages:READ",
+    "Messages:CREATE",
+    "Messages:UPDATE",
+    "Documents:READ",
+    "Documents:CREATE",
+    "Documents:UPDATE",
+    "Rapports:READ",
+  ],
+  "Sécretaire": [
+    "Utilisateurs:READ",
+    "Classes:READ",
+    "Élèves:READ",
+    "Élèves:CREATE",
+    "Élèves:UPDATE",
+    "Enseignants:READ",
+    "Affectations:READ",
+    "Présences:READ",
+    "Présences:CREATE",
+    "Présences:UPDATE",
+    "Paiements:READ",
+    "Paiements:CREATE",
+    "Paiements:UPDATE",
+    "Notifications:READ",
+    "Notifications:CREATE",
+    "Messages:READ",
+    "Messages:CREATE",
+    "Messages:UPDATE",
+    "Documents:READ",
+    "Documents:CREATE",
+    "Documents:UPDATE",
+    "Rapports:READ",
+  ],
+  "Préfet des études": [
+    "Utilisateurs:READ",
+    "Classes:READ",
+    "Classes:CREATE",
+    "Classes:UPDATE",
+    "Élèves:READ",
+    "Élèves:UPDATE",
+    "Enseignants:READ",
+    "Affectations:READ",
+    "Affectations:CREATE",
+    "Affectations:UPDATE",
+    "Présences:READ",
+    "Présences:CREATE",
+    "Présences:UPDATE",
+    "Notes:READ",
+    "Notes:CREATE",
+    "Notes:UPDATE",
+    "Bulletins:READ",
+    "Bulletins:CREATE",
+    "Bulletins:UPDATE",
+    "Notifications:READ",
+    "Notifications:CREATE",
+    "Messages:READ",
+    "Messages:CREATE",
+    "Documents:READ",
+    "Rapports:READ",
+    "Années Académiques:READ",
+    "Matières:READ",
+    "Matières:CREATE",
+    "Matières:UPDATE",
+    "Examens:READ",
+    "Examens:CREATE",
+    "Examens:UPDATE",
+  ],
+};
+
 const viewPermissionFeatures = {
   overview: null,
   countries: "Pays",
@@ -237,6 +396,7 @@ const actionPermissions = {
   "reset-role-permissions": ["Droits par rôle", "UPDATE"],
   "export-permissions": ["Droits par rôle", "READ"],
   "export-mvp-report": ["Rapports", "READ"],
+  "save-school-user-settings": ["Paramètres Établissement", "UPDATE"],
 };
 
 const unrestrictedActions = new Set([
@@ -248,11 +408,46 @@ const unrestrictedActions = new Set([
   "next-school-page",
 ]);
 
+function revealLoginForm() {
+  loginForm.classList.remove("hidden");
+  loginForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  identifierInput.focus();
+}
+
+function setLoginProfile(profile) {
+  selectedLoginProfile = profile || "school";
+  const requiresSchoolCode = selectedLoginProfile === "school";
+  loginSchoolCodeField?.classList.toggle("hidden", !requiresSchoolCode);
+  if (loginSchoolCodeInput) {
+    loginSchoolCodeInput.required = requiresSchoolCode;
+    if (requiresSchoolCode && !loginSchoolCodeInput.value.trim()) {
+      loginSchoolCodeInput.value = "CD-2026-0001";
+    }
+    if (!requiresSchoolCode) {
+      loginSchoolCodeInput.value = "";
+    }
+  }
+  document.querySelectorAll("[data-login-profile]").forEach((button) => {
+    button.classList.toggle("selected", button.dataset.loginProfile === selectedLoginProfile);
+  });
+}
+
+[openLoginButton, heroLoginButton].filter(Boolean).forEach((button) => {
+  button.addEventListener("click", () => {
+    revealLoginForm();
+    setLoginProfile(selectedLoginProfile);
+  });
+});
+
 document.querySelectorAll("[data-demo]").forEach((button) => {
   button.addEventListener("click", () => {
+    revealLoginForm();
+    setLoginProfile(button.dataset.loginProfile);
     identifierInput.value = button.dataset.demo;
     passwordInput.value = "1234";
-    loginForm.requestSubmit();
+    if (!button.dataset.loginProfile) {
+      loginForm.requestSubmit();
+    }
   });
 });
 
@@ -267,9 +462,15 @@ loginForm.addEventListener("submit", async (event) => {
   loginError.textContent = "";
 
   try {
+    const schoolCode = loginSchoolCodeInput?.value.trim().toUpperCase() ?? "";
+    if (selectedLoginProfile === "school" && !schoolCode) {
+      throw new Error("Le code établissement est obligatoire pour un compte établissement.");
+    }
+
     const payload = {
       identifier: identifierInput.value.trim(),
       password: passwordInput.value.trim(),
+      ...(schoolCode ? { schoolCode } : {}),
     };
     const response = await request("/backoffice/login", {
       method: "POST",
@@ -285,6 +486,17 @@ loginForm.addEventListener("submit", async (event) => {
     state.countries = response.countries ?? [];
     state.subscriptions = response.subscriptions ?? [];
     state.notifications = response.notifications ?? [];
+    state.students = response.students ?? [];
+    state.teachers = response.teachers ?? [];
+    state.classes = response.classes ?? [];
+    state.courses = response.courses ?? [];
+    state.assignments = response.assignments ?? [];
+    state.payments = response.payments ?? [];
+    state.presences = response.presences ?? [];
+    state.notes = response.notes ?? [];
+    state.announcements = response.announcements ?? [];
+    state.messages = response.messages ?? [];
+    state.paymentStatuses = response.paymentStatuses ?? [];
     state.auditLog = response.auditLog ?? [];
     state.rolePermissions = response.rolePermissions ?? {};
     state.academicConfigs = response.academicConfigs ?? {};
@@ -329,6 +541,17 @@ logoutButton.addEventListener("click", () => {
   state.countries = [];
   state.subscriptions = [];
   state.notifications = [];
+  state.students = [];
+  state.teachers = [];
+  state.classes = [];
+  state.courses = [];
+  state.assignments = [];
+  state.payments = [];
+  state.presences = [];
+  state.notes = [];
+  state.announcements = [];
+  state.messages = [];
+  state.paymentStatuses = [];
   state.auditLog = [];
   state.rolePermissions = {};
   state.academicConfigs = {};
@@ -395,7 +618,7 @@ function renderApp() {
   loginPanel.classList.add("hidden");
   appPanel.classList.remove("hidden");
   userName.textContent = `${user.firstName} ${user.lastName}`;
-  userRole.textContent = user.role;
+  userRole.textContent = displayRoleName(user.role);
   userInitials.textContent = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase();
   scopeLabel.textContent = scope.label;
   controlHint.textContent = scope.hint;
@@ -407,6 +630,7 @@ function renderApp() {
   renderSchools();
   renderSubscriptions();
   renderNotifications();
+  renderEstablishmentDashboard();
   renderUsers();
   renderReports();
   renderAcademicSettings();
@@ -429,6 +653,54 @@ function renderKpis() {
       `
     )
     .join("");
+  renderRoleDashboard();
+}
+
+function renderRoleDashboard() {
+  if (!roleDashboard) return;
+
+  const dashboard = getRoleDashboard();
+  const dashboardCards = dashboard.cards?.length
+    ? `
+      <div class="role-dashboard-grid">
+        ${dashboard.cards
+          .map(
+            (card) => `
+              <article class="role-dashboard-card">
+                <span>${escapeHtml(card.label)}</span>
+                <strong>${formatMetric(card.value, card.suffix)}</strong>
+                <p>${escapeHtml(card.hint)}</p>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    `
+    : "";
+
+  roleDashboard.innerHTML = `
+    <div class="role-dashboard-head">
+      <div>
+        <p class="eyebrow">${escapeHtml(dashboard.eyebrow)}</p>
+        <h3>${escapeHtml(dashboard.title)}</h3>
+        <p>${escapeHtml(dashboard.description)}</p>
+      </div>
+      <span class="status">${escapeHtml(dashboard.scope)}</span>
+    </div>
+    ${dashboardCards}
+    <div class="role-priority-list">
+      ${dashboard.priorities
+        .map(
+          (priority) => `
+            <article>
+              <strong>${escapeHtml(priority.title)}</strong>
+              <p>${escapeHtml(priority.detail)}</p>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function renderMenus() {
@@ -442,6 +714,8 @@ function renderMenus() {
     Abonnements: "subscriptions",
     Paiements: "subscriptions",
     Support: "notifications",
+    "Pilotage Établissement": "users",
+    "Établissement": "users",
     Rapports: "overview",
     "Conformité MVP": "reports",
     Paramètres: "permissions",
@@ -457,6 +731,9 @@ function renderMenus() {
   });
 
   Object.keys(viewPermissionFeatures).forEach((viewName) => {
+    if (isInternalSchoolRole(state.session?.user?.role) && viewName === "academicSettings") {
+      return;
+    }
     if (canReadView(viewName)) {
       allowedViews.add(viewName);
     }
@@ -488,6 +765,16 @@ function getBusinessControls() {
   const hasAny = (...items) => items.some((permission) => permissions.has(permission));
   const hasMatch = (pattern) => [...permissions].some((permission) => normalize(permission).includes(pattern));
   const controls = [];
+
+  if (hasSchoolUserPilotageAccess()) {
+    controls.push({
+      id: "establishment",
+      title: "Pilotage établissement",
+      description: "Voir les écrans métier de l'établissement selon les droits accordés.",
+      view: "users",
+      cta: "Ouvrir l'établissement",
+    });
+  }
 
   if (hasAny("ALL_PRIVILEGES", "COUNTRY_PRIVILEGES") || hasMatch("pays")) {
     controls.push({
@@ -549,7 +836,7 @@ function getBusinessControls() {
     });
   }
 
-  if (hasAny("ALL_PRIVILEGES") || hasMatch("paramètres")) {
+  if (canManageRolePermissions()) {
     controls.push({
       id: "permissions",
       title: "Droits par rôle",
@@ -559,7 +846,7 @@ function getBusinessControls() {
     });
   }
 
-  if (hasAny("Paramètres Établissement:READ", "Paramètres Établissement:CREATE", "Paramètres Établissement:UPDATE", "ALL_PRIVILEGES", "COUNTRY_PRIVILEGES") || hasMatch("paramètres")) {
+  if (!isInternalSchoolRole(state.session?.user?.role) && (hasAny("Paramètres Établissement:READ", "Paramètres Établissement:CREATE", "Paramètres Établissement:UPDATE", "ALL_PRIVILEGES", "COUNTRY_PRIVILEGES") || hasMatch("paramètres"))) {
     controls.push({
       id: "academicSettings",
       title: "Configuration établissement",
@@ -572,30 +859,297 @@ function getBusinessControls() {
   return controls.slice(0, 8);
 }
 
+function hasSchoolUserPilotageAccess() {
+  const schoolFeatures = ["Utilisateurs", "Classes", "Élèves", "Enseignants", "Affectations", "Présences", "Notes", "Bulletins", "Paiements", "Messages", "Documents", "Rapports"];
+  return isInternalSchoolRole(state.session?.user?.role) && schoolFeatures.some((feature) => hasBackOfficePermission(feature, "READ"));
+}
+
 function getLiveKpis() {
-  const activeSchools = state.schools.filter((school) => school.status !== "Suspendu");
-  const activeUsers = state.users.filter(isActiveUserAccount);
-  const suspendedSchools = state.schools.filter((school) => school.status === "Suspendu").length;
-  const expiredSubscriptions = state.subscriptions.filter((subscription) =>
+  const role = state.session?.user?.role;
+  const scopedSchools = getScopedSchoolsForCurrentUser();
+  const scopedUsers = getScopedUsersForCurrentUser();
+  const scopedSubscriptions = getScopedSubscriptionsForCurrentUser();
+  const scopedNotifications = getScopedNotificationsForCurrentUser();
+  const activeSchools = scopedSchools.filter((school) => school.status !== "Suspendu");
+  const activeUsers = scopedUsers.filter(isActiveUserAccount);
+  const suspendedSchools = scopedSchools.filter((school) => school.status === "Suspendu").length;
+  const expiredSubscriptions = scopedSubscriptions.filter((subscription) =>
     subscription.paymentStatus === "En retard" || isPastDate(subscription.endDate)
   ).length;
-  const monthlyRevenue = state.subscriptions
+  const monthlyRevenue = scopedSubscriptions
     .filter((subscription) => subscription.status === "Actif" && subscription.paymentStatus === "À jour")
     .reduce((total, subscription) => total + Number(subscription.monthlyPrice ?? 0), 0);
-  const annualRevenue = state.subscriptions
-    .filter((subscription) => subscription.status === "Actif" && subscription.paymentStatus === "À jour")
-    .reduce((total, subscription) => total + Number(subscription.annualPrice ?? Number(subscription.monthlyPrice ?? 0) * 10), 0);
+
+  if (isInternalSchoolRole(role)) {
+    return [
+      { label: "Utilisateurs actifs", value: activeUsers.length },
+      { label: "Élèves suivis", value: countUsersByRole(scopedUsers, ["Élève / Étudiant", "Élève", "Étudiant"]) },
+      { label: "Enseignants", value: countUsersByRole(scopedUsers, ["Enseignant"]) },
+      { label: "Alertes à traiter", value: scopedUsers.filter((user) => !isActiveUserAccount(user)).length + scopedNotifications.filter((notification) => notification.status === "Non lu").length },
+    ];
+  }
 
   return [
-    { label: "Pays", value: state.countries.length },
-    { label: "Établissements", value: state.schools.length },
-    { label: "Écoles actives", value: activeSchools.length },
+    { label: "Pays", value: getScopedCountriesForCurrentUser().length },
+    { label: "Établissements", value: scopedSchools.length },
     { label: "Utilisateurs actifs", value: activeUsers.length },
     { label: "Revenus mensuels", value: monthlyRevenue, suffix: "USD" },
-    { label: "Revenus annuels", value: annualRevenue, suffix: "USD" },
-    { label: "Établissements suspendus", value: suspendedSchools },
-    { label: "Abonnements à relancer", value: expiredSubscriptions },
+    { label: "Alertes plateforme", value: suspendedSchools + expiredSubscriptions },
   ];
+}
+
+function getRoleDashboard() {
+  const user = state.session?.user ?? {};
+  const role = normalizeRoleKey(user.role);
+  const schoolLabel = user.schoolCode && user.schoolCode !== "*" ? user.schoolCode : "Périmètre courant";
+
+  const base = {
+    scope: schoolLabel,
+    cards: [],
+  };
+
+  if (role === "admin school") {
+    return {
+      ...base,
+      eyebrow: "Application web interne",
+      title: "Tableau de bord Admin établissement",
+      description: "Pilotage de l'établissement : comptes, classes, enseignants, affectations, communications et rapports.",
+      priorities: [
+        { title: "Gérer les comptes de l'école", detail: "Créer, modifier, suspendre et réinitialiser les comptes internes." },
+        { title: "Piloter les affectations", detail: "Suivre les enseignants, classes et matières selon l'organisation de l'établissement." },
+        { title: "Lire les indicateurs école", detail: "Contrôler utilisateurs actifs, alertes et modules disponibles sans données d'autres établissements." },
+      ],
+    };
+  }
+
+  if (role === "secretaire") {
+    return {
+      ...base,
+      eyebrow: "Application web interne",
+      title: "Tableau de bord Secrétaire",
+      description: "Accueil administratif : dossiers élèves, présences, paiements, documents et communications parents.",
+      priorities: [
+        { title: "Tenir les dossiers élèves", detail: "Créer et mettre à jour les fiches élèves dans le périmètre de l'école." },
+        { title: "Suivre paiements et documents", detail: "Enregistrer les opérations autorisées et préparer les justificatifs." },
+        { title: "Communiquer avec les parents", detail: "Traiter les messages, annonces et notifications administratives." },
+      ],
+    };
+  }
+
+  if (role === "prefet des etudes") {
+    return {
+      ...base,
+      eyebrow: "Application web interne",
+      title: "Tableau de bord Préfet des études",
+      description: "Pilotage pédagogique : classes, affectations, présences, notes, examens et bulletins.",
+      priorities: [
+        { title: "Suivre les classes", detail: "Contrôler affectations, enseignants et matières disponibles." },
+        { title: "Contrôler notes et bulletins", detail: "Vérifier les sessions, périodes, examens et publication des résultats." },
+        { title: "Surveiller les présences", detail: "Lire et corriger les appels selon les droits accordés." },
+      ],
+    };
+  }
+
+  return {
+    ...base,
+    eyebrow: "BackOffice Somafrik",
+    title: user.role === "Admin Pays" ? "Tableau de bord Admin Pays" : "Tableau de bord plateforme",
+    description: user.role === "Admin Pays"
+      ? "Pilotage pays : établissements, validations, admins écoles, abonnements et support."
+      : "Pilotage global Somafrik : pays, établissements, rôles, abonnements et conformité MVP.",
+    priorities: [
+      { title: "Contrôler le périmètre", detail: "Les indicateurs suivent uniquement les données accessibles par ce rôle." },
+      { title: "Gérer les accès", detail: "Les permissions CRUD déterminent les actions visibles et exécutables." },
+      { title: "Synchroniser les actions", detail: "Chaque modification est envoyée au backend et reprise par les autres interfaces." },
+    ],
+  };
+}
+
+function getScopedSchoolsForCurrentUser() {
+  const user = state.session?.user ?? {};
+
+  if (user.role === "Super Administrateur OKAFRIK") return state.schools;
+  if (user.role === "Admin Pays") {
+    return state.schools.filter((school) =>
+      normalize(school.country) === normalize(user.countryScope) ||
+      normalize(school.countryCode) === normalize(user.countryScope)
+    );
+  }
+
+  return state.schools.filter((school) => normalize(school.code) === normalize(user.schoolCode));
+}
+
+function getScopedCountriesForCurrentUser() {
+  const user = state.session?.user ?? {};
+
+  if (user.role === "Super Administrateur OKAFRIK") return state.countries;
+  return state.countries.filter((country) =>
+    normalize(country.name) === normalize(user.countryScope) ||
+    normalize(country.code) === normalize(user.countryScope) ||
+    getCountryCodeFromScope(user.countryScope) === country.code
+  );
+}
+
+function getScopedSubscriptionsForCurrentUser() {
+  const user = state.session?.user ?? {};
+
+  if (user.role === "Super Administrateur OKAFRIK") return state.subscriptions;
+  if (user.role === "Admin Pays") {
+    const countryCode = getCountryCodeFromScope(user.countryScope);
+    return state.subscriptions.filter((subscription) =>
+      normalize(subscription.country) === normalize(user.countryScope) ||
+      normalize(subscription.countryCode) === normalize(countryCode)
+    );
+  }
+
+  return state.subscriptions.filter((subscription) => normalize(subscription.schoolCode) === normalize(user.schoolCode));
+}
+
+function getScopedNotificationsForCurrentUser() {
+  const user = state.session?.user ?? {};
+
+  if (user.role === "Super Administrateur OKAFRIK") return state.notifications;
+  if (user.role === "Admin Pays") {
+    const countryCode = getCountryCodeFromScope(user.countryScope);
+    return state.notifications.filter((notification) =>
+      normalize(notification.countryCode) === normalize(countryCode) ||
+      normalize(notification.audience).includes("admin pays")
+    );
+  }
+
+  return state.notifications.filter((notification) =>
+    normalize(notification.schoolCode) === normalize(user.schoolCode) ||
+    normalize(notification.audience).includes(normalize(user.role)) ||
+    normalize(notification.audience).includes("établissement") ||
+    normalize(notification.audience).includes("etablissement")
+  );
+}
+
+function getScopedUsersForCurrentUser() {
+  const user = state.session?.user ?? {};
+
+  if (user.role === "Super Administrateur OKAFRIK") return state.users;
+  if (user.role === "Admin Pays") return getVisibleUsers();
+  return state.users.filter((account) => normalize(account.schoolCode) === normalize(user.schoolCode));
+}
+
+function getCurrentSchool() {
+  const schoolCode = state.session?.user?.schoolCode;
+  if (!schoolCode || schoolCode === "*") return state.schools[0] ?? null;
+  return state.schools.find((school) => normalize(school.code) === normalize(schoolCode)) ?? null;
+}
+
+function getScopedStudentsForCurrentUser() {
+  const schoolCode = state.session?.user?.schoolCode;
+  if (!schoolCode || schoolCode === "*") return state.students;
+  return state.students.filter((student) => normalize(student.schoolCode) === normalize(schoolCode));
+}
+
+function getScopedTeachersForCurrentUser() {
+  const schoolCode = state.session?.user?.schoolCode;
+  const students = getScopedStudentsForCurrentUser();
+  const classNames = new Set(students.map((student) => student.className).filter(Boolean));
+  if (!schoolCode || schoolCode === "*") return state.teachers;
+  return state.teachers.filter((teacher) =>
+    normalize(teacher.schoolCode) === normalize(schoolCode) ||
+    (teacher.assignedClasses ?? []).some((className) => classNames.has(className)) ||
+    (teacher.assignments ?? []).some((assignment) => classNames.has(assignment.className))
+  );
+}
+
+function getScopedClassesForCurrentUser(students = getScopedStudentsForCurrentUser()) {
+  const schoolCode = state.session?.user?.schoolCode;
+  const classNames = new Set(students.map((student) => student.className).filter(Boolean));
+  const rows = (!schoolCode || schoolCode === "*")
+    ? state.classes
+    : state.classes.filter((classItem) =>
+        normalize(classItem.schoolCode) === normalize(schoolCode) ||
+        classNames.has(classItem.name)
+      );
+
+  classNames.forEach((className) => {
+    if (!rows.some((classItem) => classItem.name === className || classItem.className === className)) {
+      rows.push({ id: `CLASS-${className}`, name: className, schoolCode });
+    }
+  });
+  return rows;
+}
+
+function getScopedPaymentsForCurrentUser(students = getScopedStudentsForCurrentUser()) {
+  const schoolCode = state.session?.user?.schoolCode;
+  const studentIds = new Set(students.map((student) => student.id));
+  if (!schoolCode || schoolCode === "*") return state.payments;
+  return state.payments.filter((payment) =>
+    normalize(payment.schoolCode) === normalize(schoolCode) ||
+    studentIds.has(payment.studentId)
+  );
+}
+
+function getScopedPresencesForCurrentUser(students = getScopedStudentsForCurrentUser()) {
+  const schoolCode = state.session?.user?.schoolCode;
+  const studentIds = new Set(students.map((student) => student.id));
+  if (!schoolCode || schoolCode === "*") return state.presences;
+  return state.presences.filter((presence) =>
+    normalize(presence.schoolCode) === normalize(schoolCode) ||
+    studentIds.has(presence.studentId)
+  );
+}
+
+function getScopedNotesForCurrentUser(students = getScopedStudentsForCurrentUser()) {
+  const schoolCode = state.session?.user?.schoolCode;
+  const studentIds = new Set(students.map((student) => student.id));
+  if (!schoolCode || schoolCode === "*") return state.notes;
+  return state.notes.filter((note) =>
+    normalize(note.schoolCode) === normalize(schoolCode) ||
+    studentIds.has(note.studentId)
+  );
+}
+
+function getScopedMessagesForCurrentUser(students = getScopedStudentsForCurrentUser()) {
+  const schoolCode = state.session?.user?.schoolCode;
+  const studentIds = new Set(students.map((student) => student.id));
+  if (!schoolCode || schoolCode === "*") return state.messages;
+  return state.messages.filter((message) =>
+    normalize(message.schoolCode) === normalize(schoolCode) ||
+    !message.studentId ||
+    studentIds.has(message.studentId)
+  );
+}
+
+function countUsersByRole(users, roles) {
+  const normalizedRoles = roles.map((role) => normalize(role));
+  return users.filter((user) => normalizedRoles.includes(normalize(user.role))).length;
+}
+
+function getAccessibleViewNames() {
+  return Object.keys(viewPermissionFeatures).filter((viewName) => canReadView(viewName));
+}
+
+function isInternalSchoolRole(role) {
+  return ["admin school", "secretaire", "prefet des etudes"].includes(normalizeRoleKey(role));
+}
+
+function normalizeRoleKey(role) {
+  return normalize(role)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getCountryCodeFromScope(countryScope) {
+  const normalized = String(countryScope ?? "").trim().toUpperCase();
+  const codes = {
+    RDC: "CD",
+    "RÉPUBLIQUE DÉMOCRATIQUE DU CONGO": "CD",
+    "REPUBLIQUE DEMOCRATIQUE DU CONGO": "CD",
+    BURUNDI: "BI",
+    BI: "BI",
+    CONGO: "CG",
+    CG: "CG",
+    SENEGAL: "SN",
+    "SÉNÉGAL": "SN",
+    SN: "SN",
+  };
+  return codes[normalized] ?? (/^[A-Z]{2}$/.test(normalized) ? normalized : "");
 }
 
 function renderSchools() {
@@ -756,7 +1310,174 @@ function renderNotifications() {
   refreshActionVisibility();
 }
 
+function renderEstablishmentDashboard() {
+  if (!establishmentSummary) return;
+  if (!isInternalSchoolRole(state.session?.user?.role)) {
+    establishmentScopeLabel.textContent = "";
+    establishmentSummary.innerHTML = "";
+    schoolRolePilotage.innerHTML = "";
+    schoolConfigPanel?.classList.add("hidden");
+    return;
+  }
+
+  const school = getCurrentSchool();
+  const scopedUsers = getScopedUsersForCurrentUser();
+  const activeUsers = scopedUsers.filter(isActiveUserAccount);
+  const students = getScopedStudentsForCurrentUser();
+  const teachers = getScopedTeachersForCurrentUser();
+  const classes = getScopedClassesForCurrentUser(students);
+  const payments = getScopedPaymentsForCurrentUser(students);
+  const presences = getScopedPresencesForCurrentUser(students);
+  const notes = getScopedNotesForCurrentUser(students);
+  const unreadMessages = getScopedMessagesForCurrentUser(students).filter((message) => normalize(message.status) === "non lu").length;
+
+  establishmentScopeLabel.textContent = school
+    ? `${school.name} • ${school.code} • ${school.city ?? "Ville non renseignée"}`
+    : "Établissement non chargé";
+
+  establishmentSummary.innerHTML = [
+    { label: "Utilisateurs actifs", value: activeUsers.length, hint: "Comptes actifs de l'établissement" },
+    { label: "Élèves", value: students.length, hint: "Effectif rattaché au code établissement" },
+    { label: "Enseignants", value: teachers.length, hint: "Équipe pédagogique" },
+    { label: "Classes", value: classes.length, hint: "Classes configurées ou détectées" },
+    { label: "Présences", value: presences.length, hint: "Appels enregistrés" },
+    { label: "Notes", value: notes.length, hint: "Notes et évaluations saisies" },
+    { label: "Paiements", value: payments.length, hint: "Mouvements financiers visibles" },
+    { label: "Messages non lus", value: unreadMessages, hint: "Communications à traiter" },
+  ]
+    .map(
+      (item) => `
+        <article>
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${formatMetric(item.value)}</strong>
+          <p>${escapeHtml(item.hint)}</p>
+        </article>
+      `
+    )
+    .join("");
+
+  renderSchoolRolePilotage();
+  renderSchoolConfigPanel();
+  refreshActionVisibility();
+}
+
+function renderSchoolRolePilotage() {
+  if (!schoolRolePilotage) return;
+  if (state.session?.user?.role !== "Admin School") {
+    schoolRolePilotage.innerHTML = "";
+    return;
+  }
+
+  const roles = getSchoolPilotageRoles();
+  const features = getDelegableSchoolFeatures();
+  if (!state.selectedSchoolPilotageRole || !roles.includes(state.selectedSchoolPilotageRole)) {
+    state.selectedSchoolPilotageRole = roles[0] ?? "";
+  }
+  if (!state.selectedSchoolPilotageFeature || !features.includes(state.selectedSchoolPilotageFeature)) {
+    state.selectedSchoolPilotageFeature = features[0] ?? "";
+  }
+
+  schoolRolePilotage.innerHTML = `
+    <div class="section-head compact-head">
+      <div>
+        <h3>Pilotage des rôles de l'établissement</h3>
+        <p class="section-subtitle">Sélectionnez un rôle et une fonctionnalité, puis activez ou désactivez les droits disponibles dans votre périmètre.</p>
+      </div>
+    </div>
+    ${renderSchoolRoleQuickEditor(roles, features)}
+  `;
+}
+
+function renderSchoolRoleQuickEditor(roles, features) {
+  if (!roles.length || !features.length) {
+    return `
+      <div class="school-role-editor empty-editor">
+        Aucun droit délégable pour ce compte. Les accès doivent d'abord être accordés par l'Admin Pays ou le Superadmin.
+      </div>
+    `;
+  }
+
+  const role = state.selectedSchoolPilotageRole;
+  const feature = state.selectedSchoolPilotageFeature;
+  return `
+    <div class="school-role-editor">
+      <label>Rôle
+        <select data-school-role-select>
+          ${roles.map((item) => `<option value="${escapeHtml(item)}" ${item === role ? "selected" : ""}>${escapeHtml(displayRoleName(item))}</option>`).join("")}
+        </select>
+      </label>
+      <label>Fonctionnalité
+        <select data-school-feature-select>
+          ${features.map((item) => `<option value="${escapeHtml(item)}" ${item === feature ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+        </select>
+      </label>
+    </div>
+    ${renderSelectedSchoolFeatureRights()}
+  `;
+}
+
+function renderSelectedSchoolFeatureRights() {
+  const role = state.selectedSchoolPilotageRole;
+  const feature = state.selectedSchoolPilotageFeature;
+  const actions = getDelegableActionsForFeature(feature);
+  const permissions = new Set(state.rolePermissions[role] ?? []);
+
+  if (!role || !feature || !actions.length) {
+    return `
+      <article class="school-role-card">
+        <strong>Aucun droit disponible</strong>
+        <p>Les accès doivent d'abord être accordés par l'Admin Pays ou le Superadmin.</p>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="school-role-card single-feature-rights">
+      <div>
+        <strong>${escapeHtml(feature)}</strong>
+        <p>${escapeHtml(displayRoleName(role))} • ${getVisibleUsers().filter((user) => user.role === role && isActiveUserAccount(user)).length} compte(s) actif(s)</p>
+      </div>
+      <div class="school-right-column">
+        ${actions.map((crudAction) => {
+          const permission = `${feature}:${crudAction.key}`;
+          const checked = permissions.has(permission);
+          return `
+            <label class="permission-switch ${checked ? "granted" : "denied"}">
+              <input
+                type="checkbox"
+                data-school-role-toggle
+                data-role="${escapeHtml(role)}"
+                data-permission="${escapeHtml(permission)}"
+                ${checked ? "checked" : ""}
+              />
+              <span class="switch-track" aria-hidden="true"></span>
+              <strong>${crudAction.label}</strong>
+              <small>${checked ? "Accordé" : "Refusé"}</small>
+            </label>
+          `;
+        }).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderSchoolConfigPanel() {
+  if (!schoolConfigPanel) return;
+  const canConfigure = state.session?.user?.role === "Admin School" && hasBackOfficePermission("Paramètres Établissement", "UPDATE");
+  schoolConfigPanel.classList.toggle("hidden", !canConfigure);
+  if (!canConfigure) return;
+
+  const schoolCode = state.session?.user?.schoolCode;
+  const config = getAcademicConfigForSchool(schoolCode);
+  schoolConfigPeriodMode.value = config.periodMode ?? "trimestre";
+  schoolConfigDefaultScale.value = config.defaultScale ?? 20;
+  schoolConfigReportMode.value = config.reportCardMode ?? "period";
+  schoolConfigEvaluationTypes.value = (config.evaluationTypes ?? defaultAcademicConfig.evaluationTypes).join("\n");
+}
+
+
 function renderUsers() {
+  renderEstablishmentDashboard();
   const query = normalize(userSearch.value);
   const rows = getVisibleUsers().filter((user) =>
     [user.firstName, user.lastName, user.identifier, user.role, user.countryScope, user.schoolCode].some((value) =>
@@ -764,35 +1485,59 @@ function renderUsers() {
     )
   );
 
-  usersTable.innerHTML = rows
-    .map(
-      (user) => `
-        <tr>
-          <td><strong>${user.firstName} ${user.lastName}</strong><br><small>${user.identifier}</small></td>
-          <td>${user.role}</td>
-          <td>${user.scopeLevel}${user.countryScope ? ` • ${user.countryScope}` : ""}</td>
-          <td>${user.accessChannel}</td>
-          <td><span class="status">${user.status}</span></td>
-          <td>
-            <div class="row-actions">
-              ${
-                canManageUserRow(user, "UPDATE")
-                  ? `<button class="icon-action" type="button" data-action="reset-user-password" data-id="${user.id}">Mot de passe</button>`
-                  : ""
-              }
-              ${
-                canManageUserRow(user, "SUSPEND")
-                  ? `<button class="icon-action ${user.status === "Suspendu" ? "" : "danger"}" type="button" data-action="toggle-user" data-id="${user.id}">
-                      ${user.status === "Suspendu" ? "Réactiver" : "Suspendre"}
-                    </button>`
-                  : ""
-              }
-            </div>
-          </td>
-        </tr>
-      `
-    )
-    .join("");
+  usersTable.innerHTML = rows.length
+    ? rows.map(renderUserListItem).join("")
+    : `
+      <div class="empty-list-state">
+        Aucun utilisateur ne correspond à cette sélection.
+      </div>
+    `;
+}
+
+function renderUserListItem(user) {
+  const active = isActiveUserAccount(user);
+  return `
+    <article class="user-list-item">
+      <div class="user-avatar">${escapeHtml(getUserInitials(user))}</div>
+      <div class="user-list-main">
+        <div class="user-list-head">
+          <div>
+            <strong>${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</strong>
+            <span>${escapeHtml(displayRoleName(user.role))}</span>
+          </div>
+          <span class="status ${active ? "" : "status-danger"}">${escapeHtml(user.status || "Actif")}</span>
+        </div>
+        <div class="user-list-meta">
+          <span>Identifiant : ${escapeHtml(user.identifier || "Non renseigné")}</span>
+          <span>${escapeHtml(user.accessChannel || "Application")}</span>
+          <span>${escapeHtml(user.scopeLevel || "Établissement")}${user.countryScope ? ` • ${escapeHtml(user.countryScope)}` : ""}</span>
+          ${user.schoolCode && user.schoolCode !== "*" ? `<span>${escapeHtml(user.schoolCode)}</span>` : ""}
+        </div>
+        ${user.temporaryPassword ? `<p class="user-temp-password">Mot de passe temporaire : ${escapeHtml(user.temporaryPassword)}</p>` : ""}
+        <div class="user-list-actions">
+          ${
+            canManageUserRow(user, "UPDATE")
+              ? `<button class="icon-action" type="button" data-action="reset-user-password" data-id="${escapeHtml(user.id)}">Mot de passe</button>`
+              : ""
+          }
+          ${
+            canManageUserRow(user, "SUSPEND")
+              ? `<button class="icon-action ${user.status === "Suspendu" ? "" : "danger"}" type="button" data-action="toggle-user" data-id="${escapeHtml(user.id)}">
+                  ${user.status === "Suspendu" ? "Réactiver" : "Suspendre"}
+                </button>`
+              : ""
+          }
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function getUserInitials(user = {}) {
+  const firstName = String(user.firstName ?? "").trim();
+  const lastName = String(user.lastName ?? "").trim();
+  const fallback = String(user.identifier ?? user.role ?? "U").trim();
+  return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.trim().toUpperCase() || fallback.slice(0, 2).toUpperCase();
 }
 
 function renderPermissions() {
@@ -810,7 +1555,7 @@ function renderRolePermissionSelector() {
   state.selectedPermissionRole = roles.includes(currentRole) ? currentRole : roles[0] ?? "";
 
   rolePermissionSelect.innerHTML = roles
-    .map((role) => `<option value="${escapeHtml(role)}" ${role === state.selectedPermissionRole ? "selected" : ""}>${escapeHtml(role)}</option>`)
+    .map((role) => `<option value="${escapeHtml(role)}" ${role === state.selectedPermissionRole ? "selected" : ""}>${escapeHtml(displayRoleName(role))}</option>`)
     .join("");
 }
 
@@ -914,6 +1659,10 @@ function getVisibleUsers() {
       user.role === "Admin School" &&
       (normalize(user.countryScope) === normalize(currentUser.countryScope) || schoolCodes.has(user.schoolCode))
     );
+  }
+
+  if (isInternalSchoolRole(currentUser?.role)) {
+    return state.users.filter((user) => normalize(user.schoolCode) === normalize(currentUser.schoolCode));
   }
 
   return state.users;
@@ -1065,6 +1814,74 @@ function canManageAcademicSettings() {
   return hasBackOfficePermission("Paramètres Établissement", "UPDATE");
 }
 
+async function saveSchoolUserSettings() {
+  if (state.session?.user?.role !== "Admin School" || !hasBackOfficePermission("Paramètres Établissement", "UPDATE")) {
+    showToast("Action réservée à l'Admin établissement.");
+    return;
+  }
+
+  const schoolCode = state.session.user.schoolCode;
+  const evaluationTypes = linesFromTextarea(schoolConfigEvaluationTypes?.value ?? "");
+  if (!evaluationTypes.length) {
+    showToast("Ajoutez au moins un type d'évaluation.");
+    return;
+  }
+
+  const current = getAcademicConfigForSchool(schoolCode);
+  const periodMode = schoolConfigPeriodMode.value || current.periodMode || "trimestre";
+  const defaultScale = Math.max(1, Number(schoolConfigDefaultScale.value || current.defaultScale || 20));
+  const payload = {
+    ...current,
+    schoolCode,
+    periodMode,
+    defaultScale,
+    reportCardMode: schoolConfigReportMode.value || current.reportCardMode || "period",
+    evaluationTypes,
+    periods: Array.isArray(current.periods) && current.periods.length
+      ? current.periods
+      : defaultAcademicConfig.periods,
+  };
+
+  try {
+    const saved = await request("/academic-config", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    state.academicConfigs[saved.schoolCode] = { ...payload, ...saved };
+    addAudit("Configuration établissement", saved.schoolCode, `${saved.periodMode} • barème /${saved.defaultScale}`);
+    persistSession();
+    renderUsers();
+    showToast("Configuration interne enregistrée.");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function getSchoolPilotageRoles() {
+  const roles = new Set(["Secrétaire", "Préfet des études", "Enseignant", "Parent", "Élève / Étudiant"]);
+  getVisibleUsers().forEach((user) => {
+    if (!["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(user.role)) {
+      roles.add(user.role);
+    }
+  });
+  return [...roles].filter(Boolean).sort((a, b) => displayRoleName(a).localeCompare(displayRoleName(b), "fr"));
+}
+
+function getDelegableSchoolFeatures() {
+  const features = ["Utilisateurs", "Classes", "Élèves", "Enseignants", "Affectations", "Présences", "Notes", "Bulletins", "Paiements", "Notifications", "Messages", "Documents", "Rapports", "Années Académiques", "Matières", "Examens", "Paramètres Établissement"];
+  return features.filter((feature) => getDelegableActionsForFeature(feature).length > 0);
+}
+
+function getDelegableActionsForFeature(feature) {
+  return crudActions.filter((crudAction) => hasBackOfficePermission(feature, crudAction.key));
+}
+
+function isSchoolFeatureEnabledForRole(role, feature) {
+  const permissions = new Set(state.rolePermissions[role] ?? []);
+  const actions = getDelegableActionsForFeature(feature);
+  return actions.length > 0 && actions.every((action) => permissions.has(`${feature}:${action.key}`));
+}
+
 function linesFromTextarea(value) {
   return value
     .split(/\r?\n|,/)
@@ -1143,6 +1960,11 @@ async function handleActionClick(event) {
     if (!targetView) return;
     showView(targetView);
     showToast(`Module ${button.dataset.label ?? "BackOffice"} ouvert.`);
+    return;
+  }
+
+  if (action === "save-school-user-settings") {
+    await saveSchoolUserSettings();
     return;
   }
 
@@ -1478,6 +2300,26 @@ async function handleActionClick(event) {
 }
 
 function handlePermissionToggle(event) {
+  const schoolRoleSelect = event.target.closest("[data-school-role-select]");
+  if (schoolRoleSelect) {
+    state.selectedSchoolPilotageRole = schoolRoleSelect.value;
+    renderSchoolRolePilotage();
+    return;
+  }
+
+  const schoolFeatureSelect = event.target.closest("[data-school-feature-select]");
+  if (schoolFeatureSelect) {
+    state.selectedSchoolPilotageFeature = schoolFeatureSelect.value;
+    renderSchoolRolePilotage();
+    return;
+  }
+
+  const schoolInput = event.target.closest("[data-school-role-toggle]");
+  if (schoolInput) {
+    handleSchoolRoleToggle(schoolInput);
+    return;
+  }
+
   const input = event.target.closest("[data-permission-toggle]");
 
   if (!input) return;
@@ -1506,6 +2348,43 @@ function handlePermissionToggle(event) {
   renderUsers();
   renderRolePermissionMatrix();
   showToast(`${permission} ${input.checked ? "accordé" : "refusé"} pour ${role}.`);
+}
+
+function handleSchoolRoleToggle(input) {
+  if (state.session?.user?.role !== "Admin School") {
+    input.checked = !input.checked;
+    showToast("Seul l'Admin établissement peut piloter ces rôles ici.");
+    return;
+  }
+
+  const role = input.dataset.role;
+  const permission = input.dataset.permission;
+  const [feature, action] = String(permission ?? "").split(":");
+  if (!getSchoolPilotageRoles().includes(role)) {
+    input.checked = !input.checked;
+    showToast("Ce rôle n'appartient pas au pilotage de l'établissement.");
+    return;
+  }
+  if (!getDelegableActionsForFeature(feature).some((crudAction) => crudAction.key === action)) {
+    input.checked = !input.checked;
+    showToast("Ce droit n'est pas dans votre périmètre accordé.");
+    return;
+  }
+
+  const rolePermissions = new Set(state.rolePermissions[role] ?? []);
+  if (input.checked) {
+    rolePermissions.add(permission);
+  } else {
+    rolePermissions.delete(permission);
+  }
+
+  state.rolePermissions[role] = [...rolePermissions].sort(sortPermissions);
+  applyRolePermissions(role);
+  persistSession();
+  renderMenus();
+  renderControls();
+  renderUsers();
+  showToast(`${permission} ${input.checked ? "accordé" : "refusé"} pour ${displayRoleName(role)}.`);
 }
 
 function renewSubscription(subscription) {
@@ -1550,6 +2429,17 @@ function persistSession({ sync = true } = {}) {
   state.session.countries = state.countries;
   state.session.subscriptions = state.subscriptions;
   state.session.notifications = state.notifications;
+  state.session.students = state.students;
+  state.session.teachers = state.teachers;
+  state.session.classes = state.classes;
+  state.session.courses = state.courses;
+  state.session.assignments = state.assignments;
+  state.session.payments = state.payments;
+  state.session.presences = state.presences;
+  state.session.notes = state.notes;
+  state.session.announcements = state.announcements;
+  state.session.messages = state.messages;
+  state.session.paymentStatuses = state.paymentStatuses;
   state.session.auditLog = state.auditLog;
   state.session.rolePermissions = state.rolePermissions;
   state.session.academicConfigs = state.academicConfigs;
@@ -1576,6 +2466,17 @@ function applyBackOfficeState(backendState = {}) {
   if (Array.isArray(backendState.countries) && backendState.countries.length) state.countries = backendState.countries;
   if (Array.isArray(backendState.subscriptions) && backendState.subscriptions.length) state.subscriptions = backendState.subscriptions;
   if (Array.isArray(backendState.notifications) && backendState.notifications.length) state.notifications = backendState.notifications;
+  if (Array.isArray(backendState.students)) state.students = backendState.students;
+  if (Array.isArray(backendState.teachers)) state.teachers = backendState.teachers;
+  if (Array.isArray(backendState.classes)) state.classes = backendState.classes;
+  if (Array.isArray(backendState.courses)) state.courses = backendState.courses;
+  if (Array.isArray(backendState.assignments)) state.assignments = backendState.assignments;
+  if (Array.isArray(backendState.payments)) state.payments = backendState.payments;
+  if (Array.isArray(backendState.presences)) state.presences = backendState.presences;
+  if (Array.isArray(backendState.notes)) state.notes = backendState.notes;
+  if (Array.isArray(backendState.announcements)) state.announcements = backendState.announcements;
+  if (Array.isArray(backendState.messages)) state.messages = backendState.messages;
+  if (Array.isArray(backendState.paymentStatuses)) state.paymentStatuses = backendState.paymentStatuses;
   if (Array.isArray(backendState.auditLog) && backendState.auditLog.length) state.auditLog = backendState.auditLog;
   if (backendState.rolePermissions && typeof backendState.rolePermissions === "object") {
     state.rolePermissions = backendState.rolePermissions;
@@ -1593,6 +2494,17 @@ function getBackOfficeStatePayload() {
     countries: state.countries,
     subscriptions: state.subscriptions,
     notifications: state.notifications,
+    students: state.students,
+    teachers: state.teachers,
+    classes: state.classes,
+    courses: state.courses,
+    assignments: state.assignments,
+    payments: state.payments,
+    presences: state.presences,
+    notes: state.notes,
+    announcements: state.announcements,
+    messages: state.messages,
+    paymentStatuses: state.paymentStatuses,
     auditLog: state.auditLog,
     rolePermissions: state.rolePermissions,
     academicConfigs: state.academicConfigs,
@@ -1669,21 +2581,28 @@ function enforceCountryAdminSchoolAdminCrud() {
   countryAdminSchoolAdminPermissions.forEach((permission) => countryAdminPermissions.add(permission));
   state.rolePermissions["Admin Pays"] = [...countryAdminPermissions].sort(sortPermissions);
 
-  const schoolAdminPermissions = new Set(state.rolePermissions["Admin School"] ?? []);
-  [...schoolAdminForbiddenFeatures].forEach((featureName) => {
-    [...schoolAdminPermissions].forEach((permission) => {
-      if (String(permission).startsWith(featureName) || isSchoolAdminForbiddenPermission(permission)) {
-        schoolAdminPermissions.delete(permission);
+  Object.entries(internalRoleDefaultPermissions).forEach(([roleName, defaults]) => {
+    const rolePermissions = new Set(state.rolePermissions[roleName] ?? []);
+    if (!rolePermissions.size) {
+      defaults.forEach((permission) => rolePermissions.add(permission));
+    }
+    if (roleName === "Admin School") {
+      rolePermissions.add("Paramètres Établissement:READ");
+      rolePermissions.add("Paramètres Établissement:UPDATE");
+    }
+    [...rolePermissions].forEach((permission) => {
+      if (isInternalRoleForbiddenPermission(permission)) {
+        rolePermissions.delete(permission);
       }
     });
+    state.rolePermissions[roleName] = [...rolePermissions].sort(sortPermissions);
   });
-  state.rolePermissions["Admin School"] = [...schoolAdminPermissions].sort(sortPermissions);
 
   state.users = state.users.map((user) => {
-    if (user.role === "Admin School") {
+    if (internalRoleDefaultPermissions[user.role]) {
       return {
         ...user,
-        permissions: [...(state.rolePermissions["Admin School"] ?? user.permissions ?? [])].sort(sortPermissions),
+        permissions: [...(state.rolePermissions[user.role] ?? user.permissions ?? [])].sort(sortPermissions),
       };
     }
 
@@ -1706,10 +2625,25 @@ function enforceCountryAdminSchoolAdminCrud() {
   if (state.session?.user?.role === "Admin School") {
     state.session.user.permissions = [...(state.rolePermissions["Admin School"] ?? state.session.user.permissions ?? [])].sort(sortPermissions);
   }
+
+  if (state.session?.user?.role === "Secrétaire" || state.session?.user?.role === "Sécretaire") {
+    state.session.user.permissions = [...(state.rolePermissions[state.session.user.role] ?? state.session.user.permissions ?? [])].sort(sortPermissions);
+  }
+
+  if (state.session?.user?.role === "Préfet des études") {
+    state.session.user.permissions = [...(state.rolePermissions["Préfet des études"] ?? state.session.user.permissions ?? [])].sort(sortPermissions);
+  }
 }
 
 function isSchoolAdminForbiddenPermission(permission) {
+  return isInternalRoleForbiddenPermission(permission);
+}
+
+function isInternalRoleForbiddenPermission(permission) {
   const normalizedPermission = normalize(permission);
+  if (String(permission).startsWith("Paramètres Établissement")) {
+    return false;
+  }
   return (
     [...schoolAdminForbiddenFeatures].some((featureName) => String(permission).startsWith(featureName)) ||
     schoolAdminForbiddenPermissionKeywords.some((keyword) => normalizedPermission.includes(keyword))
@@ -1745,7 +2679,7 @@ function hasBackOfficePermission(features, action = "READ") {
   const featureList = Array.isArray(features) ? features : [features];
   const permissions = new Set(getCurrentRolePermissions());
 
-  if (state.session.user.role === "Admin School" && featureList.some((feature) => schoolAdminForbiddenFeatures.has(feature))) {
+  if (isInternalSchoolRole(state.session.user.role) && featureList.some((feature) => schoolAdminForbiddenFeatures.has(feature))) {
     return false;
   }
 
@@ -2040,6 +2974,14 @@ function handleRoleFormSubmit(event) {
 
 function normalizeRoleName(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function displayRoleName(role) {
+  const labels = {
+    "Super Administrateur OKAFRIK": "Super Administrateur Somafrik",
+    "Admin School": "Admin établissement",
+  };
+  return labels[role] ?? role;
 }
 
 function sortPermissions(a, b) {

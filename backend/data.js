@@ -294,7 +294,7 @@ const securityMatrix = {
   "Paramètres Établissement": {
     "Super Administrateur OKAFRIK": "CRUD",
     "Admin Pays": "CRUD",
-    "Admin School": "-",
+    "Admin School": "CRUD",
     "Préfet des études": "R",
     Enseignant: "-",
     Secrétaire: "-",
@@ -491,6 +491,7 @@ const userAccounts = [
     schoolCode: "CD-2026-0001",
     accessChannel: "Application",
     identifier: "admin",
+    password: "1234",
     status: "Actif",
     permissions: rolePermissions["Admin School"],
     temporaryPassword: "",

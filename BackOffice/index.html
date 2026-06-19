@@ -10,32 +10,148 @@
   <body>
     <main class="shell">
       <section class="login-panel" id="loginPanel">
-        <div class="brand-block">
-          <div class="brand-mark"><img src="./assets/somafrik-logo.png" alt="Logo Somafrik" /></div>
-          <div>
-            <p class="eyebrow">BackOffice</p>
-            <h1>Somafrik</h1>
-            <p class="muted">ERP scolaire par OKAFRIK. Pilotage global, pays et établissements.</p>
+        <header class="landing-header">
+          <div class="brand-mini landing-brand">
+            <div class="brand-mark"><img src="./assets/somafrik-logo.png" alt="Logo Somafrik" /></div>
+            <div>
+              <strong>Somafrik</strong>
+              <span>ERP scolaire par Somafrik</span>
+            </div>
           </div>
-        </div>
+          <nav class="landing-nav" aria-label="Navigation vitrine">
+            <a href="#modules">Modules</a>
+            <a href="#roles">Rôles</a>
+            <a href="#securite">Sécurité</a>
+            <button class="landing-login-button" type="button" id="openLoginButton">Connexion</button>
+          </nav>
+        </header>
 
-        <form class="login-card" id="loginForm">
-          <h2>Connexion BackOffice</h2>
-          <label>
-            Identifiant
-            <input id="identifierInput" autocomplete="username" placeholder="superadmin" />
-          </label>
-          <label>
-            Mot de passe
-            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="1234" />
-          </label>
-          <button type="submit">Se connecter</button>
-          <p class="error" id="loginError"></p>
-          <div class="demo-box">
-            <button type="button" data-demo="superadmin">Super Admin demo</button>
-            <button type="button" data-demo="admin-rdc">Admin Pays demo</button>
+        <section class="landing-hero">
+          <div class="landing-hero-copy">
+            <p class="eyebrow">Solution SaaS multi-pays et multi-établissements</p>
+            <h1>Somafrik centralise la gestion scolaire, du pays à la classe.</h1>
+            <p class="landing-lead">
+              Une application ERP interne pour piloter les établissements scolaires et universitaires :
+              utilisateurs, droits, élèves, enseignants, présences, notes, paiements, communications et rapports.
+            </p>
+            <div class="landing-actions">
+              <button class="primary-landing-action" type="button" id="heroLoginButton">Connexion</button>
+              <a class="secondary-landing-action" href="#modules">Voir les modules</a>
+            </div>
           </div>
-        </form>
+
+          <form class="login-card landing-login-card hidden" id="loginForm">
+            <p class="eyebrow">Accès sécurisé</p>
+            <h2>Connexion Somafrik</h2>
+            <div class="access-choice" aria-label="Choix du profil de connexion">
+              <button type="button" data-login-profile="superadmin" data-demo="superadmin">Superadmin</button>
+              <button type="button" data-login-profile="country" data-demo="admin-rdc">Admin pays</button>
+              <button type="button" data-login-profile="school" data-demo="admin">Admin établissement</button>
+            </div>
+            <p class="login-helper">
+              Les autres rôles entrent selon les accès configurés par le Superadmin : secrétaire, préfet des études, enseignants, parents et élèves.
+            </p>
+            <label class="school-code-field hidden" id="loginSchoolCodeField">
+              Code établissement
+              <input id="loginSchoolCodeInput" autocomplete="organization" placeholder="Ex : CD-2026-0001" />
+            </label>
+            <label>
+              Identifiant unique
+              <input id="identifierInput" autocomplete="username" placeholder="superadmin, admin-rdc, admin..." />
+            </label>
+            <label>
+              Mot de passe
+              <input id="passwordInput" type="password" autocomplete="current-password" placeholder="Mot de passe" />
+            </label>
+            <button type="submit">Se connecter</button>
+            <p class="error" id="loginError"></p>
+          </form>
+        </section>
+
+        <section class="landing-section" id="modules">
+          <div class="landing-section-head">
+            <p class="eyebrow">Modules essentiels</p>
+            <h2>Un socle MVP prêt pour l’exploitation scolaire</h2>
+          </div>
+          <div class="landing-grid">
+            <article>
+              <strong>Gestion multi-établissements</strong>
+              <p>Création, validation, suspension et suivi des écoles ou universités par pays.</p>
+            </article>
+            <article>
+              <strong>Utilisateurs et rôles</strong>
+              <p>Droits CRUD, suspension, réinitialisation de mot de passe et périmètre par rôle.</p>
+            </article>
+            <article>
+              <strong>Scolarité</strong>
+              <p>Classes, élèves, enseignants, affectations, présences, notes, examens et bulletins.</p>
+            </article>
+            <article>
+              <strong>Finance scolaire</strong>
+              <p>Frais, paiements, reste à payer, impayés et historique détaillé.</p>
+            </article>
+            <article>
+              <strong>Communication</strong>
+              <p>Annonces, messages parents, notifications et suivi des statuts lu/non lu.</p>
+            </article>
+            <article>
+              <strong>Rapports</strong>
+              <p>Indicateurs de pilotage par plateforme, pays, établissement et rôle métier.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="landing-section landing-band" id="roles">
+          <div class="landing-section-head">
+            <p class="eyebrow">Accès par responsabilité</p>
+            <h2>Chaque acteur voit son tableau de bord métier</h2>
+          </div>
+          <div class="role-showcase">
+            <article><span>01</span><strong>Superadmin</strong><p>Pilote Somafrik : pays, rôles, droits, établissements, conformité et supervision globale.</p></article>
+            <article><span>02</span><strong>Admin pays</strong><p>Gère les établissements, validations et administrateurs scolaires de son pays.</p></article>
+            <article><span>03</span><strong>Admin établissement</strong><p>Administre son école ou université : utilisateurs, classes, affectations, communication et rapports.</p></article>
+            <article><span>04</span><strong>Rôles configurés</strong><p>Secrétaire, préfet, enseignant, parent et élève accèdent selon les droits accordés.</p></article>
+          </div>
+        </section>
+
+        <section class="landing-section trust-section" id="securite">
+          <div>
+            <p class="eyebrow">Sécurité et séparation des données</p>
+            <h2>Conçu pour plusieurs pays, plusieurs établissements et plusieurs rôles.</h2>
+          </div>
+          <ul>
+            <li>Identification par code établissement et identifiant unique utilisateur.</li>
+            <li>Données séparées par pays, établissement, rôle et périmètre opérationnel.</li>
+            <li>Actions synchronisées avec le backend pour éviter les écarts mobile / web.</li>
+            <li>Permissions ajustables par le Superadmin selon la règle métier.</li>
+          </ul>
+        </section>
+
+        <footer class="landing-footer">
+          <div>
+            <strong>Somafrik</strong>
+            <p>ERP scolaire et universitaire édité par Somafrik.</p>
+            <small>Copyright © 2026 Somafrik. Tous droits réservés.</small>
+          </div>
+          <div>
+            <strong>Mentions légales</strong>
+            <a href="#securite">Confidentialité</a>
+            <a href="#securite">Protection des données</a>
+            <a href="#securite">Conditions d’utilisation</a>
+          </div>
+          <div>
+            <strong>Liens utiles</strong>
+            <a href="#modules">Modules Somafrik</a>
+            <a href="#roles">Accès par rôle</a>
+            <a href="#securite">Sécurité</a>
+          </div>
+          <div>
+            <strong>Support</strong>
+            <span>support@somafrik.app</span>
+            <span>BackOffice Somafrik</span>
+            <span>Plateforme interne sécurisée</span>
+          </div>
+        </footer>
       </section>
 
       <section class="app-panel hidden" id="appPanel">
@@ -44,7 +160,7 @@
             <div class="brand-mark"><img src="./assets/somafrik-logo.png" alt="Logo Somafrik" /></div>
             <div>
               <strong>Somafrik</strong>
-              <span>par OKAFRIK</span>
+              <span>par Somafrik</span>
             </div>
           </div>
           <nav>
@@ -58,7 +174,6 @@
             <button class="nav-item" data-view="academicSettings">Configuration</button>
             <button class="nav-item" data-view="permissions">Permissions</button>
           </nav>
-          <button class="logout" id="logoutButton">Déconnexion</button>
         </aside>
 
         <section class="workspace">
@@ -67,18 +182,23 @@
               <p class="eyebrow" id="scopeLabel">Périmètre</p>
               <h2 id="pageTitle">Vue globale</h2>
             </div>
-            <div class="user-pill">
-              <span id="userInitials">SA</span>
-              <div>
-                <strong id="userName">Super Admin</strong>
-                <small id="userRole">Super Administrateur</small>
+            <div class="topbar-actions">
+              <div class="user-pill">
+                <span id="userInitials">SA</span>
+                <div>
+                  <strong id="userName">Super Admin</strong>
+                  <small id="userRole">Super Administrateur</small>
+                </div>
               </div>
+              <button class="logout" id="logoutButton">Déconnexion</button>
             </div>
           </header>
 
           <section class="cards-grid" id="kpiGrid"></section>
 
           <section class="view" id="overviewView">
+            <section class="role-dashboard" id="roleDashboard"></section>
+
             <div class="section-head">
               <h3>Contrôle métier</h3>
               <div class="section-actions">
@@ -188,28 +308,50 @@
 
           <section class="view hidden" id="usersView">
             <div class="section-head">
-              <h3>Utilisateurs BackOffice et écoles</h3>
+              <div>
+                <h3>Utilisateurs et pilotage établissement</h3>
+                <p class="section-subtitle" id="establishmentScopeLabel">Périmètre établissement</p>
+              </div>
               <div class="section-actions">
                 <input id="userSearch" placeholder="Rechercher un utilisateur" />
                 <button class="action-button" type="button" data-action="add-user">Créer</button>
                 <button class="action-button" type="button" data-action="reset-passwords">Réinitialiser</button>
               </div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Utilisateur</th>
-                    <th>Rôle</th>
-                    <th>Périmètre</th>
-                    <th>Canal</th>
-                    <th>Statut</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="usersTable"></tbody>
-              </table>
+            <div class="establishment-summary" id="establishmentSummary"></div>
+            <div class="establishment-user-admin" id="schoolRolePilotage"></div>
+            <div class="establishment-config-panel hidden" id="schoolConfigPanel">
+              <div class="section-head compact-head">
+                <div>
+                  <h3>Configuration interne de l'établissement</h3>
+                  <p class="section-subtitle">Périodes, types d'évaluation, barème et bulletin selon votre gestion.</p>
+                </div>
+                <button class="action-button" type="button" data-action="save-school-user-settings">Enregistrer</button>
+              </div>
+              <div class="form-grid">
+                <label>Mode de période
+                  <select id="schoolConfigPeriodMode">
+                    <option value="trimestre">Trimestre</option>
+                    <option value="semestre">Semestre</option>
+                    <option value="periode">Périodes personnalisées</option>
+                  </select>
+                </label>
+                <label>Barème par défaut
+                  <input id="schoolConfigDefaultScale" type="number" min="1" placeholder="20" />
+                </label>
+                <label>Mode bulletin
+                  <select id="schoolConfigReportMode">
+                    <option value="period">Par période</option>
+                    <option value="annual">Annuel</option>
+                    <option value="custom">Personnalisé</option>
+                  </select>
+                </label>
+                <label class="form-wide">Types d'évaluation
+                  <textarea id="schoolConfigEvaluationTypes" rows="4" placeholder="Interrogation&#10;Devoir&#10;Examen"></textarea>
+                </label>
+              </div>
             </div>
+            <div class="users-compact-list" id="usersTable"></div>
           </section>
 
           <section class="view hidden" id="reportsView">

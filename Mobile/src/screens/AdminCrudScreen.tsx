@@ -17,7 +17,7 @@ import { RootStackParamList } from "../navigation/AppNavigator";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
 import { messageThemes, rolePermissions } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
-import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
+import { canMutateEntity, canReadEntity, hasSecurityPermission, SecurityAction } from "../domain/security/permissions";
 import { resetUserPassword as resetUserPasswordOnBackend } from "../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
@@ -32,6 +32,32 @@ type Field = {
 
 const teacherCourseAssignmentType = "Professeur → cours";
 const studentClassAssignmentType = "Élève → classe";
+const rolePilotageActions: Array<{ key: SecurityAction; label: string }> = [
+  { key: "READ", label: "Lire" },
+  { key: "CREATE", label: "Créer" },
+  { key: "UPDATE", label: "Modifier" },
+  { key: "DELETE", label: "Supprimer" },
+  { key: "SUSPEND", label: "Suspendre" },
+];
+const schoolPilotageFeatures = [
+  "Utilisateurs",
+  "Classes",
+  "Élèves",
+  "Enseignants",
+  "Affectations",
+  "Présences",
+  "Notes",
+  "Bulletins",
+  "Paiements",
+  "Notifications",
+  "Messages",
+  "Documents",
+  "Rapports",
+  "Années Académiques",
+  "Matières",
+  "Examens",
+  "Paramètres Établissement",
+];
 
 const configs: Record<
   AdminEntity,
@@ -236,6 +262,8 @@ export default function AdminCrudScreen({ route }: Props) {
     usersData,
     paymentsData,
     subscriptionsData,
+    rolePermissionsData,
+    updateRoleFeatureAccess,
   } = useAdminData();
   const config = configs[entity];
   const items = getItems(entity);
@@ -252,10 +280,17 @@ export default function AdminCrudScreen({ route }: Props) {
   const [dateField, setDateField] = useState<Field | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [calendarStep, setCalendarStep] = useState<"year" | "month" | "day">("year");
+  const [selectedPermissionRole, setSelectedPermissionRole] = useState("");
+  const [selectedPermissionFeature, setSelectedPermissionFeature] = useState("");
   const canCreate = canMutateEntity(session, entity, "CREATE");
   const canRead = canReadEntity(session, entity);
   const canUpdate = canMutateEntity(session, entity, "UPDATE");
   const canDelete = canMutateEntity(session, entity, "DELETE");
+  const delegableFeatures = useMemo(
+    () => schoolPilotageFeatures.filter((feature) => getDelegablePermissionsForFeature(session, feature).length > 0),
+    [session?.permissions, session?.user.permissions]
+  );
+  const pilotageRoles = useMemo(() => getMobilePilotageRoles(usersData), [usersData]);
 
   useEffect(() => {
     if (!canRead) {
@@ -270,6 +305,19 @@ export default function AdminCrudScreen({ route }: Props) {
       setSelectedCourseClass(classesData[0].name);
     }
   }, [classesData, entity, selectedCourseClass]);
+
+  useEffect(() => {
+    if (entity !== "users" || session?.role !== "school_admin") {
+      return;
+    }
+
+    if (!selectedPermissionRole || !pilotageRoles.includes(selectedPermissionRole)) {
+      setSelectedPermissionRole(pilotageRoles[0] ?? "");
+    }
+    if (!selectedPermissionFeature || !delegableFeatures.includes(selectedPermissionFeature)) {
+      setSelectedPermissionFeature(delegableFeatures[0] ?? "");
+    }
+  }, [delegableFeatures, entity, pilotageRoles, selectedPermissionFeature, selectedPermissionRole, session?.role]);
 
   const visibleItems = useMemo(() => {
     if (entity === "courses" && selectedCourseClass) {
@@ -610,6 +658,28 @@ export default function AdminCrudScreen({ route }: Props) {
     }
   };
 
+  const selectedDelegablePermissions = getDelegablePermissionsForFeature(session, selectedPermissionFeature);
+  const selectedRolePermissions = new Set(rolePermissionsData[selectedPermissionRole] ?? []);
+
+  const togglePermissionAction = (permission: string, enabled: boolean) => {
+    if (session?.role !== "school_admin") {
+      Alert.alert("Accès refusé", "Seul l'admin établissement peut piloter ces droits.");
+      return;
+    }
+
+    if (!selectedPermissionRole || !selectedPermissionFeature || !permission) {
+      Alert.alert("Sélection incomplète", "Choisissez un rôle et une fonctionnalité accordée à votre compte.");
+      return;
+    }
+
+    updateRoleFeatureAccess(
+      selectedPermissionRole,
+      selectedPermissionFeature,
+      [permission],
+      enabled
+    );
+  };
+
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -632,6 +702,93 @@ export default function AdminCrudScreen({ route }: Props) {
             </TouchableOpacity>
           )}
         </View>
+
+        {entity === "users" && session?.role === "school_admin" && (
+          <View style={styles.permissionPilotageCard}>
+            <View style={styles.permissionPilotageHead}>
+              <View style={styles.permissionIcon}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#2563EB" />
+              </View>
+              <View style={styles.permissionTitleBlock}>
+                <Text style={styles.permissionTitle}>Droits par rôle</Text>
+                <Text style={styles.permissionSubtitle}>
+                  Activez uniquement les fonctionnalités accordées à votre établissement.
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.blockLabel}>Rôle</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {pilotageRoles.map((role) => (
+                <TouchableOpacity
+                  key={`pilotage-role-${role}`}
+                  activeOpacity={0.85}
+                  style={[styles.filterPill, selectedPermissionRole === role && styles.filterPillActive]}
+                  onPress={() => setSelectedPermissionRole(role)}
+                >
+                  <Text style={[styles.filterText, selectedPermissionRole === role && styles.filterTextActive]}>
+                    {role}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.blockLabel}>Fonctionnalité</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {delegableFeatures.map((feature) => (
+                <TouchableOpacity
+                  key={`pilotage-feature-${feature}`}
+                  activeOpacity={0.85}
+                  style={[styles.filterPill, selectedPermissionFeature === feature && styles.filterPillActive]}
+                  onPress={() => setSelectedPermissionFeature(feature)}
+                >
+                  <Text style={[styles.filterText, selectedPermissionFeature === feature && styles.filterTextActive]}>
+                    {feature}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.selectedFeatureCard}>
+              <View>
+                <Text style={styles.permissionFeatureName}>{selectedPermissionFeature || "Aucune fonctionnalité"}</Text>
+                <Text style={styles.permissionActions}>
+                  {selectedPermissionRole || "Choisissez un rôle"}
+                </Text>
+              </View>
+
+              <View style={styles.permissionCrudColumn}>
+                {selectedDelegablePermissions.length ? (
+                  selectedDelegablePermissions.map((permission) => {
+                    const actionKey = permission.split(":")[1] as SecurityAction;
+                    const label = rolePilotageActions.find((action) => action.key === actionKey)?.label ?? actionKey;
+                    const enabled = selectedRolePermissions.has(permission);
+                    return (
+                      <View key={permission} style={styles.permissionCrudRow}>
+                        <View style={styles.permissionCrudText}>
+                          <Text style={styles.permissionCrudLabel}>{label}</Text>
+                          <Text style={styles.permissionCrudStatus}>{enabled ? "Accordé" : "Refusé"}</Text>
+                        </View>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          style={[styles.toggleButton, enabled && styles.toggleButtonActive]}
+                          onPress={() => togglePermissionAction(permission, !enabled)}
+                        >
+                          <View style={[styles.toggleKnob, enabled && styles.toggleKnobActive]} />
+                          <Text style={[styles.toggleButtonText, enabled && styles.toggleButtonTextActive]}>
+                            {enabled ? "Oui" : "Non"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.permissionActions}>Aucun droit accordé par le niveau supérieur.</Text>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
 
         {entity === "schools" && (
           <View style={styles.filtersCard}>
@@ -762,29 +919,77 @@ export default function AdminCrudScreen({ route }: Props) {
           </View>
         )}
 
-        {visibleItems.map((item: any) => (
-          <View key={item.id} style={styles.card}>
-            <View style={styles.cardContent}>
-              <Text style={styles.cardTitle}>{getPrimaryText(entity, item)}</Text>
-              <Text style={styles.cardMeta}>{getSecondaryText(entity, item)}</Text>
-            </View>
-            {canUpdate && (
-              <TouchableOpacity style={styles.iconButton} onPress={() => openEdit(item)}>
-                <Ionicons name="create-outline" size={20} color="#2563EB" />
-              </TouchableOpacity>
-            )}
-            {entity === "users" && canUpdate && (
-              <TouchableOpacity style={styles.iconButtonWarning} onPress={() => resetUserPassword(item)}>
-                <Ionicons name="key-outline" size={20} color="#B45309" />
-              </TouchableOpacity>
-            )}
-            {canDelete && (
-              <TouchableOpacity style={styles.iconButtonDanger} onPress={() => confirmDelete(item)}>
-                <Ionicons name="trash-outline" size={20} color="#DC2626" />
-              </TouchableOpacity>
-            )}
+        {entity === "users" ? (
+          <View style={styles.userList}>
+            {visibleItems.map((item: any) => (
+              <View key={item.id} style={styles.userListRow}>
+                <View style={styles.userAvatar}>
+                  <Text style={styles.userAvatarText}>{getUserInitials(item)}</Text>
+                </View>
+                <View style={styles.userListContent}>
+                  <View style={styles.userListTopLine}>
+                    <Text style={styles.userListName} numberOfLines={1}>
+                      {getPrimaryText(entity, item)}
+                    </Text>
+                    <View style={[styles.userStatusBadge, isActiveUserAccount(item) ? styles.userStatusActive : styles.userStatusInactive]}>
+                      <Text style={[styles.userStatusText, isActiveUserAccount(item) ? styles.userStatusTextActive : styles.userStatusTextInactive]}>
+                        {item.status || "Actif"}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.userListRole} numberOfLines={1}>{item.role}</Text>
+                  <Text style={styles.userListMeta} numberOfLines={1}>
+                    {item.identifier || "Identifiant non renseigné"} • {item.accessChannel || "Application"}
+                  </Text>
+                  {item.temporaryPassword ? (
+                    <Text style={styles.userTempPassword} numberOfLines={1}>
+                      Mot de passe temporaire : {item.temporaryPassword}
+                    </Text>
+                  ) : null}
+                  <View style={styles.userListActions}>
+                    {canUpdate && (
+                      <TouchableOpacity style={styles.listActionButton} onPress={() => openEdit(item)}>
+                        <Ionicons name="create-outline" size={17} color="#2563EB" />
+                        <Text style={styles.listActionText}>Modifier</Text>
+                      </TouchableOpacity>
+                    )}
+                    {canUpdate && (
+                      <TouchableOpacity style={styles.listActionButtonWarning} onPress={() => resetUserPassword(item)}>
+                        <Ionicons name="key-outline" size={17} color="#B45309" />
+                        <Text style={styles.listActionTextWarning}>Mot de passe</Text>
+                      </TouchableOpacity>
+                    )}
+                    {canDelete && (
+                      <TouchableOpacity style={styles.listActionButtonDanger} onPress={() => confirmDelete(item)}>
+                        <Ionicons name="trash-outline" size={17} color="#DC2626" />
+                        <Text style={styles.listActionTextDanger}>Supprimer</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
+            ))}
           </View>
-        ))}
+        ) : (
+          visibleItems.map((item: any) => (
+            <View key={item.id} style={styles.card}>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>{getPrimaryText(entity, item)}</Text>
+                <Text style={styles.cardMeta}>{getSecondaryText(entity, item)}</Text>
+              </View>
+              {canUpdate && (
+                <TouchableOpacity style={styles.iconButton} onPress={() => openEdit(item)}>
+                  <Ionicons name="create-outline" size={20} color="#2563EB" />
+                </TouchableOpacity>
+              )}
+              {canDelete && (
+                <TouchableOpacity style={styles.iconButtonDanger} onPress={() => confirmDelete(item)}>
+                  <Ionicons name="trash-outline" size={20} color="#DC2626" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))
+        )}
 
         {visibleItems.length === 0 && (
           <View style={styles.emptyState}>
@@ -1815,11 +2020,36 @@ function getManageableSchoolUserRoles() {
     .filter((role) => !["Parent", "Élève / Étudiant"].includes(role));
 }
 
+function getMobilePilotageRoles(usersData: any[]) {
+  const roles = new Set(["Secrétaire", "Préfet des études", "Enseignant", "Parent", "Élève / Étudiant"]);
+  usersData.forEach((user) => {
+    if (user?.role && !isPlatformUserRole(user.role) && user.role !== "Admin School") {
+      roles.add(user.role);
+    }
+  });
+
+  return [...roles].sort((left, right) => left.localeCompare(right, "fr"));
+}
+
+function getDelegablePermissionsForFeature(session: any, feature: string) {
+  if (!feature) return [];
+  return rolePilotageActions
+    .filter((action) => hasSecurityPermission(session, feature, action.key))
+    .map((action) => `${feature}:${action.key}`);
+}
+
 function isActiveUserAccount(item: any) {
   const status = normalize(item?.status)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   return !["suspendu", "desactive", "disabled", "inactive", "inactif"].includes(status);
+}
+
+function getUserInitials(item: any) {
+  const firstName = String(item?.firstName ?? "").trim();
+  const lastName = String(item?.lastName ?? "").trim();
+  const fallback = String(item?.identifier ?? item?.role ?? "U").trim();
+  return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.trim().toUpperCase() || fallback.slice(0, 2).toUpperCase();
 }
 
 function getRoleDefaults(role?: string, schoolCode = "") {
@@ -2187,6 +2417,123 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: "#FFFFFF",
   },
+  permissionPilotageCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  permissionPilotageHead: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14,
+  },
+  permissionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permissionTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  permissionTitle: {
+    color: "#0F172A",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  permissionSubtitle: {
+    marginTop: 4,
+    color: "#64748B",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+  },
+  selectedFeatureCard: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    gap: 12,
+  },
+  permissionFeatureName: {
+    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  permissionActions: {
+    marginTop: 4,
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  permissionCrudColumn: {
+    gap: 10,
+  },
+  permissionCrudRow: {
+    minHeight: 54,
+    borderRadius: 14,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  permissionCrudText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  permissionCrudLabel: {
+    color: "#0F172A",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  permissionCrudStatus: {
+    marginTop: 3,
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  toggleButton: {
+    minWidth: 84,
+    minHeight: 40,
+    borderRadius: 999,
+    padding: 4,
+    paddingRight: 10,
+    backgroundColor: "#E2E8F0",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  toggleButtonActive: {
+    backgroundColor: "#DCFCE7",
+  },
+  toggleKnob: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#94A3B8",
+  },
+  toggleKnobActive: {
+    backgroundColor: "#16A34A",
+  },
+  toggleButtonText: {
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  toggleButtonTextActive: {
+    color: "#166534",
+  },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
@@ -2194,6 +2541,138 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
+  },
+  userList: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  userListRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  userAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  userAvatarText: {
+    color: "#2563EB",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  userListContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  userListTopLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  userListName: {
+    flex: 1,
+    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  userListRole: {
+    marginTop: 3,
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  userListMeta: {
+    marginTop: 3,
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  userTempPassword: {
+    marginTop: 4,
+    color: "#B45309",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  userStatusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  userStatusActive: {
+    backgroundColor: "#DCFCE7",
+  },
+  userStatusInactive: {
+    backgroundColor: "#FEE2E2",
+  },
+  userStatusText: {
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  userStatusTextActive: {
+    color: "#166534",
+  },
+  userStatusTextInactive: {
+    color: "#991B1B",
+  },
+  userListActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+  },
+  listActionButton: {
+    minHeight: 34,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    backgroundColor: "#EFF6FF",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  listActionButtonWarning: {
+    minHeight: 34,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    backgroundColor: "#FEF3C7",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  listActionButtonDanger: {
+    minHeight: 34,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    backgroundColor: "#FEF2F2",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  listActionText: {
+    color: "#2563EB",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  listActionTextWarning: {
+    color: "#B45309",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  listActionTextDanger: {
+    color: "#DC2626",
+    fontSize: 11,
+    fontWeight: "900",
   },
   classCardsBlock: {
     marginBottom: 14,

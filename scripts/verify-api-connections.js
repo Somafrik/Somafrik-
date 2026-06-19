@@ -43,6 +43,7 @@ async function main() {
     body: JSON.stringify({
       identifier: process.env.SOMAFRIK_TEST_USER || "superadmin@somafrik.app",
       password: process.env.SOMAFRIK_TEST_PASSWORD || "1234",
+      ...(process.env.SOMAFRIK_TEST_SCHOOL_CODE ? { schoolCode: process.env.SOMAFRIK_TEST_SCHOOL_CODE } : {}),
     }),
   });
   const token = session.accessToken;

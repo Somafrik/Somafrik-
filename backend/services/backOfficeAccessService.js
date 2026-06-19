@@ -18,8 +18,11 @@ class BackOfficeAccessService {
       throw new BusinessError(400, "Identifiant et mot de passe obligatoires");
     }
 
+    const normalizedIdentifier = String(identifier).trim().toLowerCase();
     const user = this.userAccounts.find((account) =>
-      [account.identifier, account.phone, account.publicId].some((value) => value === identifier)
+      [account.identifier, account.phone, account.publicId].some(
+        (value) => String(value ?? "").trim().toLowerCase() === normalizedIdentifier
+      )
     );
 
     if (!user || !this.verifyPassword(user, password)) {
@@ -30,8 +33,12 @@ class BackOfficeAccessService {
       throw new BusinessError(403, "Compte suspendu ou desactive");
     }
 
-    if (user.accessChannel !== "BackOffice" && !this.isPlatformAdmin(user)) {
+    if (user.accessChannel !== "BackOffice" && !this.isBackOfficeRole(user)) {
       throw new BusinessError(403, "Ce compte n'a pas accès au BackOffice");
+    }
+
+    if (!this.isPlatformAdmin(user) && !String(schoolCode ?? "").trim()) {
+      throw new BusinessError(400, "Code établissement obligatoire pour ce compte");
     }
 
     const schoolContext = this.resolveSchoolContext(schoolCode || this.getDefaultSchoolCodeForUser(user));
@@ -59,11 +66,26 @@ class BackOfficeAccessService {
       return verifySecret(password, user.passwordHash);
     }
 
+    if (user.pinHash) {
+      return verifySecret(password, user.pinHash);
+    }
+
     return user.password === password;
   }
 
   isPlatformAdmin(user) {
     return user.role === "Super Administrateur OKAFRIK" || user.role === "Admin Pays";
+  }
+
+  isBackOfficeRole(user) {
+    return [
+      "Super Administrateur OKAFRIK",
+      "Admin Pays",
+      "Admin School",
+      "Secrétaire",
+      "Sécretaire",
+      "Préfet des études",
+    ].includes(user.role);
   }
 
   resolveSchoolContext(schoolCode) {
@@ -193,7 +215,19 @@ class BackOfficeAccessService {
       return ["Dashboard", "Établissements", "Validations", "Paiements", "Rapports", "Support", "Paramètres"];
     }
 
-    return ["Dashboard", "Utilisateurs", "Paramètres"];
+    if (user.role === "Admin School") {
+      return ["Dashboard", "Utilisateurs", "Rapports", "Support", "Années Académiques"];
+    }
+
+    if (user.role === "Secrétaire" || user.role === "Sécretaire") {
+      return ["Dashboard", "Utilisateurs", "Support", "Rapports"];
+    }
+
+    if (user.role === "Préfet des études") {
+      return ["Dashboard", "Utilisateurs", "Rapports", "Années Académiques", "Support"];
+    }
+
+    return ["Dashboard"];
   }
 
   getDashboard(user) {
@@ -239,6 +273,32 @@ class BackOfficeAccessService {
           { label: "Établissements suspendus", value: suspendedSchools },
           { label: "Admins écoles", value: schoolAdmins },
           { label: "Abonnements en retard", value: expiredSubscriptions },
+        ],
+      };
+    }
+
+    if (user.role === "Secrétaire" || user.role === "Sécretaire") {
+      return {
+        profile: "Secrétaire",
+        privilegeLevel: "SCHOOL_INTERNAL",
+        kpis: [
+          { label: "Établissement", value: scopedSchools.length },
+          { label: "Utilisateurs", value: scopedUsers.length },
+          { label: "Dossiers élèves", value: scopedUsers.filter((account) => ["Élève / Étudiant", "Élève", "Étudiant"].includes(account.role)).length },
+          { label: "Permissions", value: user.permissions?.length ?? 0 },
+        ],
+      };
+    }
+
+    if (user.role === "Préfet des études") {
+      return {
+        profile: "Préfet des études",
+        privilegeLevel: "SCHOOL_PEDAGOGY",
+        kpis: [
+          { label: "Établissement", value: scopedSchools.length },
+          { label: "Enseignants", value: scopedUsers.filter((account) => account.role === "Enseignant").length },
+          { label: "Élèves", value: scopedUsers.filter((account) => ["Élève / Étudiant", "Élève", "Étudiant"].includes(account.role)).length },
+          { label: "Permissions", value: user.permissions?.length ?? 0 },
         ],
       };
     }

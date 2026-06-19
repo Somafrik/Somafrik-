@@ -62,6 +62,7 @@ type AdminDataContextValue = {
   deleteItem: (entity: AdminEntity, id: string) => void;
   upsertPresenceItems: (items: PresenceItem[]) => void;
   upsertNoteItem: (item: NoteItem) => void;
+  updateRoleFeatureAccess: (role: string, feature: string, permissions: string[], enabled: boolean) => void;
 };
 
 const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefined);
@@ -295,6 +296,43 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
+    const updateRoleFeatureAccess = (role: string, feature: string, permissions: string[], enabled: boolean) => {
+      const featurePrefix = `${feature}:`;
+      const allowedPermissions = [...new Set(permissions.filter((permission) => permission.startsWith(featurePrefix)))];
+      if (!role || !allowedPermissions.length) {
+        return;
+      }
+
+      setRolePermissionsData((current) => {
+        const nextRolePermissions = new Set(current[role] ?? []);
+        allowedPermissions.forEach((permission) => {
+          if (enabled) {
+            nextRolePermissions.add(permission);
+          } else {
+            nextRolePermissions.delete(permission);
+          }
+        });
+
+        const nextRolePermissionList = [...nextRolePermissions].sort();
+        const nextPermissions = {
+          ...current,
+          [role]: nextRolePermissionList,
+        };
+        const nextUsers = (state.users ?? []).map((user: any) =>
+          user.role === role ? { ...user, permissions: nextRolePermissionList } : user
+        );
+
+        setUsersData(nextUsers as UserAccount[]);
+        persistSyncedState({
+          ...state,
+          users: nextUsers,
+          rolePermissions: nextPermissions,
+        });
+
+        return nextPermissions;
+      });
+    };
+
     return {
       studentsData: (state.students ?? []) as Student[],
       teachersData: (state.teachers ?? []) as Teacher[],
@@ -346,6 +384,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
           persistSyncedState({ ...state, notes: nextItems });
           return nextItems;
         }),
+      updateRoleFeatureAccess,
     };
   }, [
     announcementsData,

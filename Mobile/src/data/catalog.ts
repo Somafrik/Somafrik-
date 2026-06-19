@@ -526,7 +526,7 @@ const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
   Messages: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "CRUD", "Élève / Étudiant": "CRUD" },
   Documents: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Rapports: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
-  "Paramètres Établissement": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  "Paramètres Établissement": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   "Années Académiques": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Matières: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Affectations: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "R", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },

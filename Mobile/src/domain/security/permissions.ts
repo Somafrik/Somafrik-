@@ -1,9 +1,9 @@
 import type { AdminEntity } from "../../context/AdminDataContext";
 
-export type SecurityAction = "READ" | "CREATE" | "UPDATE" | "DELETE";
+export type SecurityAction = "READ" | "CREATE" | "UPDATE" | "DELETE" | "SUSPEND";
 
-const crudActions: SecurityAction[] = ["READ", "CREATE", "UPDATE", "DELETE"];
-const schoolAdminForbiddenFeatures = new Set(["Établissements", "Abonnements", "Paramètres Établissement"]);
+const crudActions: SecurityAction[] = ["READ", "CREATE", "UPDATE", "DELETE", "SUSPEND"];
+const schoolAdminForbiddenFeatures = new Set(["Établissements", "Abonnements"]);
 
 export const entityFeatureMap: Partial<Record<AdminEntity, string>> = {
   schools: "Établissements",

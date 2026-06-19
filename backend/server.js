@@ -913,7 +913,7 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
     notes: mergeScopedRows(current.notes, scopedRequested.notes, scopedCurrent.notes),
     announcements: mergeScopedRows(current.announcements, scopedRequested.announcements, scopedCurrent.announcements),
     messages: mergeScopedRows(current.messages, scopedRequested.messages, scopedCurrent.messages),
-    rolePermissions: current.rolePermissions,
+    rolePermissions: mergeScopedRolePermissions(current.rolePermissions, requested.rolePermissions, principal),
     academicConfigs: {
       ...current.academicConfigs,
       ...scopedRequested.academicConfigs,
@@ -931,6 +931,48 @@ function mergeScopedRows(currentRows, requestedScopedRows, currentScopedRows) {
     ...requestedScopedRows,
     ...currentRows.filter((row) => !scopedKeys.has(rowKey(row)) && !requestedKeys.has(rowKey(row))),
   ];
+}
+
+function mergeScopedRolePermissions(currentRolePermissions = {}, requestedRolePermissions = {}, principal = {}) {
+  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
+    return requestedRolePermissions;
+  }
+
+  if (principal.role !== "Admin School") {
+    return currentRolePermissions;
+  }
+
+  const nextRolePermissions = { ...currentRolePermissions };
+  Object.entries(requestedRolePermissions ?? {}).forEach(([role, permissions]) => {
+    if (isPlatformBackOfficeRole(role) || !Array.isArray(permissions)) {
+      return;
+    }
+
+    nextRolePermissions[role] = [...new Set(permissions.filter(isSchoolRolePermissionAllowed))]
+      .sort((left, right) => String(left).localeCompare(String(right), "fr"));
+  });
+
+  return nextRolePermissions;
+}
+
+function isPlatformBackOfficeRole(role) {
+  return ["super administrateur okafrik", "admin pays"].includes(normalizeBusinessPermission(role));
+}
+
+function isSchoolRolePermissionAllowed(permission) {
+  if (!permission || permission === "ALL_PRIVILEGES" || permission === "COUNTRY_PRIVILEGES") {
+    return false;
+  }
+
+  const [feature] = String(permission).split(":");
+  const normalizedFeature = normalizeBusinessPermission(feature);
+  const forbiddenFeatures = new Set(["pays", "etablissements", "abonnements"]);
+  if (forbiddenFeatures.has(normalizedFeature)) {
+    return false;
+  }
+
+  const normalizedPermission = normalizeBusinessPermission(permission);
+  return !["abonnement", "inscription", "tarif"].some((keyword) => normalizedPermission.includes(keyword));
 }
 
 function rowKey(row = {}) {
@@ -1125,9 +1167,13 @@ function enforceBusinessRolePermissions(role, permissions = []) {
     return permissions;
   }
 
-  const forbiddenFeatures = ["Établissements", "Abonnements", "Paramètres Établissement"];
+  const forbiddenFeatures = ["Établissements", "Abonnements"];
   const forbiddenKeywords = ["abonnement", "etablissement", "établissement", "inscription", "tarif"];
   return permissions.filter((permission) => {
+    if (String(permission).startsWith("Paramètres Établissement:")) {
+      return true;
+    }
+
     const normalizedPermission = normalizeBusinessPermission(permission);
     return (
       !forbiddenFeatures.some((feature) => String(permission).startsWith(feature)) &&
