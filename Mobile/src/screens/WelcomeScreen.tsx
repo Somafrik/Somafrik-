@@ -28,7 +28,7 @@ export default function WelcomeScreen({ navigation }: Props) {
         <Image source={somafrikLogo} style={styles.logoImage} />
       </Animated.View>
       <Animated.Text style={[styles.brand, { opacity }]}>Somafrik</Animated.Text>
-      <Animated.Text style={[styles.parentBrand, { opacity }]}>par OKAFRIK</Animated.Text>
+      <Animated.Text style={[styles.parentBrand, { opacity }]}>par Somafrik</Animated.Text>
       <Animated.Text style={[styles.subtitle, { opacity }]}>
         ERP scolaire mobile et tablette pour tous les rôles.
       </Animated.Text>

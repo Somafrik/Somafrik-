@@ -1,4 +1,5 @@
 const seedData = require("../data");
+const { applySystemActivePeriod } = require("../lib/academicPeriods");
 const { hashSecret } = require("../services/credentialService");
 
 function clone(value) {
@@ -13,6 +14,7 @@ class FallbackRepository {
     this.auditLogs = [];
     this.backOfficeState = null;
     this.notes = clone(seedData.notes);
+    this.presences = clone(seedData.presences);
     this.subjects = seedData.courses.map((course) => ({
       id: course.publicId ?? course.id,
       schoolId: seedData.school.id,
@@ -38,6 +40,10 @@ class FallbackRepository {
     this.ready = true;
   }
 
+  async close() {
+    this.ready = false;
+  }
+
   async getDataset() {
     await this.init();
     return clone({
@@ -51,9 +57,13 @@ class FallbackRepository {
       courses: seedData.courses,
       students: seedData.students,
       notes: this.notes,
-      presences: seedData.presences,
+      presences: this.presences,
       payments: seedData.payments,
       announcements: seedData.announcements,
+      exams: seedData.exams,
+      bulletins: seedData.bulletins,
+      documents: seedData.documents,
+      teacherAssignments: seedData.teacherAssignments,
       platformNotifications: seedData.platformNotifications,
     });
   }
@@ -135,11 +145,11 @@ class FallbackRepository {
 
   async getAcademicConfig(schoolCode) {
     const normalizedSchoolCode = String(schoolCode && schoolCode !== "*" ? schoolCode : seedData.school.code).trim().toUpperCase();
-    return this.backOfficeState?.academicConfigs?.[normalizedSchoolCode] ?? {
+    const config = this.backOfficeState?.academicConfigs?.[normalizedSchoolCode] ?? {
       schoolCode: normalizedSchoolCode,
       periodMode: "trimestre",
       periods: [
-        { id: "trimestre-1", name: "Trimestre 1", type: "Trimestre", order: 1, startDate: "01-09-2025", endDate: "31-12-2025", active: true },
+        { id: "trimestre-1", name: "Trimestre 1", type: "Trimestre", order: 1, startDate: "01-09-2025", endDate: "31-12-2025", active: false },
         { id: "trimestre-2", name: "Trimestre 2", type: "Trimestre", order: 2, startDate: "01-01-2026", endDate: "31-03-2026", active: false },
         { id: "trimestre-3", name: "Trimestre 3", type: "Trimestre", order: 3, startDate: "01-04-2026", endDate: "30-06-2026", active: false },
       ],
@@ -149,6 +159,14 @@ class FallbackRepository {
       allowCustomClasses: true,
       allowCustomCourses: true,
       allowCustomReportCards: true,
+      levels: seedData.demoLevels,
+      tracks: seedData.demoTracks,
+      classNames: seedData.demoClassNames,
+      subjects: seedData.demoSubjects,
+    };
+    return {
+      ...config,
+      periods: applySystemActivePeriod(config.periods ?? []),
     };
   }
 
@@ -157,17 +175,23 @@ class FallbackRepository {
     const savedConfig = {
       schoolCode: normalizedSchoolCode,
       periodMode: config.periodMode ?? "trimestre",
-      periods: Array.isArray(config.periods) && config.periods.length ? config.periods : [
-        { id: "trimestre-1", name: "Trimestre 1", type: "Trimestre", order: 1, startDate: "01-09-2025", endDate: "31-12-2025", active: true },
+      periods: applySystemActivePeriod(
+        Array.isArray(config.periods) && config.periods.length ? config.periods : [
+        { id: "trimestre-1", name: "Trimestre 1", type: "Trimestre", order: 1, startDate: "01-09-2025", endDate: "31-12-2025", active: false },
         { id: "trimestre-2", name: "Trimestre 2", type: "Trimestre", order: 2, startDate: "01-01-2026", endDate: "31-03-2026", active: false },
         { id: "trimestre-3", name: "Trimestre 3", type: "Trimestre", order: 3, startDate: "01-04-2026", endDate: "30-06-2026", active: false },
       ],
+      ),
       evaluationTypes: Array.isArray(config.evaluationTypes) && config.evaluationTypes.length ? config.evaluationTypes : ["Interrogation", "Devoir", "Examen"],
       defaultScale: Number(config.defaultScale ?? 20),
       reportCardMode: config.reportCardMode ?? "period",
       allowCustomClasses: config.allowCustomClasses !== false,
       allowCustomCourses: config.allowCustomCourses !== false,
       allowCustomReportCards: config.allowCustomReportCards !== false,
+      levels: Array.isArray(config.levels) && config.levels.length ? config.levels : seedData.demoLevels,
+      tracks: Array.isArray(config.tracks) && config.tracks.length ? config.tracks : seedData.demoTracks,
+      classNames: Array.isArray(config.classNames) && config.classNames.length ? config.classNames : seedData.demoClassNames,
+      subjects: Array.isArray(config.subjects) && config.subjects.length ? config.subjects : seedData.demoSubjects,
     };
     this.backOfficeState = {
       ...(this.backOfficeState ?? {}),
@@ -299,6 +323,70 @@ class FallbackRepository {
       this.notes[existingIndex] = next;
     } else {
       this.notes.unshift(next);
+    }
+
+    return clone(next);
+  }
+
+  async upsertAttendanceBatch(payload = {}, principal = {}) {
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    if (!items.length) {
+      return [];
+    }
+
+    const saved = [];
+    for (const item of items) {
+      saved.push(await this.upsertAttendance(item, principal));
+    }
+
+    return saved;
+  }
+
+  async upsertAttendance(payload = {}, principal = {}) {
+    if (!payload.studentId || !payload.date) {
+      const error = new Error("Présence invalide");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const student = seedData.students.find(
+      (item) => String(item.id) === String(payload.studentId) || item.matricule === payload.studentId
+    );
+    if (!student) {
+      const error = new Error("Élève ou classe introuvable pour l'appel");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (principal.role === "Enseignant" && !(principal.classNames ?? []).includes(student.className)) {
+      const error = new Error("Accès refusé: élève hors classe affectée.");
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const present = payload.present ?? !["Absent", "absent", "Excusé", "excused"].includes(payload.status);
+    const status = payload.status ?? (present ? "Présent" : "Absent");
+    const savedAt = new Date().toISOString();
+    const existingIndex = this.presences.findIndex(
+      (item) => String(item.studentId) === String(student.id) && String(item.date) === String(payload.date)
+    );
+
+    const next = {
+      id: existingIndex >= 0 ? this.presences[existingIndex].id : `PRE-MEM-${Date.now()}`,
+      publicId: existingIndex >= 0 ? this.presences[existingIndex].publicId : `PRE-MEM-${Date.now()}`,
+      studentId: String(student.id),
+      schoolCode: student.schoolCode,
+      className: student.className,
+      date: payload.date,
+      savedAt,
+      present,
+      status,
+    };
+
+    if (existingIndex >= 0) {
+      this.presences[existingIndex] = next;
+    } else {
+      this.presences.unshift(next);
     }
 
     return clone(next);

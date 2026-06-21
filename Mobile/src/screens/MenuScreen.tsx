@@ -73,6 +73,7 @@ const teacherMenuItems: MenuItem[] = [
 
 function filterMenuItemsByPermission(session: any, items: MenuItem[]) {
   return items.filter((item) => {
+    if (session?.role === "school_admin" && item.entity === "students") return false;
     if (item.entity) return canReadEntity(session, item.entity);
     if (item.route) return canReadRoute(session, item.route);
     return true;
@@ -128,6 +129,10 @@ export default function MenuScreen() {
           key={item.label}
           style={styles.item}
           onPress={() => {
+            if (item.entity === "users" && session?.role === "school_admin") {
+              navigation.navigate("Utilisateurs");
+              return;
+            }
             if (item.entity) {
               navigation.navigate("AdminCrud", { entity: item.entity });
               return;

@@ -101,7 +101,27 @@ export type AcademicManagementConfig = {
   evaluationTypes: string[];
   defaultScale: number;
   reportCardMode: "period" | "semester" | "annual" | string;
+  levels?: string[];
+  tracks?: string[];
+  classNames?: string[];
+  subjects?: string[];
 };
+
+export const DEFAULT_LEVELS = ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème"];
+export const DEFAULT_TRACKS = ["Générale", "Sciences", "Lettres", "Technique", "Commerciale"];
+export const DEFAULT_CLASS_NAMES = DEFAULT_LEVELS.flatMap((level) => [`${level} A`, `${level} B`]);
+export const DEFAULT_SUBJECTS = [
+  "Mathématiques",
+  "Français",
+  "Sciences",
+  "Histoire",
+  "Géographie",
+  "Anglais",
+  "Physique",
+  "Chimie",
+  "SVT",
+  "Informatique",
+];
 
 export type PaymentItem = {
   id: string;
@@ -381,7 +401,7 @@ export const subscriptions: SubscriptionItem[] = [
 ];
 
 export const rolePermissions: Record<string, string[]> = {
-  "Super Administrateur OKAFRIK": [
+  "Super Administrateur Somafrik": [
     "ALL_PRIVILEGES",
     "Contrôler tous les pays",
     "Créer un pays",
@@ -508,29 +528,33 @@ export const defaultAcademicConfig: AcademicManagementConfig = {
   evaluationTypes: ["Interrogation", "Devoir", "Examen", "Travail pratique", "Projet"],
   defaultScale: 20,
   reportCardMode: "period",
+  levels: DEFAULT_LEVELS,
+  tracks: DEFAULT_TRACKS,
+  classNames: DEFAULT_CLASS_NAMES,
+  subjects: DEFAULT_SUBJECTS,
 };
 
 const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
-  Pays: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "R", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  "Établissements": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  Utilisateurs: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  Classes: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
-  Élèves: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Enseignants: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
-  Présences: { "Super Administrateur OKAFRIK": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Notes: { "Super Administrateur OKAFRIK": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "R", "Élève / Étudiant": "R" },
-  Bulletins: { "Super Administrateur OKAFRIK": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
-  Paiements: { "Super Administrateur OKAFRIK": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "R", Enseignant: "-", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Abonnements: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
-  Notifications: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Messages: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "CRUD", "Élève / Étudiant": "CRUD" },
-  Documents: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Rapports: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
-  "Paramètres Établissement": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  "Années Académiques": { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  Matières: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
-  Affectations: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "R", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
-  Examens: { "Super Administrateur OKAFRIK": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Pays: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "R", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  "Établissements": { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Utilisateurs: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Classes: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
+  Élèves: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Enseignants: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
+  Présences: { "Super Administrateur Somafrik": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Notes: { "Super Administrateur Somafrik": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "R", "Élève / Étudiant": "R" },
+  Bulletins: { "Super Administrateur Somafrik": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
+  Paiements: { "Super Administrateur Somafrik": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "R", Enseignant: "-", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Abonnements: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "-", "Préfet des études": "-", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
+  Notifications: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Messages: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "CRUD", "Élève / Étudiant": "CRUD" },
+  Documents: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
+  Rapports: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
+  "Paramètres Établissement": { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  "Années Académiques": { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Matières: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
+  Affectations: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "R", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
+  Examens: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
 };
 
 function permissionsFromSecurityMatrix(role: string) {
@@ -547,7 +571,7 @@ for (const role of Object.keys(rolePermissions)) {
   rolePermissions[role] = [...new Set([...(rolePermissions[role] ?? []), ...permissionsFromSecurityMatrix(role)])];
 }
 
-rolePermissions["Super Administrateur OKAFRIK"] = [
+rolePermissions["Super Administrateur Somafrik"] = [
   ...new Set(Object.values(rolePermissions).flat()),
 ];
 
@@ -573,7 +597,7 @@ export const userAccounts: UserAccount[] = [
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: ["Compte initial créé le 01-09-2025"],
   },
   {
@@ -584,7 +608,7 @@ export const userAccounts: UserAccount[] = [
     gender: "Masculin",
     phone: "+243 810 000 900",
     email: "superadmin@somafrik.app",
-    role: "Super Administrateur OKAFRIK",
+    role: "Super Administrateur Somafrik",
     secondaryRoles: [],
     scopeLevel: "Global",
     countryScope: "",
@@ -592,7 +616,7 @@ export const userAccounts: UserAccount[] = [
     accessChannel: "Application",
     identifier: "superadmin",
     status: "Actif",
-    permissions: rolePermissions["Super Administrateur OKAFRIK"],
+    permissions: rolePermissions["Super Administrateur Somafrik"],
     temporaryPassword: "1234",
     photoUrl: "",
     createdAt: "01-09-2025",
@@ -621,7 +645,7 @@ export const userAccounts: UserAccount[] = [
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: ["Compte admin pays RDC créé le 01-09-2025"],
   },
   {
@@ -645,7 +669,7 @@ export const userAccounts: UserAccount[] = [
     photoUrl: "",
     createdAt: "15-05-2026",
     lastLoginAt: "",
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: ["Compte admin pays Burundi créé le 15-05-2026"],
   },
   {
@@ -1270,7 +1294,7 @@ while (userAccounts.length < 50) {
     email: `user-${index}@somafrik.demo`,
     role,
     secondaryRoles: index % 6 === 0 ? ["Auditeur"] : [],
-    scopeLevel: role === "Super Administrateur OKAFRIK" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+    scopeLevel: role === "Super Administrateur Somafrik" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
     countryScope: schoolItem.country,
     schoolCode: isBackOffice ? "*" : schoolItem.code,
     accessChannel: isBackOffice ? "BackOffice" : "Application",
@@ -1289,7 +1313,7 @@ while (userAccounts.length < 50) {
     photoUrl: "",
     createdAt: `${String((index % 27) + 1).padStart(2, "0")}-01-2026`,
     lastLoginAt: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: [`Compte démo ${index} créé automatiquement`],
   });
 }

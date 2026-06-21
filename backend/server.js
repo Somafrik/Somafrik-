@@ -8,23 +8,23 @@ const { BackOfficeAccessService } = require("./services/backOfficeAccessService"
 const { GradeBookService } = require("./services/gradeBookService");
 const { MvpBusinessService } = require("./services/mvpBusinessService");
 const { ReportPdfService } = require("./services/reportPdfService");
-const { PostgresRepository } = require("./db/postgresRepository");
-const { FallbackRepository } = require("./db/fallbackRepository");
+const { createPostgresRepository, initializeRepository } = require("./db/repositoryFactory");
 const { TokenService } = require("./services/tokenService");
 const { RbacService } = require("./services/rbacService");
 const { PaginationService } = require("./services/paginationService");
 const { CacheService } = require("./services/cacheService");
 const { TenantScopeService } = require("./services/tenantScopeService");
+const { RoleGovernanceService } = require("./services/roleGovernanceService");
 const { AuditService } = require("./services/auditService");
 
 const app = express();
-const databaseUrl = process.env.DATABASE_URL ?? buildDatabaseUrl();
-let repository = new PostgresRepository(databaseUrl);
+let repository = createPostgresRepository();
 const tokenService = new TokenService();
 const rbacService = new RbacService();
 const paginationService = new PaginationService();
 const cacheService = new CacheService();
 const tenantScopeService = new TenantScopeService();
+const roleGovernanceService = new RoleGovernanceService();
 let auditService = new AuditService(repository);
 
 app.disable("x-powered-by");
@@ -43,6 +43,28 @@ app.use(
     },
   }),
 );
+
+const webDistPath = path.join(__dirname, "..", "web", "dist");
+app.use(
+  "/web",
+  express.static(webDistPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith("index.html")) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      }
+    },
+  }),
+);
+
+// SPA fallback: toute route cliente /web/* (hors fichiers statiques) renvoie l'app React.
+app.get(/^\/web(\/.*)?$/, (req, res, next) => {
+  if (req.method !== "GET" || req.path.includes(".")) {
+    return next();
+  }
+  res.sendFile(path.join(webDistPath, "index.html"), (error) => {
+    if (error) next();
+  });
+});
 
 app.get("/", asyncHandler(async (_req, res) => {
   res.json({
@@ -149,20 +171,37 @@ app.post("/api/auth/refresh", asyncHandler(async (req, res) => {
     throw new BusinessError(401, "Session expirée ou révoquée");
   }
 
+  const rolePermissionsMap = await getRolePermissionsMap();
+  const permissions = mergeRolePermissions(
+    session.role,
+    [...new Set([...(payload.permissions ?? []), ...rbacService.permissionsFor(session.role)])],
+    rolePermissionsMap,
+  );
   const accessToken = tokenService.createAccessToken({
     sub: session.user_id,
     role: session.role,
     schoolCode: session.school_code ?? "*",
     countryCode: session.country_code ?? "",
     sessionId: payload.sessionId,
-    permissions: rbacService.permissionsFor(session.role),
+    permissions,
   });
 
   res.json({
     accessToken,
     tokenType: "Bearer",
     expiresIn: tokenService.accessTokenTtlSeconds,
+    permissions,
   });
+}));
+
+app.get("/api/auth/effective-permissions", requireAuth, asyncHandler(async (req, res) => {
+  const rolePermissionsMap = await getRolePermissionsMap();
+  const permissions = mergeRolePermissions(
+    req.principal.role,
+    [...new Set([...(req.principal.permissions ?? []), ...rbacService.permissionsFor(req.principal.role)])],
+    rolePermissionsMap,
+  );
+  res.json({ permissions });
 }));
 
 app.post("/api/auth/logout", requireAuth, asyncHandler(async (req, res) => {
@@ -197,9 +236,11 @@ app.get("/api/school", requireAuth, asyncHandler(async (_req, res) => {
 }));
 
 app.get("/api/classes", requireAuth, asyncHandler(async (req, res) => {
-  const { classes, students, teachers, presences } = await getAuthoritativeBackOfficeState();
-  const scopedClasses = tenantScopeService.filterRows(classes, req.principal);
-  const scopedStudents = tenantScopeService.filterRows(students, req.principal);
+  const state = await getAuthoritativeBackOfficeState();
+  const { classes, students, teachers, presences } = state;
+  const scope = deriveSchoolScope(req.principal, state);
+  const scopedClasses = tenantScopeService.filterRows(classes, req.principal, scope);
+  const scopedStudents = tenantScopeService.filterRows(students, req.principal, scope);
   const result = scopedClasses.map((item) => {
     const classStudents = scopedStudents.filter((student) => student.className === item.name);
     const teacher = teachers.find((teacherItem) => teacherItem.id === item.teacherId);
@@ -223,8 +264,9 @@ app.get("/api/classes", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/courses", requireAuth, asyncHandler(async (req, res) => {
-  const { courses } = await getAuthoritativeBackOfficeState();
-  res.json(tenantScopeService.filterRows(courses, req.principal));
+  const state = await getAuthoritativeBackOfficeState();
+  const scope = deriveSchoolScope(req.principal, state);
+  res.json(tenantScopeService.filterRows(state.courses, req.principal, scope));
 }));
 
 app.get("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
@@ -233,7 +275,7 @@ app.get("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.put("/api/academic-config", requireAuth, asyncHandler(async (req, res) => {
-  if (!["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(req.principal.role)) {
+  if (!["Super Administrateur Somafrik", "Admin Pays", "Admin School"].includes(req.principal.role)) {
     throw new BusinessError(403, "Seuls les administrateurs peuvent configurer la gestion académique.");
   }
   const saved = await repository.saveAcademicConfig(req.principal.schoolCode, req.body ?? {});
@@ -353,8 +395,9 @@ app.get("/api/students/:id/payments", requireAuth, asyncHandler(async (req, res)
 }));
 
 app.get("/api/teachers", requireAuth, requirePermission("GET /api/teachers"), asyncHandler(async (req, res) => {
-  const { teachers } = await getAuthoritativeBackOfficeState();
-  const result = tenantScopeService.filterRows(teachers, req.principal).map(({ password, passwordHash, pinHash, ...teacher }) => ({
+  const state = await getAuthoritativeBackOfficeState();
+  const scope = deriveSchoolScope(req.principal, state);
+  const result = tenantScopeService.filterRows(state.teachers, req.principal, scope).map(({ password, passwordHash, pinHash, ...teacher }) => ({
       ...teacher,
       assignedClasses: [...new Set((teacher.assignments ?? []).map((item) => item.className))],
       courses: [...new Set((teacher.assignments ?? []).map((item) => item.course))],
@@ -387,6 +430,13 @@ app.post("/api/users/:id/reset-password", requireAuth, asyncHandler(async (req, 
     throw new BusinessError(404, "Utilisateur introuvable dans votre établissement.");
   }
 
+  if (isPendingValidationUser(target)) {
+    throw new BusinessError(
+      409,
+      "Compte en attente de validation par le Super Administrateur. Aucune action n'est possible avant validation."
+    );
+  }
+
   const temporaryPassword = String(req.body?.temporaryPassword ?? "").trim();
   if (temporaryPassword.length < 6) {
     throw new BusinessError(400, "Le mot de passe temporaire doit contenir au moins 6 caractères.");
@@ -408,8 +458,10 @@ app.post("/api/users/:id/reset-password", requireAuth, asyncHandler(async (req, 
 }));
 
 app.get("/api/payments", requireAuth, requirePermission("GET /api/payments"), asyncHandler(async (req, res) => {
-  const { payments, students } = await getAuthoritativeBackOfficeState();
-  const scopedPayments = tenantScopeService.filterRows(payments, req.principal);
+  const state = await getAuthoritativeBackOfficeState();
+  const { payments, students } = state;
+  const scope = deriveSchoolScope(req.principal, state);
+  const scopedPayments = tenantScopeService.filterRows(payments, req.principal, scope);
   const result = scopedPayments.map((payment) => {
     const student = students.find((item) => item.id === payment.studentId);
     return {
@@ -443,7 +495,7 @@ app.get("/api/backoffice/notifications", requireAuth, requirePermission("GET /ap
 }));
 
 app.get("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
-  assertBackOfficeManager(req.principal);
+  assertBackOfficeReader(req.principal);
   const state = await getAuthoritativeBackOfficeState();
   res.json(scopeBackOfficeState(state, req.principal));
 }));
@@ -469,7 +521,7 @@ app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 app.get("/api/audit", requireAuth, asyncHandler(async (req, res) => {
-  if (!["Super Administrateur OKAFRIK", "Admin Pays"].includes(req.principal.role)) {
+  if (!["Super Administrateur Somafrik", "Admin Pays"].includes(req.principal.role)) {
     throw new BusinessError(403, "Seuls les administrateurs habilités peuvent consulter l'audit.");
   }
   if (req.query.schoolCode) {
@@ -513,7 +565,8 @@ app.get("/api/v2/academic-years", requireAuth, requirePermission("GET /api/v2/ac
 
 app.get("/api/v2/exams", requireAuth, requirePermission("GET /api/v2/exams"), asyncHandler(async (req, res) => {
   const rows = await cacheService.remember("v2:exams", () => repository.getExamsV2());
-  sendList(res, tenantScopeService.filterRows(rows, req.principal), req.query, ["code", "name", "type", "className", "subject"]);
+  const scope = deriveSchoolScope(req.principal, await getAuthoritativeBackOfficeState());
+  sendList(res, tenantScopeService.filterRows(rows, req.principal, scope), req.query, ["code", "name", "type", "className", "subject"]);
 }));
 
 app.get("/api/v2/documents", requireAuth, requirePermission("GET /api/v2/documents"), asyncHandler(async (req, res) => {
@@ -542,12 +595,16 @@ app.get("/api/mvp/dashboard", requireAuth, asyncHandler(async (_req, res) => {
 
 async function getRuntime() {
   const dataset = await repository.getDataset();
+  const storedState = await repository.getBackOfficeState();
+  applyStoredStatusOverlay(dataset, storedState);
+  applyStoredUserOverlay(dataset, storedState);
   const authService = new AuthService({
     school: dataset.school,
     schools: dataset.platformSchools,
     teachers: dataset.teachers,
     students: dataset.students,
     userAccounts: dataset.userAccounts,
+    countries: dataset.countries,
   });
   const gradeBookService = new GradeBookService({
     students: dataset.students,
@@ -582,6 +639,82 @@ async function getRuntime() {
   };
 }
 
+// Superpose le statut (Actif/Suspendu) du state BackOffice persistant (JSON) sur le
+// dataset issu des tables, afin que la connexion reflète les suspensions pays/établissement
+// effectuées dans le BackOffice (pays suspendu => admin pays et établissements bloqués).
+function applyStoredStatusOverlay(dataset, storedState) {
+  if (!dataset || !isPlainObject(storedState)) {
+    return;
+  }
+
+  if (Array.isArray(storedState.countries)) {
+    const statusByCode = new Map(
+      storedState.countries
+        .filter((country) => country && country.code)
+        .map((country) => [String(country.code).trim().toUpperCase(), country.status])
+    );
+    dataset.countries = (dataset.countries ?? []).map((country) => {
+      const status = statusByCode.get(String(country.code ?? "").trim().toUpperCase());
+      return status ? { ...country, status } : country;
+    });
+  }
+
+  if (Array.isArray(storedState.schools)) {
+    const statusByCode = new Map(
+      storedState.schools
+        .filter((school) => school && school.code)
+        .map((school) => [String(school.code).trim().toUpperCase(), school.status])
+    );
+    const overlaySchoolStatus = (school) => {
+      const status = statusByCode.get(String(school.code ?? "").trim().toUpperCase());
+      return status ? { ...school, status } : school;
+    };
+    dataset.platformSchools = (dataset.platformSchools ?? []).map(overlaySchoolStatus);
+    if (dataset.school) {
+      dataset.school = overlaySchoolStatus(dataset.school);
+    }
+  }
+}
+
+// Superpose les comptes gérés depuis le state BackOffice persistant sur le dataset
+// de connexion : un Admin École créé/validé dans le BackOffice devient ainsi
+// authentifiable, et son statut (Actif / Suspendu / En attente de validation)
+// reflété au login. Le mot de passe temporaire sert de secret tant qu'aucun
+// hash n'est défini.
+function applyStoredUserOverlay(dataset, storedState) {
+  if (!dataset || !isPlainObject(storedState) || !Array.isArray(storedState.users)) {
+    return;
+  }
+
+  const keyOf = (user) => String(user?.id ?? user?.publicId ?? user?.identifier ?? "");
+  const byKey = new Map();
+
+  for (const user of dataset.userAccounts ?? []) {
+    const key = keyOf(user);
+    if (key) {
+      byKey.set(key, user);
+    }
+  }
+
+  for (const stored of storedState.users) {
+    const key = keyOf(stored);
+    if (!key) {
+      continue;
+    }
+
+    const base = byKey.get(key) ?? {};
+    const merged = { ...base, ...stored };
+
+    if (!merged.password && !merged.passwordHash && !merged.pinHash && merged.temporaryPassword) {
+      merged.password = merged.temporaryPassword;
+    }
+
+    byKey.set(key, merged);
+  }
+
+  dataset.userAccounts = [...byKey.values()];
+}
+
 function handleBusinessResponse(res, action) {
   try {
     return res.json(action());
@@ -606,10 +739,21 @@ function handleBusinessAction(action) {
   }
 }
 
-function assertBackOfficeManager(principal) {
-  if (!principal || !["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(principal.role)) {
+function assertBackOfficeReader(principal) {
+  const allowedRoles = [
+    "Super Administrateur Somafrik",
+    "Admin Pays",
+    "Admin School",
+    "Secrétaire",
+    "Préfet des études",
+  ];
+  if (!principal || !allowedRoles.includes(principal.role)) {
     throw new BusinessError(403, "Accès BackOffice non autorisé");
   }
+}
+
+function assertBackOfficeManager(principal) {
+  assertBackOfficeReader(principal);
 }
 
 function assertCanManageNotes(principal) {
@@ -659,6 +803,9 @@ function sanitizeBackOfficeState(payload = {}) {
     paymentStatuses: Array.isArray(payload.paymentStatuses) ? payload.paymentStatuses : [],
     presences: Array.isArray(payload.presences) ? payload.presences : [],
     notes: Array.isArray(payload.notes) ? payload.notes : [],
+    exams: Array.isArray(payload.exams) ? payload.exams : [],
+    bulletins: Array.isArray(payload.bulletins) ? payload.bulletins : [],
+    documents: Array.isArray(payload.documents) ? payload.documents : [],
     academicConfigs: isPlainObject(payload.academicConfigs) ? payload.academicConfigs : {},
     announcements: Array.isArray(payload.announcements) ? payload.announcements : [],
     messages: Array.isArray(payload.messages) ? payload.messages : [],
@@ -685,18 +832,30 @@ const backOfficeDeletableEntities = [
   "paymentStatuses",
   "presences",
   "notes",
+  "exams",
+  "bulletins",
+  "documents",
   "announcements",
   "messages",
 ];
 
 async function getAuthoritativeBackOfficeState() {
+  const runtime = await getRuntime();
+  const runtimeState = buildInitialBackOfficeState(runtime);
   const storedState = await repository.getBackOfficeState();
-  if (hasUserBackOfficeState(storedState)) {
-    return sanitizeBackOfficeState(storedState);
+
+  if (!hasUserBackOfficeState(storedState)) {
+    return sanitizeBackOfficeState(runtimeState);
   }
 
-  const runtime = await getRuntime();
-  return sanitizeBackOfficeState(buildInitialBackOfficeState(runtime));
+  const merged = mergeBackOfficeRuntimeState(runtime, storedState);
+  return sanitizeBackOfficeState(stripLegacyOrganizationFields(merged));
+}
+
+function stripLegacyOrganizationFields(state = {}) {
+  const countries = (state.countries ?? []).map(({ organizationCode: _ignored, ...country }) => country);
+  const { organizations: _organizations, ...rest } = state;
+  return { ...rest, countries };
 }
 
 function hasUserBackOfficeState(state) {
@@ -723,6 +882,9 @@ function buildInitialBackOfficeState(runtime = {}) {
     paymentStatuses: [],
     presences: runtime.presences ?? [],
     notes: runtime.notes ?? [],
+    exams: runtime.exams ?? [],
+    bulletins: runtime.bulletins ?? [],
+    documents: runtime.documents ?? [],
     academicConfigs: {},
     announcements: runtime.announcements ?? [],
     messages: [],
@@ -749,6 +911,9 @@ function mergeBackOfficeRuntimeState(runtime = {}, storedState = {}) {
     paymentStatuses: storedState.paymentStatuses ?? [],
     presences: runtime.presences ?? [],
     notes: runtime.notes ?? [],
+    exams: runtime.exams ?? [],
+    bulletins: runtime.bulletins ?? [],
+    documents: runtime.documents ?? [],
     academicConfigs: storedState.academicConfigs ?? {},
     announcements: runtime.announcements ?? [],
     messages: storedState.messages ?? [],
@@ -761,7 +926,7 @@ function mergeBackOfficeRuntimeState(runtime = {}, storedState = {}) {
   const merged = {
     ...runtimeState,
     ...storedState,
-    schools: mergeRowsByIdentity(runtimeState.schools, storedState.schools),
+    schools: mergeSchoolRows(runtimeState.schools, storedState.schools),
     users: mergeRowsByIdentity(runtimeState.users, storedState.users),
     countries: mergeRowsByIdentity(runtimeState.countries, storedState.countries),
     subscriptions: mergeRowsByIdentity(runtimeState.subscriptions, storedState.subscriptions),
@@ -773,6 +938,9 @@ function mergeBackOfficeRuntimeState(runtime = {}, storedState = {}) {
     payments: mergeRowsByIdentity(runtimeState.payments, storedState.payments),
     presences: mergeRowsByIdentity(runtimeState.presences, storedState.presences),
     notes: mergeRowsByIdentity(runtimeState.notes, storedState.notes),
+    exams: mergeRowsByIdentity(runtimeState.exams ?? [], storedState.exams ?? []),
+    bulletins: mergeRowsByIdentity(runtimeState.bulletins ?? [], storedState.bulletins ?? []),
+    documents: mergeRowsByIdentity(runtimeState.documents ?? [], storedState.documents ?? []),
     announcements: mergeRowsByIdentity(runtimeState.announcements, storedState.announcements),
     rolePermissions: {
       ...runtimeState.rolePermissions,
@@ -797,9 +965,36 @@ function mergeRowsByIdentity(primaryRows = [], secondaryRows = []) {
   return [...rows.values()];
 }
 
+function schoolRowKey(row = {}) {
+  const code = String(row.code ?? row.publicId ?? row.schoolCode ?? "").trim().toUpperCase();
+  return code || String(row.id ?? row.publicId ?? "");
+}
+
+function mergeSchoolRows(dbSchools = [], storedSchools = []) {
+  const rows = new Map();
+
+  dbSchools.forEach((school) => {
+    const key = schoolRowKey(school);
+    if (key) rows.set(key, { ...school });
+  });
+
+  storedSchools.forEach((school) => {
+    const key = schoolRowKey(school);
+    if (!key) return;
+    const existing = rows.get(key);
+    rows.set(key, existing ? { ...existing, ...school } : { ...school });
+  });
+
+  return [...rows.values()];
+}
+
+function isSuperAdminPrincipal(principal) {
+  return principal?.role === "Super Administrateur Somafrik" || principal?.role === "Super Administrateur OKAFRIK";
+}
+
 function scopeBackOfficeState(payload = {}, principal) {
   const state = sanitizeBackOfficeState(payload);
-  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
+  if (!principal || isSuperAdminPrincipal(principal)) {
     return state;
   }
 
@@ -807,7 +1002,10 @@ function scopeBackOfficeState(payload = {}, principal) {
     const countryCode = principal.countryCode;
     const schools = state.schools.filter((item) => countryCodeFromSchoolOrCountry(item.code, item.country) === countryCode);
     const schoolCodes = new Set(schools.map((item) => item.code));
-    const scopedState = scopeStateWithSchools(state, schoolCodes, { countries: state.countries.filter((item) => item.code === countryCode) });
+    const countries = state.countries.filter((item) => item.code === countryCode);
+    const scopedState = scopeStateWithSchools(state, schoolCodes, {
+      countries,
+    });
     return {
       ...scopedState,
       users: scopedState.users.filter((item) => item.role === "Admin School"),
@@ -846,6 +1044,11 @@ function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
   const paymentStatuses = state.paymentStatuses.filter((item) => hasSchoolScope(item, schoolCodes));
   const presences = state.presences.filter((item) => belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
   const notes = state.notes.filter((item) => belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
+  const exams = state.exams.filter((item) =>
+    hasSchoolScope(item, schoolCodes) || classNames.has(item.className),
+  );
+  const bulletins = state.bulletins.filter((item) => belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
+  const documents = state.documents.filter((item) => belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
   const announcements = state.announcements.filter((item) => hasSchoolScope(item, schoolCodes));
   const messages = state.messages.filter((item) => !item.studentId ? hasSchoolScope(item, schoolCodes) : belongsToScopedStudentOrSchool(item, schoolCodes, studentIds));
   const academicConfigs = Object.fromEntries(
@@ -866,6 +1069,9 @@ function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
     subscriptions: overrides.subscriptions ?? subscriptions,
     presences,
     notes,
+    exams,
+    bulletins,
+    documents,
     announcements,
     messages,
     academicConfigs,
@@ -873,17 +1079,201 @@ function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
   };
 }
 
+const MANAGED_PENDING_VALIDATION_STATUS = "En attente de validation";
+const MANAGED_VALIDATED_STATUS = "Validé";
+const SCHOOL_ADMIN_ROLE_LABEL = "Admin School";
+
+function isPendingValidationSchool(school) {
+  const status = school?.validationStatus;
+  return status === MANAGED_PENDING_VALIDATION_STATUS || status === "En attente";
+}
+
+/**
+ * Règle métier : un établissement créé par un Admin Pays doit être validé par le
+ * Super Admin. L'Admin Pays ne peut ni le créer validé, ni l'activer lui-même.
+ */
+function applyCountryAdminSchoolValidation(mergedSchools, currentSchools, principal) {
+  const currentByKey = new Map(currentSchools.map((school) => [rowKey(school), school]));
+  const requestedAt = new Date().toISOString();
+  const requestedBy = principal?.sub ?? principal?.identifier ?? "Admin Pays";
+
+  return mergedSchools.map((school) => {
+    const prior = currentByKey.get(rowKey(school));
+
+    if (!prior) {
+      return {
+        ...school,
+        validationStatus: MANAGED_PENDING_VALIDATION_STATUS,
+        validationRequestedBy: requestedBy,
+        validationRequestedAt: school.validationRequestedAt ?? requestedAt,
+        validatedBy: null,
+        validatedAt: null,
+      };
+    }
+
+    if (isPendingValidationSchool(prior)) {
+      return {
+        ...school,
+        validationStatus: prior.validationStatus ?? MANAGED_PENDING_VALIDATION_STATUS,
+        validationRequestedBy: prior.validationRequestedBy ?? requestedBy,
+        validationRequestedAt: prior.validationRequestedAt ?? requestedAt,
+        validatedBy: prior.validatedBy ?? null,
+        validatedAt: prior.validatedAt ?? null,
+      };
+    }
+
+    return school;
+  });
+}
+
+function finalizeSuperAdminSchoolValidation(schools = [], currentSchools = [], principal) {
+  const currentByKey = new Map(currentSchools.map((school) => [rowKey(school), school]));
+  const validatedAt = new Date().toISOString();
+  const validatedBy = principal?.sub ?? principal?.identifier ?? "Super Admin";
+
+  return schools.map((school) => {
+    const prior = currentByKey.get(rowKey(school));
+    const wasPending = prior ? isPendingValidationSchool(prior) : isPendingValidationSchool(school);
+
+    if (wasPending && school.validationStatus === MANAGED_VALIDATED_STATUS) {
+      return {
+        ...school,
+        validatedBy: school.validatedBy ?? validatedBy,
+        validatedAt: school.validatedAt ?? validatedAt,
+      };
+    }
+
+    return school;
+  });
+}
+
+function isPendingValidationUser(user) {
+  return (
+    user?.validationStatus === MANAGED_PENDING_VALIDATION_STATUS ||
+    user?.status === MANAGED_PENDING_VALIDATION_STATUS
+  );
+}
+
+/**
+ * Règle métier : un Admin École créé par un Admin Pays est autorisé, mais doit
+ * être validé par le Super Admin pour devenir utilisable. L'Admin Pays ne peut
+ * donc ni le créer actif, ni l'activer lui-même.
+ */
+function applyCountryAdminUserValidation(mergedUsers, currentUsers, principal) {
+  const currentByKey = new Map(currentUsers.map((user) => [rowKey(user), user]));
+  const requestedAt = new Date().toISOString();
+  const requestedBy = principal?.sub ?? principal?.identifier ?? "Admin Pays";
+
+  return mergedUsers.map((user) => {
+    if (user?.role !== SCHOOL_ADMIN_ROLE_LABEL) {
+      return user;
+    }
+
+    const prior = currentByKey.get(rowKey(user));
+
+    if (!prior) {
+      return {
+        ...user,
+        status: MANAGED_PENDING_VALIDATION_STATUS,
+        validationStatus: MANAGED_PENDING_VALIDATION_STATUS,
+        validationRequestedBy: requestedBy,
+        validationRequestedAt: user.validationRequestedAt ?? requestedAt,
+        validatedBy: null,
+        validatedAt: null,
+      };
+    }
+
+    if (isPendingValidationUser(prior)) {
+      return {
+        ...user,
+        status: MANAGED_PENDING_VALIDATION_STATUS,
+        validationStatus: MANAGED_PENDING_VALIDATION_STATUS,
+        validationRequestedBy: prior.validationRequestedBy ?? requestedBy,
+        validationRequestedAt: prior.validationRequestedAt ?? requestedAt,
+        validatedBy: prior.validatedBy ?? null,
+        validatedAt: prior.validatedAt ?? null,
+      };
+    }
+
+    return user;
+  });
+}
+
+/**
+ * Quand le Super Admin active un compte Admin École précédemment en attente, on
+ * horodate la validation pour la traçabilité (la validation reste son privilège).
+ */
+function finalizeSuperAdminUserValidation(users = [], currentUsers = [], principal) {
+  const currentByKey = new Map(currentUsers.map((user) => [rowKey(user), user]));
+  const validatedAt = new Date().toISOString();
+  const validatedBy = principal?.sub ?? principal?.identifier ?? "Super Admin";
+
+  return users.map((user) => {
+    if (user?.role !== SCHOOL_ADMIN_ROLE_LABEL) {
+      return user;
+    }
+
+    const prior = currentByKey.get(rowKey(user));
+    const wasPending = prior ? isPendingValidationUser(prior) : isPendingValidationUser(user);
+
+    if (wasPending && user.status === "Actif") {
+      return {
+        ...user,
+        validationStatus: MANAGED_VALIDATED_STATUS,
+        validatedBy: user.validatedBy ?? validatedBy,
+        validatedAt: user.validatedAt ?? validatedAt,
+      };
+    }
+
+    return user;
+  });
+}
+
 function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, principal) {
   const current = sanitizeBackOfficeState(currentPayload);
   const requested = sanitizeBackOfficeState(requestedPayload);
 
-  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
+  if (!principal || isSuperAdminPrincipal(principal)) {
     return applyDeletedRows({
       ...requested,
+      schools: finalizeSuperAdminSchoolValidation(requested.schools, current.schools, principal),
+      users: finalizeSuperAdminUserValidation(requested.users, current.users, principal),
       deletedRows: mergeDeletedRows(
         current.deletedRows,
         detectDeletedRows(current, requested, backOfficeDeletableEntities)
       ),
+    });
+  }
+
+  if (principal.role === "Admin Pays") {
+    const scopedCurrent = scopeBackOfficeState(current, principal);
+    const scopedRequested = scopeBackOfficeState(requested, principal);
+    const deletedRows = mergeDeletedRows(
+      current.deletedRows,
+      detectDeletedRows(scopedCurrent, scopedRequested, roleGovernanceService.editableEntitiesForCountryAdmin()),
+    );
+
+    return applyDeletedRows({
+      ...current,
+      schools: applyCountryAdminSchoolValidation(
+        mergeScopedRows(current.schools, scopedRequested.schools, scopedCurrent.schools),
+        current.schools,
+        principal,
+      ),
+      users: applyCountryAdminUserValidation(
+        mergeScopedRows(current.users, scopedRequested.users, scopedCurrent.users),
+        current.users,
+        principal,
+      ),
+      countries: mergeScopedRows(current.countries, scopedRequested.countries, scopedCurrent.countries),
+      subscriptions: mergeScopedRows(
+        current.subscriptions,
+        scopedRequested.subscriptions,
+        scopedCurrent.subscriptions,
+      ),
+      rolePermissions: current.rolePermissions,
+      deletedRows,
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -899,7 +1289,9 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
     ...current,
     schools: mergeScopedRows(current.schools, scopedRequested.schools, scopedCurrent.schools),
     users: mergeScopedRows(current.users, scopedRequested.users, scopedCurrent.users),
-    countries: principal.role === "Admin Pays" ? mergeScopedRows(current.countries, scopedRequested.countries, scopedCurrent.countries) : current.countries,
+    countries: principal.role === "Admin Pays"
+      ? mergeScopedRows(current.countries, scopedRequested.countries, scopedCurrent.countries)
+      : current.countries,
     subscriptions: principal.role === "Admin School" ? current.subscriptions : mergeScopedRows(current.subscriptions, scopedRequested.subscriptions, scopedCurrent.subscriptions),
     notifications: current.notifications,
     students: mergeScopedRows(current.students, scopedRequested.students, scopedCurrent.students),
@@ -911,6 +1303,9 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
     paymentStatuses: mergeScopedRows(current.paymentStatuses, scopedRequested.paymentStatuses, scopedCurrent.paymentStatuses),
     presences: mergeScopedRows(current.presences, scopedRequested.presences, scopedCurrent.presences),
     notes: mergeScopedRows(current.notes, scopedRequested.notes, scopedCurrent.notes),
+    exams: mergeScopedRows(current.exams, scopedRequested.exams, scopedCurrent.exams),
+    bulletins: mergeScopedRows(current.bulletins, scopedRequested.bulletins, scopedCurrent.bulletins),
+    documents: mergeScopedRows(current.documents, scopedRequested.documents, scopedCurrent.documents),
     announcements: mergeScopedRows(current.announcements, scopedRequested.announcements, scopedCurrent.announcements),
     messages: mergeScopedRows(current.messages, scopedRequested.messages, scopedCurrent.messages),
     rolePermissions: mergeScopedRolePermissions(current.rolePermissions, requested.rolePermissions, principal),
@@ -933,9 +1328,20 @@ function mergeScopedRows(currentRows, requestedScopedRows, currentScopedRows) {
   ];
 }
 
+const SUPERADMIN_MANAGED_ROLES = roleGovernanceService.superadminManagedRoles;
+
 function mergeScopedRolePermissions(currentRolePermissions = {}, requestedRolePermissions = {}, principal = {}) {
-  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
-    return requestedRolePermissions;
+  if (!principal || isSuperAdminPrincipal(principal)) {
+    const next = { ...currentRolePermissions };
+    for (const role of SUPERADMIN_MANAGED_ROLES) {
+      if (Array.isArray(requestedRolePermissions?.[role])) {
+        next[role] = roleGovernanceService.normalizeManagedRolePermissions(
+          role,
+          requestedRolePermissions[role],
+        );
+      }
+    }
+    return next;
   }
 
   if (principal.role !== "Admin School") {
@@ -948,31 +1354,24 @@ function mergeScopedRolePermissions(currentRolePermissions = {}, requestedRolePe
       return;
     }
 
-    nextRolePermissions[role] = [...new Set(permissions.filter(isSchoolRolePermissionAllowed))]
-      .sort((left, right) => String(left).localeCompare(String(right), "fr"));
+    nextRolePermissions[role] = [...new Set(permissions.filter((permission) =>
+      roleGovernanceService.isSchoolRolePermissionAllowed(permission),
+    ))].sort((left, right) => String(left).localeCompare(String(right), "fr"));
   });
 
   return nextRolePermissions;
 }
 
 function isPlatformBackOfficeRole(role) {
-  return ["super administrateur okafrik", "admin pays"].includes(normalizeBusinessPermission(role));
+  return [
+    "super administrateur okafrik",
+    "admin pays",
+    "admin school",
+  ].includes(normalizeBusinessPermission(role));
 }
 
 function isSchoolRolePermissionAllowed(permission) {
-  if (!permission || permission === "ALL_PRIVILEGES" || permission === "COUNTRY_PRIVILEGES") {
-    return false;
-  }
-
-  const [feature] = String(permission).split(":");
-  const normalizedFeature = normalizeBusinessPermission(feature);
-  const forbiddenFeatures = new Set(["pays", "etablissements", "abonnements"]);
-  if (forbiddenFeatures.has(normalizedFeature)) {
-    return false;
-  }
-
-  const normalizedPermission = normalizeBusinessPermission(permission);
-  return !["abonnement", "inscription", "tarif"].some((keyword) => normalizedPermission.includes(keyword));
+  return roleGovernanceService.isSchoolRolePermissionAllowed(permission);
 }
 
 function rowKey(row = {}) {
@@ -980,12 +1379,12 @@ function rowKey(row = {}) {
 }
 
 function getEditableEntitiesForPrincipal(principal) {
-  if (!principal || principal.role === "Super Administrateur OKAFRIK") {
+  if (!principal || isSuperAdminPrincipal(principal)) {
     return backOfficeDeletableEntities;
   }
 
   if (principal.role === "Admin Pays") {
-    return ["schools", "users", "countries", "subscriptions"];
+    return roleGovernanceService.editableEntitiesForCountryAdmin();
   }
 
   return [
@@ -999,6 +1398,9 @@ function getEditableEntitiesForPrincipal(principal) {
     "paymentStatuses",
     "presences",
     "notes",
+    "exams",
+    "bulletins",
+    "documents",
     "announcements",
     "messages",
   ];
@@ -1087,6 +1489,28 @@ function hasSchoolScope(row = {}, schoolCodes) {
   );
 }
 
+// Contexte d'isolation établissement : identifiants d'élèves et noms de classes
+// rattachés à l'établissement du principal. Sert à scoper les entités qui ne portent
+// pas de code établissement (classes, cours, enseignants, paiements...).
+function deriveSchoolScope(principal, state = {}) {
+  const schoolCode = principal?.schoolCode;
+  if (!schoolCode || schoolCode === "*") {
+    return { schoolStudentIds: [], schoolClassNames: [] };
+  }
+  const students = (state.students ?? []).filter((student) => student.schoolCode === schoolCode);
+  const schoolStudentIds = students.map((student) => student.id).filter(Boolean);
+  const schoolClassNames = [
+    ...new Set([
+      ...students.map((student) => student.className).filter(Boolean),
+      ...(state.classes ?? [])
+        .filter((item) => item.schoolCode === schoolCode)
+        .map((item) => item.name)
+        .filter(Boolean),
+    ]),
+  ];
+  return { schoolStudentIds, schoolClassNames };
+}
+
 function belongsToScopedStudentOrSchool(row = {}, schoolCodes, studentIds) {
   if (row.studentId) {
     return studentIds.has(row.studentId);
@@ -1100,8 +1524,9 @@ function isPlainObject(value) {
 }
 
 async function sendAuthenticatedResponse(req, res, response, action) {
-  const principal = buildPrincipal(response);
-  if (action === "backoffice_login" && ["Super Administrateur OKAFRIK", "Admin Pays"].includes(principal.role)) {
+  const rolePermissionsMap = await getRolePermissionsMap();
+  const principal = buildPrincipal(response, rolePermissionsMap);
+  if (action === "backoffice_login" && ["Super Administrateur Somafrik", "Admin Pays"].includes(principal.role)) {
     const auditRows = await repository.getAuditLogs({ limit: 100 });
     response.auditLog = tenantScopeService.filterRows(auditRows, principal);
   }
@@ -1134,7 +1559,9 @@ async function sendAuthenticatedResponse(req, res, response, action) {
 
   res.json({
     ...response,
-    user: response.user ? { ...response.user, permissions: principal.permissions } : response.user,
+    user: response.user
+      ? { ...response.user, role: principal.role, permissions: principal.permissions }
+      : response.user,
     accessToken,
     refreshToken: refreshSession.token,
     tokenType: "Bearer",
@@ -1143,13 +1570,15 @@ async function sendAuthenticatedResponse(req, res, response, action) {
   });
 }
 
-function buildPrincipal(response) {
+function buildPrincipal(response, rolePermissionsMap = null) {
   const user = response.user ?? {};
   const school = response.schoolContext ?? response.school ?? {};
-  const role = user.role ?? roleLabelFromMobileRole(response.role);
+  const rawRole = user.role ?? roleLabelFromMobileRole(response.role);
+  const role =
+    rawRole === "Super Administrateur OKAFRIK" ? "Super Administrateur Somafrik" : rawRole;
   const schoolCode = role === "Admin Pays" ? "*" : user.schoolCode ?? school.code ?? "*";
   const countryCode = user.countryCode ?? countryCodeFromScope(user.countryScope) ?? school.countryCode ?? countryCodeFromSchoolOrCountry(schoolCode, school.country);
-  const permissions = enforceBusinessRolePermissions(role, user.permissions ?? rbacService.permissionsFor(role));
+  const permissions = mergeRolePermissions(role, user.permissions ?? rbacService.permissionsFor(role), rolePermissionsMap);
 
   return {
     sub: user.id ?? user.publicId ?? user.matricule ?? "anonymous",
@@ -1160,6 +1589,34 @@ function buildPrincipal(response) {
     studentIds: getPrincipalStudentIds(response),
     classNames: user.assignedClasses ?? [],
   };
+}
+
+// Récupère la matrice de droits par rôle (configurée par le Super Admin dans le BackOffice).
+async function getRolePermissionsMap() {
+  const storedState = await repository.getBackOfficeState();
+  return isPlainObject(storedState) && isPlainObject(storedState.rolePermissions)
+    ? storedState.rolePermissions
+    : null;
+}
+
+// Fusionne les droits de base (compte / RBAC) avec les droits accordés au rôle par le Super Admin.
+// Logique métier : un module accordé à un rôle devient visible (dashboard, onglets, menu) pour
+// tous les utilisateurs de ce rôle, sans jamais retirer un privilège déjà détenu par le compte.
+function mergeRolePermissions(role, basePermissions = [], rolePermissionsMap = null) {
+  const configured =
+    rolePermissionsMap && Array.isArray(rolePermissionsMap[role])
+      ? rolePermissionsMap[role]
+      : role === "Super Administrateur Somafrik" &&
+          Array.isArray(rolePermissionsMap?.["Super Administrateur OKAFRIK"])
+        ? rolePermissionsMap["Super Administrateur OKAFRIK"]
+        : null;
+
+  if (!configured || !configured.length) {
+    return enforceBusinessRolePermissions(role, basePermissions ?? []);
+  }
+
+  const merged = [...new Set([...(basePermissions ?? []), ...configured])];
+  return enforceBusinessRolePermissions(role, merged);
 }
 
 function enforceBusinessRolePermissions(role, permissions = []) {
@@ -1205,7 +1662,7 @@ function getPrincipalStudentIds(response) {
 }
 
 function roleLabelFromMobileRole(role) {
-  if (role === "super_admin") return "Super Administrateur OKAFRIK";
+  if (role === "super_admin") return "Super Administrateur Somafrik";
   if (role === "country_admin") return "Admin Pays";
   if (role === "school_admin") return "Admin School";
   if (role === "principal") return "Proviseur";
@@ -1303,10 +1760,21 @@ function asyncHandler(handler) {
 
 function buildCorsOptions() {
   const rawOrigins = process.env.CORS_ORIGINS ?? "*";
-  const allowedOrigins = rawOrigins
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const devOrigins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+  ];
+  const allowedOrigins = [
+    ...new Set(
+      rawOrigins
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+        .concat(process.env.CORS_ALLOW_DEV_ORIGINS === "false" ? [] : devOrigins),
+    ),
+  ];
 
   if (allowedOrigins.includes("*")) {
     return { origin: true };
@@ -1318,7 +1786,9 @@ function buildCorsOptions() {
         return callback(null, true);
       }
 
-      return callback(new BusinessError(403, "Origine CORS non autorisée"));
+      return callback(
+        new BusinessError(403, `Origine CORS non autorisée: ${origin}`),
+      );
     },
   };
 }
@@ -1364,20 +1834,9 @@ initRepository()
 async function initRepository() {
   warnIfUnsafeConfiguration();
 
-  try {
-    repository.engine = "postgresql";
-    await repository.init();
-  } catch (error) {
-    if (process.env.SOMAFRIK_DB_REQUIRED === "true") {
-      throw error;
-    }
-
-    console.warn("PostgreSQL indisponible, démarrage en mode démo mémoire.");
-    console.warn(`Cause: ${error.code ?? error.message}`);
-    repository = new FallbackRepository();
-    auditService = new AuditService(repository);
-    await repository.init();
-  }
+  const { repository: active } = await initializeRepository({ repository });
+  repository = active;
+  auditService = new AuditService(repository);
 }
 
 function warnIfUnsafeConfiguration() {
@@ -1388,13 +1847,4 @@ function warnIfUnsafeConfiguration() {
   if (!process.env.JWT_SECRET) {
     console.warn("JWT_SECRET non défini: utilisation du secret de développement.");
   }
-}
-
-function buildDatabaseUrl() {
-  const user = encodeURIComponent(process.env.POSTGRES_USER ?? "somafrik");
-  const password = encodeURIComponent(process.env.POSTGRES_PASSWORD ?? "somafrik123");
-  const host = process.env.POSTGRES_HOST ?? "localhost";
-  const port = process.env.POSTGRES_PORT ?? "5432";
-  const database = encodeURIComponent(process.env.POSTGRES_DB ?? "somafrik");
-  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
 }

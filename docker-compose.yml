@@ -9,7 +9,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-somafrik}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-somafrik123}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Port hôte distinct (5433) pour éviter tout conflit avec un PostgreSQL local sur 5432.
+      # Le backend Docker se connecte de toute façon via le réseau interne (postgres:5432).
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

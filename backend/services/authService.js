@@ -6,6 +6,7 @@ const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000;
 
 const managedMobileRoles = {
+  "Super Administrateur Somafrik": { role: "super_admin", roleLabel: "Super Administrateur" },
   "Super Administrateur OKAFRIK": { role: "super_admin", roleLabel: "Super Administrateur" },
   "Admin Pays": { role: "country_admin", roleLabel: "Admin Pays" },
   "Admin School": { role: "school_admin", roleLabel: "Admin Établissement" },
@@ -23,12 +24,13 @@ class BusinessError extends Error {
 }
 
 class AuthService {
-  constructor({ school, schools = [school], teachers, students, userAccounts }) {
+  constructor({ school, schools = [school], teachers, students, userAccounts, countries = [] }) {
     this.school = school;
     this.schools = schools.filter(Boolean);
     this.teachers = teachers;
     this.students = students;
     this.userAccounts = userAccounts;
+    this.countries = countries;
   }
 
   identify({ schoolCode, identifier }) {
@@ -148,6 +150,7 @@ class AuthService {
         (!teacher.schoolCode || teacher.schoolCode === accountIdentifier.schoolCode) &&
         (accountIdentifier.matches(teacher.id) ||
           accountIdentifier.matches(teacher.publicId) ||
+          accountIdentifier.matches(teacher.identifier) ||
           accountIdentifier.matches(teacher.phone)) &&
         (password === undefined || this.verifyUserSecret(teacher, password))
     );
@@ -222,7 +225,63 @@ class AuthService {
       throw new BusinessError(403, "Etablissement suspendu. Connexion indisponible.");
     }
 
+    if (
+      school.validationStatus === "En attente de validation" ||
+      school.validationStatus === "En attente"
+    ) {
+      throw new BusinessError(
+        403,
+        "Établissement en attente de validation par le Super Administrateur. Connexion indisponible."
+      );
+    }
+
+    if (this.isCountrySuspended(this.resolveSchoolCountryCode(school))) {
+      throw new BusinessError(403, "Pays suspendu. Connexion indisponible pour ce pays.");
+    }
+
     return school;
+  }
+
+  resolveSchoolCountryCode(school) {
+    if (!school) {
+      return "";
+    }
+
+    return (
+      this.getCountryCode(school.country) ||
+      this.getCountryCode(school.countryCode) ||
+      String(school.code ?? "").slice(0, 2).toUpperCase()
+    );
+  }
+
+  isCountrySuspended(countryCode) {
+    if (!countryCode) {
+      return false;
+    }
+
+    const normalized = String(countryCode).trim().toUpperCase();
+    return this.countries.some(
+      (country) =>
+        String(country.code ?? "").trim().toUpperCase() === normalized &&
+        country.status === "Suspendu"
+    );
+  }
+
+  getCountryCode(countryScope) {
+    const normalized = String(countryScope ?? "").trim().toUpperCase();
+    const codes = {
+      RDC: "CD",
+      "RÉPUBLIQUE DÉMOCRATIQUE DU CONGO": "CD",
+      "REPUBLIQUE DEMOCRATIQUE DU CONGO": "CD",
+      BURUNDI: "BI",
+      BI: "BI",
+      CONGO: "CG",
+      CG: "CG",
+      SENEGAL: "SN",
+      "SÉNÉGAL": "SN",
+      SN: "SN",
+    };
+    return codes[normalized] ?? (/^[A-Z]{2}$/.test(normalized) ? normalized : "");
   }
 
   verifyUserSecret(user, secret) {
@@ -283,13 +342,24 @@ class AuthService {
   }
 
   assertManagedUserCanUseMobile(user) {
+    if (
+      user &&
+      (user.validationStatus === "En attente de validation" ||
+        user.status === "En attente de validation")
+    ) {
+      throw new BusinessError(
+        403,
+        "Compte en attente de validation par le Super Administrateur. Connexion indisponible."
+      );
+    }
+
     if (user && user.status !== "Actif") {
       throw new BusinessError(403, "Compte suspendu ou desactive. Connexion indisponible.");
     }
 
     if (
       user?.accessChannel === "BackOffice" &&
-      !["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(user.role)
+      !["Super Administrateur Somafrik", "Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(user.role)
     ) {
       throw new BusinessError(
         403,

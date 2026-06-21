@@ -3,4 +3,6 @@
 **/.expo
 **/.git
 **/.env
+**/dist
+web/dist
 Mobile

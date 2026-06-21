@@ -29,7 +29,7 @@ const routes = [
   { method: "GET", path: "/school", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
   { method: "GET", path: "/classes", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
   { method: "GET", path: "/students?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher", "parent", "student"] },
-  { method: "GET", path: "/teachers?page=1&limit=5", allow: ["superadmin", "countryAdmin", "teacher"] },
+  { method: "GET", path: "/teachers?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
   { method: "GET", path: "/users?page=1&limit=5", allow: ["superadmin", "countryAdmin"] },
   { method: "GET", path: "/payments?page=1&limit=5", allow: ["superadmin", "countryAdmin", "parent", "student"] },
   { method: "GET", path: "/backoffice/countries", allow: ["superadmin", "countryAdmin"] },

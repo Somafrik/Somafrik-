@@ -30,7 +30,7 @@ const school = {
 };
 
 const rolePermissions = {
-  "Super Administrateur OKAFRIK": [
+  "Super Administrateur Somafrik": [
     "ALL_PRIVILEGES",
     "Contrôler tous les pays",
     "Créer un pays",
@@ -64,24 +64,6 @@ const rolePermissions = {
     "Suivre abonnements pays",
     "Relancer établissements en retard",
     "Auditer utilisateurs pays",
-    "Voir élèves",
-    "Gérer élèves",
-    "Voir enseignants",
-    "Gérer enseignants",
-    "Voir classes",
-    "Gérer classes",
-    "Gérer cours",
-    "Voir notes",
-    "Modifier notes",
-    "Voir présences",
-    "Modifier présences",
-    "Gérer paiements",
-    "Gérer utilisateurs",
-    "Gérer annonces",
-    "Publier communications",
-    "Valider bulletins",
-    "Voir rapports",
-    "Voir rapports financiers",
   ],
   "Admin School": [
     "Voir élèves",
@@ -142,7 +124,7 @@ const rolePermissions = {
 
 const securityMatrix = {
   Pays: {
-    "Super Administrateur OKAFRIK": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
     "Admin Pays": "R",
     "Admin School": "-",
     "Préfet des études": "-",
@@ -152,7 +134,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   "Établissements": {
-    "Super Administrateur OKAFRIK": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "-",
     "Préfet des études": "-",
@@ -162,7 +144,7 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Utilisateurs: {
-    "Super Administrateur OKAFRIK": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "CRUD",
     "Préfet des études": "R",
@@ -172,8 +154,8 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Classes: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -182,8 +164,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Élèves: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -192,8 +174,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Enseignants: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "R",
     Enseignant: "-",
@@ -202,8 +184,8 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Présences: {
-    "Super Administrateur OKAFRIK": "R",
-    "Admin Pays": "R",
+    "Super Administrateur Somafrik": "R",
+    "Admin Pays": "-",
     "Admin School": "R",
     "Préfet des études": "CRUD",
     Enseignant: "CRUD",
@@ -212,8 +194,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Notes: {
-    "Super Administrateur OKAFRIK": "R",
-    "Admin Pays": "R",
+    "Super Administrateur Somafrik": "R",
+    "Admin Pays": "-",
     "Admin School": "R",
     "Préfet des études": "CRUD",
     Enseignant: "CRUD",
@@ -222,8 +204,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Bulletins: {
-    "Super Administrateur OKAFRIK": "R",
-    "Admin Pays": "R",
+    "Super Administrateur Somafrik": "R",
+    "Admin Pays": "-",
     "Admin School": "R",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -232,8 +214,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Paiements: {
-    "Super Administrateur OKAFRIK": "R",
-    "Admin Pays": "R",
+    "Super Administrateur Somafrik": "R",
+    "Admin Pays": "-",
     "Admin School": "R",
     "Préfet des études": "R",
     Enseignant: "-",
@@ -242,7 +224,7 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Abonnements: {
-    "Super Administrateur OKAFRIK": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
     "Admin Pays": "CRUD",
     "Admin School": "-",
     "Préfet des études": "-",
@@ -252,8 +234,8 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Notifications: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -262,8 +244,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Messages: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "CRUD",
@@ -272,8 +254,8 @@ const securityMatrix = {
     "Élève / Étudiant": "CRUD",
   },
   Documents: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -282,8 +264,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   Rapports: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "R",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -292,8 +274,8 @@ const securityMatrix = {
     "Élève / Étudiant": "R",
   },
   "Paramètres Établissement": {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "R",
     Enseignant: "-",
@@ -302,8 +284,8 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   "Années Académiques": {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "R",
     Enseignant: "R",
@@ -312,8 +294,8 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Matières: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -322,8 +304,8 @@ const securityMatrix = {
     "Élève / Étudiant": "-",
   },
   Examens: {
-    "Super Administrateur OKAFRIK": "CRUD",
-    "Admin Pays": "CRUD",
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
     "Admin School": "CRUD",
     "Préfet des études": "CRUD",
     Enseignant: "R",
@@ -347,7 +329,7 @@ for (const role of Object.keys(rolePermissions)) {
   rolePermissions[role] = [...new Set([...(rolePermissions[role] ?? []), ...permissionsFromSecurityMatrix(role)])];
 }
 
-rolePermissions["Super Administrateur OKAFRIK"] = [
+rolePermissions["Super Administrateur Somafrik"] = [
   ...new Set(Object.values(rolePermissions).flat()),
 ];
 
@@ -423,7 +405,7 @@ const subscriptions = [
 const platformNotifications = [
   {
     id: "NOTIF-001",
-    audience: "Super Administrateur OKAFRIK",
+    audience: "Super Administrateur Somafrik",
     countryCode: "*",
     title: "Nouveau pays créé",
     message: "La République du Congo a été ajoutée au périmètre Somafrik.",
@@ -436,7 +418,7 @@ const platformNotifications = [
   },
   {
     id: "NOTIF-002",
-    audience: "Super Administrateur OKAFRIK",
+    audience: "Super Administrateur Somafrik",
     countryCode: "*",
     title: "Abonnement expiré",
     message: "Un abonnement pays est arrivé à échéance.",
@@ -498,7 +480,7 @@ const userAccounts = [
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: ["Compte initial créé le 01-09-2025"],
   },
   {
@@ -509,7 +491,7 @@ const userAccounts = [
     gender: "Masculin",
     phone: "+243 810 000 900",
     email: "superadmin@somafrik.app",
-    role: "Super Administrateur OKAFRIK",
+    role: "Super Administrateur Somafrik",
     secondaryRoles: [],
     scopeLevel: "Global",
     countryScope: "",
@@ -518,7 +500,7 @@ const userAccounts = [
     identifier: "superadmin",
     password: "1234",
     status: "Actif",
-    permissions: rolePermissions["Super Administrateur OKAFRIK"],
+    permissions: rolePermissions["Super Administrateur Somafrik"],
     temporaryPassword: "1234",
     photoUrl: "",
     createdAt: "01-09-2025",
@@ -548,7 +530,7 @@ const userAccounts = [
     photoUrl: "",
     createdAt: "01-09-2025",
     lastLoginAt: "01-06-2026",
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: ["Compte admin pays RDC créé le 01-09-2025"],
   },
   {
@@ -573,7 +555,7 @@ const userAccounts = [
     photoUrl: "",
     createdAt: "15-05-2026",
     lastLoginAt: "",
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: ["Compte admin pays Burundi créé le 15-05-2026"],
   },
   {
@@ -679,7 +661,9 @@ const userAccounts = [
 const teachers = [
   {
     id: "T1",
-    publicId: "ENS-0001",
+    publicId: "CD-2026-0001-ENS-0001",
+    identifier: "ENS-0001",
+    schoolCode: "CD-2026-0001",
     name: "Jean Kabeya",
     firstName: "Jean",
     gender: "Masculin",
@@ -695,7 +679,9 @@ const teachers = [
   },
   {
     id: "T2",
-    publicId: "ENS-0002",
+    publicId: "CD-2026-0001-ENS-0002",
+    identifier: "ENS-0002",
+    schoolCode: "CD-2026-0001",
     name: "Marie Mukendi",
     firstName: "Marie",
     gender: "Féminin",
@@ -710,7 +696,9 @@ const teachers = [
   },
   {
     id: "T3",
-    publicId: "ENS-0003",
+    publicId: "CD-2026-0001-ENS-0003",
+    identifier: "ENS-0003",
+    schoolCode: "CD-2026-0001",
     name: "Patrick Ilunga",
     firstName: "Patrick",
     gender: "Masculin",
@@ -725,7 +713,9 @@ const teachers = [
   },
   {
     id: "T4",
-    publicId: "ENS-0004",
+    publicId: "CD-2026-0001-ENS-0004",
+    identifier: "ENS-0004",
+    schoolCode: "CD-2026-0001",
     name: "Sarah Mbuyi",
     firstName: "Sarah",
     gender: "Féminin",
@@ -787,8 +777,29 @@ const payments = [
 ];
 
 const announcements = [
-  { id: "A1", title: "Reunion des parents", message: "Reunion generale samedi a 10h00.", date: "2026-05-30" },
-  { id: "A2", title: "Examens", message: "Les evaluations commencent le 10 juin.", date: "2026-05-29" },
+  { id: "A1", schoolCode: "CD-2026-0001", title: "Reunion des parents", message: "Reunion generale samedi a 10h00.", date: "2026-05-30", audience: "Parents", status: "Publié" },
+  { id: "A2", schoolCode: "CD-2026-0001", title: "Examens", message: "Les evaluations commencent le 10 juin.", date: "2026-05-29", audience: "Tous", status: "Publié" },
+];
+
+const exams = [
+  { id: "EX1", schoolCode: "CD-2026-0001", name: "Contrôle T1 — Mathématiques", className: "6ème A", subject: "Mathématiques", examType: "Contrôle", date: "2026-06-10", period: "Trimestre 1", status: "Programmé" },
+  { id: "EX2", schoolCode: "CD-2026-0001", name: "Devoir T1 — Français", className: "6ème A", subject: "Français", examType: "Devoir", date: "2026-06-12", period: "Trimestre 1", status: "Programmé" },
+  { id: "EX3", schoolCode: "CD-2026-0001", name: "Examen T1 — Sciences", className: "6ème B", subject: "Sciences", examType: "Examen", date: "2026-06-15", period: "Trimestre 1", status: "En cours" },
+  { id: "EX4", schoolCode: "CD-2026-0001", name: "Interrogation — Physique", className: "5ème A", subject: "Physique", examType: "Interrogation", date: "2026-05-28", period: "Trimestre 1", status: "Publié" },
+];
+
+const bulletins = [
+  { id: "BUL1", schoolCode: "CD-2026-0001", studentId: "1", studentName: "Jean Dupont", className: "6ème A", period: "Trimestre 1", average: "14.0", rank: "2/28", status: "Publié", publishedAt: "01-06-2026" },
+  { id: "BUL2", schoolCode: "CD-2026-0001", studentId: "2", studentName: "Marie Martin", className: "6ème A", period: "Trimestre 1", average: "15.5", rank: "1/28", status: "Publié", publishedAt: "01-06-2026" },
+  { id: "BUL3", schoolCode: "CD-2026-0001", studentId: "3", studentName: "Paul Bernard", className: "6ème B", period: "Trimestre 1", average: "12.0", rank: "8/26", status: "En validation", publishedAt: "" },
+  { id: "BUL4", schoolCode: "CD-2026-0001", studentId: "4", studentName: "Sarah Mbala", className: "5ème A", period: "Trimestre 1", average: "13.8", rank: "3/24", status: "Brouillon", publishedAt: "" },
+];
+
+const documents = [
+  { id: "DOC1", schoolCode: "CD-2026-0001", studentId: "1", studentName: "Jean Dupont", documentType: "Attestation", title: "Attestation de scolarité 2025-2026", format: "PDF", status: "Disponible", generatedAt: "15-05-2026" },
+  { id: "DOC2", schoolCode: "CD-2026-0001", studentId: "2", studentName: "Marie Martin", documentType: "Certificat", title: "Certificat de réussite", format: "PDF", status: "Disponible", generatedAt: "20-05-2026" },
+  { id: "DOC3", schoolCode: "CD-2026-0001", studentId: "3", studentName: "Paul Bernard", documentType: "Attestation", title: "Attestation de présence", format: "PDF", status: "En génération", generatedAt: "" },
+  { id: "DOC4", schoolCode: "CD-2026-0001", studentId: "4", studentName: "Sarah Mbala", documentType: "Relevé", title: "Relevé de notes provisoire", format: "PDF", status: "Disponible", generatedAt: "25-05-2026" },
 ];
 
 const demoCountryTemplates = [
@@ -809,6 +820,7 @@ const demoLastNames = ["Kabeya", "Mukendi", "Ilunga", "Mbuyi", "Kabasele", "Tshi
 const demoSubjects = ["Mathématiques", "Français", "Sciences", "Histoire", "Géographie", "Anglais", "Physique", "Chimie", "SVT", "Informatique"];
 const demoLevels = ["1ère", "2ème", "3ème", "4ème", "5ème", "6ème"];
 const demoTracks = ["Générale", "Sciences", "Lettres", "Technique", "Commerciale"];
+const demoClassNames = demoLevels.flatMap((level) => [`${level} A`, `${level} B`]);
 const demoRoles = [
   "Directeur adjoint",
   "Préfet des études",
@@ -937,7 +949,9 @@ while (teachers.length < 50) {
   const lastName = demoLastNames[index % demoLastNames.length];
   teachers.push({
     id: `T${index}`,
-    publicId: `ENS-${String(index).padStart(4, "0")}`,
+    publicId: `${school.code}-ENS-${String(index).padStart(4, "0")}`,
+    identifier: `ENS-${String(index).padStart(4, "0")}`,
+    schoolCode: school.code,
     name: `${firstName} ${lastName}`,
     firstName,
     gender: index % 2 === 0 ? "Féminin" : "Masculin",
@@ -1062,18 +1076,33 @@ while (announcements.length < 50) {
   const index = announcements.length + 1;
   announcements.push({
     id: `A${index}`,
+    schoolCode: "CD-2026-0001",
     title: `Annonce Somafrik ${index}`,
     message: `Communication importante numéro ${index} pour les familles et le personnel.`,
     date: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
+    audience: "Tous",
+    status: "Publié",
   });
 }
+
+const teacherAssignments = teachers.flatMap((teacher) =>
+  (teacher.assignments ?? []).map((assignment, index) => ({
+    id: `${teacher.id}-ASSIGNMENT-${index + 1}`,
+    schoolCode: school.code,
+    teacherId: teacher.id,
+    teacherName: teacher.name,
+    className: assignment.className,
+    subject: assignment.course,
+    course: assignment.course,
+  })),
+);
 
 while (platformNotifications.length < 50) {
   const index = platformNotifications.length + 1;
   const country = countries[index % countries.length];
   platformNotifications.push({
     id: `NOTIF-${String(index).padStart(3, "0")}`,
-    audience: index % 2 === 0 ? "Super Administrateur OKAFRIK" : "Admin Pays",
+    audience: index % 2 === 0 ? "Super Administrateur Somafrik" : "Admin Pays",
     countryCode: index % 2 === 0 ? "*" : country.code,
     title: `Notification plateforme ${index}`,
     message: `Événement Somafrik ${index} à traiter selon le niveau de priorité.`,
@@ -1103,9 +1132,9 @@ while (userAccounts.length < 50) {
     email: `user-${index}@somafrik.demo`,
     role,
     secondaryRoles: index % 6 === 0 ? ["Auditeur"] : [],
-    scopeLevel: role === "Super Administrateur OKAFRIK" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+    scopeLevel: role === "Super Administrateur Somafrik" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
     countryScope: country.name.includes("République Démocratique") ? "RDC" : country.code,
-    schoolCode: role === "Super Administrateur OKAFRIK" || role === "Admin Pays" ? "*" : schoolItem.code,
+    schoolCode: role === "Super Administrateur Somafrik" || role === "Admin Pays" ? "*" : schoolItem.code,
     accessChannel: isBackOffice ? "BackOffice" : "Application",
     identifier: isBackOffice
       ? `demo-user-${index}`
@@ -1123,7 +1152,7 @@ while (userAccounts.length < 50) {
     photoUrl: "",
     createdAt: `${String((index % 27) + 1).padStart(2, "0")}-01-2026`,
     lastLoginAt: `${String((index % 27) + 1).padStart(2, "0")}-06-2026`,
-    createdBy: "Super Administrateur OKAFRIK",
+    createdBy: "Super Administrateur Somafrik",
     history: [`Compte démo ${index} créé automatiquement`],
   });
 }
@@ -1139,9 +1168,17 @@ module.exports = {
   presences,
   payments,
   announcements,
+  exams,
+  bulletins,
+  documents,
+  teacherAssignments,
   rolePermissions,
   userAccounts,
   countries,
   subscriptions,
   platformNotifications,
+  demoLevels,
+  demoTracks,
+  demoSubjects,
+  demoClassNames,
 };

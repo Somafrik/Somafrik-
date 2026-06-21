@@ -1,17 +1,14 @@
 import { UserRole } from "../navigation/AppNavigator";
+import { resolveApiBaseUrl, resolveApiRootUrl, isUsingLocalhostOnDevice } from "../config/env";
 
-declare const process: {
-  env?: {
-    EXPO_PUBLIC_API_URL?: string;
-  };
-};
-
-const configuredApiUrl = process.env?.EXPO_PUBLIC_API_URL?.trim();
 let accessToken: string | null = null;
 
-export const API_BASE_URL = configuredApiUrl
-  ? `${configuredApiUrl.replace(/\/$/, "")}/api`
-  : "http://192.168.1.141:5000/api";
+export function getApiBaseUrl() {
+  return resolveApiBaseUrl();
+}
+
+/** @deprecated Préférez getApiBaseUrl() — conservé pour compatibilité. */
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export type StudentSummary = {
   id: string;
@@ -143,7 +140,7 @@ type TeacherSummary = {
 };
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -285,10 +282,22 @@ export function resetUserPassword(userId: string, temporaryPassword: string) {
 
 export function getReportCardPdfUrl(studentId: string, period = "Trimestre 1") {
   const tokenQuery = accessToken ? `&access_token=${encodeURIComponent(accessToken)}` : "";
-  return `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/report.pdf?period=${encodeURIComponent(period)}${tokenQuery}`;
+  return `${getApiBaseUrl()}/students/${encodeURIComponent(studentId)}/report.pdf?period=${encodeURIComponent(period)}${tokenQuery}`;
 }
 
 function buildApiConnectionError(error: unknown) {
   const reason = error instanceof Error ? error.message : "Connexion API impossible";
-  return new Error(`${reason} Adresse utilisée: ${API_BASE_URL}. Vérifiez EXPO_PUBLIC_API_URL avec l'adresse IP du PC.`);
+  const apiUrl = getApiBaseUrl();
+  if (isUsingLocalhostOnDevice()) {
+    return new Error(
+      `${reason}\n\nSur téléphone, localhost ne fonctionne pas.\n` +
+        `Mettez l'IP du PC dans Mobile/.env.local :\n` +
+        `EXPO_PUBLIC_API_URL=http://VOTRE_IP:5000\n` +
+        `Puis relancez : npm run start:clear`
+    );
+  }
+  return new Error(
+    `${reason}\n\nAdresse utilisée : ${apiUrl}\n` +
+      `Vérifiez que le backend tourne (port 5000) et que le téléphone est sur le même Wi‑Fi.`
+  );
 }

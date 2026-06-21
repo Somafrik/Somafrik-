@@ -1,7 +1,7 @@
 const seedData = require("../data");
 
 const roleAliases = {
-  super_admin: "Super Administrateur OKAFRIK",
+  super_admin: "Super Administrateur Somafrik",
   country_admin: "Admin Pays",
   school_admin: "Admin School",
   prefet: "Préfet des études",
@@ -13,7 +13,7 @@ const roleAliases = {
 
 const routePermissions = {
   "GET /api/users": ["Utilisateurs:READ", "Gérer utilisateurs", "Auditer utilisateurs pays", "ALL_PRIVILEGES"],
-  "GET /api/teachers": ["Enseignants:READ", "Voir enseignants", "Gérer enseignants", "ALL_PRIVILEGES"],
+  "GET /api/teachers": ["Enseignants:READ", "Voir enseignants", "Gérer enseignants", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
   "GET /api/payments": ["Paiements:READ", "Gérer paiements", "Voir paiements", "Voir rapports financiers", "Suivre abonnements pays", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
   "GET /api/v2/subjects": ["Matières:READ", "Gérer cours", "Voir classes", "Modifier notes", "Organiser examens", "COUNTRY_PRIVILEGES", "ALL_PRIVILEGES"],
   "POST /api/v2/subjects": ["Matières:CREATE", "Gérer cours", "ALL_PRIVILEGES"],

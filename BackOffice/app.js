@@ -1,4 +1,5 @@
 const API_BASE_URL = "/api";
+const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 const state = {
   session: null,
@@ -968,7 +969,7 @@ function getRoleDashboard() {
 function getScopedSchoolsForCurrentUser() {
   const user = state.session?.user ?? {};
 
-  if (user.role === "Super Administrateur OKAFRIK") return state.schools;
+  if (isSuperAdminRole(user.role)) return state.schools;
   if (user.role === "Admin Pays") {
     return state.schools.filter((school) =>
       normalize(school.country) === normalize(user.countryScope) ||
@@ -982,7 +983,7 @@ function getScopedSchoolsForCurrentUser() {
 function getScopedCountriesForCurrentUser() {
   const user = state.session?.user ?? {};
 
-  if (user.role === "Super Administrateur OKAFRIK") return state.countries;
+  if (isSuperAdminRole(user.role)) return state.countries;
   return state.countries.filter((country) =>
     normalize(country.name) === normalize(user.countryScope) ||
     normalize(country.code) === normalize(user.countryScope) ||
@@ -993,7 +994,7 @@ function getScopedCountriesForCurrentUser() {
 function getScopedSubscriptionsForCurrentUser() {
   const user = state.session?.user ?? {};
 
-  if (user.role === "Super Administrateur OKAFRIK") return state.subscriptions;
+  if (isSuperAdminRole(user.role)) return state.subscriptions;
   if (user.role === "Admin Pays") {
     const countryCode = getCountryCodeFromScope(user.countryScope);
     return state.subscriptions.filter((subscription) =>
@@ -1008,7 +1009,7 @@ function getScopedSubscriptionsForCurrentUser() {
 function getScopedNotificationsForCurrentUser() {
   const user = state.session?.user ?? {};
 
-  if (user.role === "Super Administrateur OKAFRIK") return state.notifications;
+  if (isSuperAdminRole(user.role)) return state.notifications;
   if (user.role === "Admin Pays") {
     const countryCode = getCountryCodeFromScope(user.countryScope);
     return state.notifications.filter((notification) =>
@@ -1028,7 +1029,7 @@ function getScopedNotificationsForCurrentUser() {
 function getScopedUsersForCurrentUser() {
   const user = state.session?.user ?? {};
 
-  if (user.role === "Super Administrateur OKAFRIK") return state.users;
+  if (isSuperAdminRole(user.role)) return state.users;
   if (user.role === "Admin Pays") return getVisibleUsers();
   return state.users.filter((account) => normalize(account.schoolCode) === normalize(user.schoolCode));
 }
@@ -1671,7 +1672,7 @@ function getVisibleUsers() {
 function canManageUserRow(user, action = "READ") {
   if (!hasBackOfficePermission("Utilisateurs", action)) return false;
   const currentUser = state.session?.user;
-  if (currentUser?.role === "Super Administrateur OKAFRIK") return true;
+  if (isSuperAdminRole(currentUser?.role)) return true;
   if (currentUser?.role === "Admin Pays") {
     return user.role === "Admin School" && getVisibleUsers().some((item) => item.id === user.id);
   }
@@ -1860,7 +1861,7 @@ async function saveSchoolUserSettings() {
 function getSchoolPilotageRoles() {
   const roles = new Set(["Secrétaire", "Préfet des études", "Enseignant", "Parent", "Élève / Étudiant"]);
   getVisibleUsers().forEach((user) => {
-    if (!["Super Administrateur OKAFRIK", "Admin Pays", "Admin School"].includes(user.role)) {
+    if (!isSuperAdminRole(user.role) && !["Admin Pays", "Admin School"].includes(user.role)) {
       roles.add(user.role);
     }
   });
@@ -2536,7 +2537,7 @@ function startRealtimeSync() {
   state.realtimeIntervalId = setInterval(() => {
     if (!state.session?.accessToken) return;
     refreshBackOfficeStateFromBackend();
-  }, 5000);
+  }, SYNC_INTERVAL_MS);
 }
 
 function stopRealtimeSync() {
@@ -2570,12 +2571,16 @@ function initializeRolePermissions({ force = false } = {}) {
 }
 
 function enforceCountryAdminSchoolAdminCrud() {
-  const superAdminPermissions = new Set(state.rolePermissions["Super Administrateur OKAFRIK"] ?? []);
+  const superAdminPermissions = new Set(
+    state.rolePermissions["Super Administrateur Somafrik"] ??
+      state.rolePermissions["Super Administrateur OKAFRIK"] ??
+      [],
+  );
   superAdminPermissions.add("ALL_PRIVILEGES");
   crudPermissionModules.forEach((moduleName) => {
     crudActions.forEach((crudAction) => superAdminPermissions.add(`${moduleName}:${crudAction.key}`));
   });
-  state.rolePermissions["Super Administrateur OKAFRIK"] = [...superAdminPermissions].sort(sortPermissions);
+  state.rolePermissions["Super Administrateur Somafrik"] = [...superAdminPermissions].sort(sortPermissions);
 
   const countryAdminPermissions = new Set(state.rolePermissions["Admin Pays"] ?? []);
   countryAdminSchoolAdminPermissions.forEach((permission) => countryAdminPermissions.add(permission));
@@ -2653,14 +2658,14 @@ function isInternalRoleForbiddenPermission(permission) {
 function getPermissionRoles() {
   const roles = new Set([state.session?.user?.role, ...state.users.map((user) => user.role), ...Object.keys(state.rolePermissions)]);
   return [...roles].filter(Boolean).sort((a, b) => {
-    if (a === "Super Administrateur OKAFRIK") return -1;
-    if (b === "Super Administrateur OKAFRIK") return 1;
+    if (a === "Super Administrateur Somafrik") return -1;
+    if (b === "Super Administrateur Somafrik") return 1;
     return a.localeCompare(b, "fr");
   });
 }
 
 function canManageRolePermissions() {
-  return state.session?.user?.role === "Super Administrateur OKAFRIK";
+  return isSuperAdminRole(state.session?.user?.role);
 }
 
 function getCurrentRolePermissions() {
@@ -2786,7 +2791,7 @@ function renameSelectedRole() {
   const currentRole = state.selectedPermissionRole;
   if (!currentRole) return;
 
-  if (currentRole === "Super Administrateur OKAFRIK") {
+  if (isSuperAdminRole(currentRole)) {
     openRoleForm("rename-protected", currentRole);
     return;
   }
@@ -2803,7 +2808,7 @@ function deleteSelectedRole() {
   const role = state.selectedPermissionRole;
   if (!role) return;
 
-  if (role === "Super Administrateur OKAFRIK") {
+  if (isSuperAdminRole(role)) {
     openRoleForm("delete-protected", role);
     return;
   }
@@ -2978,10 +2983,15 @@ function normalizeRoleName(value) {
 
 function displayRoleName(role) {
   const labels = {
+    "Super Administrateur Somafrik": "Super Administrateur Somafrik",
     "Super Administrateur OKAFRIK": "Super Administrateur Somafrik",
     "Admin School": "Admin établissement",
   };
   return labels[role] ?? role;
+}
+
+function isSuperAdminRole(role) {
+  return role === "Super Administrateur Somafrik" || role === "Super Administrateur OKAFRIK";
 }
 
 function sortPermissions(a, b) {

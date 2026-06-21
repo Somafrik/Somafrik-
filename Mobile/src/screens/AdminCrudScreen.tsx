@@ -15,10 +15,12 @@ import * as ImagePicker from "expo-image-picker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
-import { messageThemes, rolePermissions } from "../data/catalog";
+import { messageThemes, rolePermissions, DEFAULT_CLASS_NAMES, DEFAULT_LEVELS, DEFAULT_SUBJECTS, DEFAULT_TRACKS } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
-import { canMutateEntity, canReadEntity, hasSecurityPermission, SecurityAction } from "../domain/security/permissions";
+import { canMutateEntity, canReadEntity, hasSecurityPermission, isSuperAdminRole, SecurityAction } from "../domain/security/permissions";
 import { resetUserPassword as resetUserPasswordOnBackend } from "../services/api";
+import { removeSchoolClassFromState } from "../lib/classRules";
+import { formatTeacherClasses } from "../lib/teacherClasses";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
 
@@ -90,16 +92,16 @@ const configs: Record<
       { key: "gender", label: "Sexe", placeholder: "Choisir le sexe", type: "select" },
       { key: "phone", label: "Téléphone", placeholder: "+243 ..." },
       { key: "email", label: "Email", placeholder: "enseignant@email.com" },
-      { key: "mainSubject", label: "Matière principale", placeholder: "Mathématiques" },
+      { key: "mainSubject", label: "Matière principale", placeholder: "Choisir une matière", type: "select" },
     ],
   },
   classes: {
     title: "Gestion des classes",
     addLabel: "Ajouter une classe",
     fields: [
-      { key: "name", label: "Nom de classe", placeholder: "4ème A" },
-      { key: "level", label: "Niveau", placeholder: "4ème" },
-      { key: "track", label: "Filière", placeholder: "Générale" },
+      { key: "name", label: "Nom de classe", placeholder: "Choisir une classe", type: "select" },
+      { key: "level", label: "Niveau", placeholder: "Choisir un niveau", type: "select" },
+      { key: "track", label: "Filière", placeholder: "Choisir une filière", type: "select" },
       { key: "teacherId", label: "Responsable", placeholder: "Choisir un enseignant", type: "select" },
     ],
   },
@@ -121,7 +123,7 @@ const configs: Record<
     addLabel: "Ajouter un cours",
     fields: [
       { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
-      { key: "name", label: "Nom du cours", placeholder: "Mathématiques" },
+      { key: "name", label: "Nom du cours", placeholder: "Choisir une matière", type: "select" },
       { key: "coefficient", label: "Coefficient", placeholder: "2", keyboardType: "numeric" },
     ],
   },
@@ -264,6 +266,7 @@ export default function AdminCrudScreen({ route }: Props) {
     subscriptionsData,
     rolePermissionsData,
     updateRoleFeatureAccess,
+    academicConfigData,
   } = useAdminData();
   const config = configs[entity];
   const items = getItems(entity);
@@ -523,6 +526,24 @@ export default function AdminCrudScreen({ route }: Props) {
         text: "Supprimer",
         style: "destructive",
         onPress: () => {
+          if (entity === "classes") {
+            const schoolCode = session?.user?.schoolCode ?? session?.school?.code;
+            const stateForDelete = {
+              students: studentsData,
+              courses: coursesData,
+              assignments: assignmentsData,
+              classes: classesData,
+              academicConfigs: academicConfigData?.schoolCode
+                ? { [academicConfigData.schoolCode]: academicConfigData }
+                : {},
+            };
+            const result = removeSchoolClassFromState(stateForDelete, item, schoolCode);
+            if (!result.ok) {
+              Alert.alert("Suppression refusée", result.error);
+              return;
+            }
+          }
+
           deleteItem(entity, item.id);
           if (entity === "assignments") {
             removeTeacherCourseAssignment(item);
@@ -975,7 +996,7 @@ export default function AdminCrudScreen({ route }: Props) {
             <View key={item.id} style={styles.card}>
               <View style={styles.cardContent}>
                 <Text style={styles.cardTitle}>{getPrimaryText(entity, item)}</Text>
-                <Text style={styles.cardMeta}>{getSecondaryText(entity, item)}</Text>
+                <Text style={styles.cardMeta}>{getSecondaryText(entity, item, { assignmentsData, classesData })}</Text>
               </View>
               {canUpdate && (
                 <TouchableOpacity style={styles.iconButton} onPress={() => openEdit(item)}>
@@ -1126,7 +1147,9 @@ export default function AdminCrudScreen({ route }: Props) {
                 schoolsData,
                 usersData,
                 countriesData,
-                form
+                form,
+                academicConfigData,
+                editingItem?.id
               ).map((option, index) => (
                 <TouchableOpacity
                   key={`${selectField?.key ?? "option"}-${option}-${index}`}
@@ -1366,9 +1389,11 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
   if (entity === "teachers") {
     if (!form.name || !form.phone) return null;
     const publicId = form.publicId || generateTeacherPublicId(schoolCode, context?.teachersData ?? []);
+    const identifier = String(publicId).match(/ENS-\d+$/i)?.[0]?.toUpperCase() ?? publicId;
     return {
       id: nextId,
       publicId,
+      identifier,
       schoolCode,
       name: form.name,
       firstName: form.firstName ?? "",
@@ -1632,10 +1657,18 @@ function getScreenTitle(baseTitle: string, entity: AdminEntity, filter?: string)
   return baseTitle;
 }
 
-function getSecondaryText(entity: AdminEntity, item: any) {
+function getSecondaryText(
+  entity: AdminEntity,
+  item: any,
+  context?: { assignmentsData?: any[]; classesData?: any[] },
+) {
   if (entity === "students") return `${item.publicId ?? item.matricule} • ${item.gender ?? "Sexe non renseigné"} • ${item.className} • Parent : ${item.parentPhone}`;
   if (entity === "teachers") {
-    return `ID : ${item.publicId ?? item.id} • ${item.mainSubject ?? "Matière non renseignée"} • ${item.phone}`;
+    const classes = formatTeacherClasses(item, {
+      assignments: context?.assignmentsData ?? [],
+      classes: context?.classesData ?? [],
+    });
+    return `ID : ${item.publicId ?? item.id} • ${item.mainSubject ?? "Matière non renseignée"} • Classes : ${classes} • ${item.phone}`;
   }
   if (entity === "classes") return `${item.publicId ?? item.id} • ${item.level ?? "Niveau non renseigné"} • ${item.track ?? "Filière non renseignée"} • Responsable : ${item.teacherId || "Non assigné"}`;
   if (entity === "countries") return `${item.phonePrefix} • ${item.currency} • ${item.timezone} • ${item.status}`;
@@ -1798,6 +1831,20 @@ function validateBusinessRules({
   }
 
   if (entity === "classes") {
+    const className = normalize(item.name);
+    if (!className) {
+      return "Classe impossible : le nom de la classe est requis.";
+    }
+
+    const duplicateClass = classesData.find(
+      (schoolClass) =>
+        normalize(schoolClass.name) === className &&
+        String(schoolClass.id ?? "") !== String(editingId ?? "")
+    );
+    if (duplicateClass) {
+      return `Classe impossible : « ${item.name} » existe déjà dans l'établissement.`;
+    }
+
     const teacherId = normalize(item.teacherId);
 
     if (!teacherId) {
@@ -1902,11 +1949,13 @@ function generatePublicId(prefix: string, year: string, items: any[], size = 6) 
 }
 
 function generateTeacherPublicId(schoolCode: string, teachersData: any[]) {
+  const normalizedSchool = String(schoolCode ?? "").trim().toUpperCase();
   const next = getNextSequence(
     teachersData,
-    new RegExp(`^(?:${escapeRegExp(schoolCode)}-)?ENS-(\\d+)$`, "i")
+    new RegExp(`^(?:${escapeRegExp(normalizedSchool)}-)?ENS-(\\d+)$`, "i")
   );
-  return `ENS-${String(next).padStart(4, "0")}`;
+  const identifier = `ENS-${String(next).padStart(4, "0")}`;
+  return `${normalizedSchool}-${identifier}`;
 }
 
 function generateLearnerPublicId(
@@ -1966,7 +2015,7 @@ function escapeRegExp(value: string) {
 }
 
 function isGlobalOrCountryRole(role?: string) {
-  return role === "Super Administrateur OKAFRIK" || role === "Admin Pays";
+  return isSuperAdminRole(role) || role === "Admin Pays";
 }
 
 function shouldHideField(entity: AdminEntity, form: Record<string, string>, field: Field) {
@@ -2011,7 +2060,7 @@ function canShowUserForSession(item: any, session: any) {
 }
 
 function isPlatformUserRole(role?: string) {
-  return role === "Super Administrateur OKAFRIK" || role === "Admin Pays";
+  return isSuperAdminRole(role) || role === "Admin Pays";
 }
 
 function getManageableSchoolUserRoles() {
@@ -2053,7 +2102,7 @@ function getUserInitials(item: any) {
 }
 
 function getRoleDefaults(role?: string, schoolCode = "") {
-  if (role === "Super Administrateur OKAFRIK") {
+  if (isSuperAdminRole(role)) {
     return { scopeLevel: "Global", schoolCode: "*", accessChannel: "Application" };
   }
 
@@ -2108,8 +2157,31 @@ function getSelectOptions(
   schoolsData: any[],
   usersData: any[],
   countriesData: any[],
-  form: Record<string, string>
+  form: Record<string, string>,
+  academicConfigData?: { levels?: string[]; tracks?: string[]; classNames?: string[]; subjects?: string[] },
+  editingId?: string
 ) {
+  if (key === "level") {
+    return academicConfigData?.levels?.length ? academicConfigData.levels : DEFAULT_LEVELS;
+  }
+
+  if (key === "track") {
+    return academicConfigData?.tracks?.length ? academicConfigData.tracks : DEFAULT_TRACKS;
+  }
+
+  if (key === "mainSubject" || (key === "name" && entity === "courses") || (key === "course" && entity === "assignments")) {
+    const configured = academicConfigData?.subjects?.length ? academicConfigData.subjects : DEFAULT_SUBJECTS;
+    if (entity === "assignments" && key === "course") {
+      const selectedClass = normalize(form.className);
+      const fromCourses = coursesData
+        .filter((course) => !selectedClass || normalize(course.className) === selectedClass)
+        .map((course) => course.name)
+        .filter(Boolean);
+      return [...new Set([...configured, ...fromCourses])].sort((a, b) => a.localeCompare(b, "fr"));
+    }
+    return configured;
+  }
+
   if (key === "gender") {
     return ["Masculin", "Féminin"];
   }
@@ -2210,16 +2282,34 @@ function getSelectOptions(
     return ["À jour", "En retard", "En attente"];
   }
 
-  if (key === "className") {
-    return classesData.map((schoolClass) => schoolClass.name).filter(Boolean);
+  if (key === "name" && entity === "classes") {
+    const configured = academicConfigData?.classNames?.length ? academicConfigData.classNames : DEFAULT_CLASS_NAMES;
+    const taken = new Set(
+      classesData
+        .filter((schoolClass) => String(schoolClass.id ?? "") !== String(editingId ?? ""))
+        .map((schoolClass) => normalize(schoolClass.name))
+        .filter(Boolean)
+    );
+    const current = normalize(form.name);
+    const options: string[] = [];
+    const seen = new Set<string>();
+    for (const name of configured) {
+      const normalizedName = normalize(name);
+      if (!normalizedName || seen.has(normalizedName)) continue;
+      if (taken.has(normalizedName) && normalizedName !== current) continue;
+      seen.add(normalizedName);
+      options.push(name);
+    }
+    if (current && !seen.has(current) && form.name.trim()) {
+      options.push(form.name.trim());
+    }
+    return options.sort((a, b) => a.localeCompare(b, "fr"));
   }
 
-  if (key === "course") {
-    const selectedClass = normalize(form.className);
-    return coursesData
-      .filter((course) => !selectedClass || normalize(course.className) === selectedClass)
-      .map((course) => course.name)
-      .filter(Boolean);
+  if (key === "className") {
+    const configured = academicConfigData?.classNames?.length ? academicConfigData.classNames : DEFAULT_CLASS_NAMES;
+    const fromClasses = classesData.map((schoolClass) => schoolClass.name).filter(Boolean);
+    return [...new Set([...configured, ...fromClasses])].sort((a, b) => a.localeCompare(b, "fr"));
   }
 
   if (key === "status") {

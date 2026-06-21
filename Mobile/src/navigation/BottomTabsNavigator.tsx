@@ -1,8 +1,10 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
+import type { ComponentType } from "react";
 
 import HomeScreen from "../screens/HomeScreen";
 import ClassesScreen from "../screens/ClassesScreen";
+import UsersScreen from "../screens/UsersScreen";
 import StudentsScreen from "../screens/StudentsScreen";
 import TeachersScreen from "../screens/TeachersScreen";
 import PaymentsScreen from "../screens/PaymentsScreen";
@@ -18,6 +20,23 @@ import { useAuth } from "../context/AuthContext";
 import { canReadRoute } from "../domain/security/permissions";
 
 const Tab = createBottomTabNavigator();
+
+type TabScreenConfig = {
+  name: string;
+  route: string;
+  component: ComponentType<any>;
+};
+
+// Onglets disponibles pour l'admin établissement — filtrés par droits accordés par le Super Admin.
+const schoolAdminTabCandidates: TabScreenConfig[] = [
+  { name: "Classes", route: "Classes", component: ClassesScreen },
+  { name: "Utilisateurs", route: "Users", component: UsersScreen },
+  { name: "Enseignants", route: "Teachers", component: TeachersScreen },
+  { name: "Paiements", route: "Payments", component: PaymentsScreen },
+  { name: "Messages", route: "Messages", component: MessagesScreen },
+  { name: "TeacherAttendance", route: "TeacherAttendance", component: TeacherAttendanceScreen },
+  { name: "TeacherGrades", route: "TeacherGrades", component: TeacherGradesScreen },
+];
 
 const tabConfig: Record<
   string,
@@ -77,10 +96,10 @@ const tabConfig: Record<
     icon: "chatbubbles-outline",
     focusedIcon: "chatbubbles",
   },
-  TeacherStudents: {
-    label: "Élèves",
-    icon: "people-outline",
-    focusedIcon: "people",
+  Utilisateurs: {
+    label: "Utilisateurs",
+    icon: "person-outline",
+    focusedIcon: "person",
   },
   TeacherAttendance: {
     label: "Appel",
@@ -99,6 +118,7 @@ export default function BottomTabsNavigator() {
   const isParentStudent = session?.role === "parent_student" || session?.role === "student";
   const isTeacher = session?.role === "teacher";
   const isGlobalAdmin = session?.role === "super_admin" || session?.role === "country_admin";
+  const isSchoolAdmin = session?.role === "school_admin";
   const isPedagogicalStaff = session?.role === "principal" || session?.role === "prefet";
   const isSecretary = session?.role === "secretary";
   const canOpenClasses = canReadRoute(session, "Classes");
@@ -112,6 +132,9 @@ export default function BottomTabsNavigator() {
   const canOpenMessages = canReadRoute(session, "Messages");
   const canOpenTeacherAttendance = canReadRoute(session, "TeacherAttendance");
   const canOpenTeacherGrades = canReadRoute(session, "TeacherGrades");
+  const schoolAdminTabs = isSchoolAdmin
+    ? schoolAdminTabCandidates.filter((tab) => canReadRoute(session, tab.route))
+    : [];
 
   return (
     <Tab.Navigator
@@ -198,6 +221,22 @@ export default function BottomTabsNavigator() {
           {canOpenTeacherAttendance && <Tab.Screen name="TeacherAttendance" component={TeacherAttendanceScreen} />}
           {canOpenPayments && <Tab.Screen name="Paiements" component={PaymentsScreen} />}
           {canOpenMessages && <Tab.Screen name="Messages" component={MessagesScreen} />}
+        </>
+      ) : isSchoolAdmin ? (
+        <>
+          {schoolAdminTabs.map((tab) => (
+            <Tab.Screen key={tab.name} name={tab.name} component={tab.component} />
+          ))}
+          {canOpenStudents && (
+            <Tab.Screen
+              name="Students"
+              component={StudentsScreen}
+              options={{
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: "none" },
+              }}
+            />
+          )}
         </>
       ) : isGlobalAdmin ? (
         <>

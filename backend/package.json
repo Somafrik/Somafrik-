@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "dev:memory": "node scripts/dev-memory.js",
     "dev:nodemon": "nodemon server.js"
   },
   "dependencies": {

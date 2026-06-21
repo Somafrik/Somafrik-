@@ -3,11 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Somafrik BackOffice</title>
+    <title>Somafrik — ERP scolaire SaaS multi-pays et multi-établissements</title>
+    <meta
+      name="description"
+      content="Somafrik centralise la gestion scolaire et universitaire : établissements, utilisateurs, droits, scolarité, finance, communication et rapports, du pays à la classe."
+    />
+    <meta name="theme-color" content="#1d4ed8" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://somafrik.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Somafrik" />
+    <meta property="og:title" content="Somafrik — ERP scolaire SaaS multi-pays" />
+    <meta
+      property="og:description"
+      content="Pilotez établissements, utilisateurs, scolarité, finance, communication et rapports depuis un BackOffice unique et sécurisé."
+    />
+    <meta property="og:image" content="./assets/somafrik-logo.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Somafrik — ERP scolaire SaaS" />
+    <meta
+      name="twitter:description"
+      content="ERP scolaire SaaS multi-pays et multi-établissements."
+    />
+    <meta name="twitter:image" content="./assets/somafrik-logo.png" />
     <link rel="icon" type="image/png" href="./assets/somafrik-logo.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260605-2" />
+    <link rel="stylesheet" href="./styles.css?v=20260620-1" />
   </head>
   <body>
+    <a class="skip-link" href="#modules">Aller au contenu</a>
     <main class="shell">
       <section class="login-panel" id="loginPanel">
         <header class="landing-header">
@@ -26,10 +49,13 @@
           </nav>
         </header>
 
-        <section class="landing-hero">
-          <div class="landing-hero-copy">
-            <p class="eyebrow">Solution SaaS multi-pays et multi-établissements</p>
-            <h1>Somafrik centralise la gestion scolaire, du pays à la classe.</h1>
+        <section class="landing-hero" aria-labelledby="heroTitle">
+          <div class="landing-hero-copy" data-reveal>
+            <p class="hero-badge">Solution SaaS multi-pays et multi-établissements</p>
+            <h1 id="heroTitle">
+              Somafrik centralise la gestion scolaire,
+              <span class="accent">du pays à la classe.</span>
+            </h1>
             <p class="landing-lead">
               Une application ERP interne pour piloter les établissements scolaires et universitaires :
               utilisateurs, droits, élèves, enseignants, présences, notes, paiements, communications et rapports.
@@ -37,6 +63,20 @@
             <div class="landing-actions">
               <button class="primary-landing-action" type="button" id="heroLoginButton">Connexion</button>
               <a class="secondary-landing-action" href="#modules">Voir les modules</a>
+            </div>
+            <div class="hero-trust" role="list" aria-label="Indicateurs clés">
+              <div role="listitem">
+                <strong>Multi-pays</strong>
+                <span>Données séparées par pays</span>
+              </div>
+              <div role="listitem">
+                <strong>6 modules</strong>
+                <span>Socle MVP opérationnel</span>
+              </div>
+              <div role="listitem">
+                <strong>Rôles &amp; droits</strong>
+                <span>Permissions CRUD ajustables</span>
+              </div>
             </div>
           </div>
 
@@ -68,58 +108,58 @@
           </form>
         </section>
 
-        <section class="landing-section" id="modules">
-          <div class="landing-section-head">
+        <section class="landing-section" id="modules" aria-labelledby="modulesTitle">
+          <div class="landing-section-head" data-reveal>
             <p class="eyebrow">Modules essentiels</p>
-            <h2>Un socle MVP prêt pour l’exploitation scolaire</h2>
+            <h2 id="modulesTitle">Un socle MVP prêt pour l’exploitation scolaire</h2>
           </div>
           <div class="landing-grid">
-            <article>
+            <article data-reveal>
               <strong>Gestion multi-établissements</strong>
               <p>Création, validation, suspension et suivi des écoles ou universités par pays.</p>
             </article>
-            <article>
+            <article data-reveal style="--reveal-delay: 60ms">
               <strong>Utilisateurs et rôles</strong>
               <p>Droits CRUD, suspension, réinitialisation de mot de passe et périmètre par rôle.</p>
             </article>
-            <article>
+            <article data-reveal style="--reveal-delay: 120ms">
               <strong>Scolarité</strong>
               <p>Classes, élèves, enseignants, affectations, présences, notes, examens et bulletins.</p>
             </article>
-            <article>
+            <article data-reveal style="--reveal-delay: 180ms">
               <strong>Finance scolaire</strong>
               <p>Frais, paiements, reste à payer, impayés et historique détaillé.</p>
             </article>
-            <article>
+            <article data-reveal style="--reveal-delay: 240ms">
               <strong>Communication</strong>
               <p>Annonces, messages parents, notifications et suivi des statuts lu/non lu.</p>
             </article>
-            <article>
+            <article data-reveal style="--reveal-delay: 300ms">
               <strong>Rapports</strong>
               <p>Indicateurs de pilotage par plateforme, pays, établissement et rôle métier.</p>
             </article>
           </div>
         </section>
 
-        <section class="landing-section landing-band" id="roles">
-          <div class="landing-section-head">
+        <section class="landing-section landing-band" id="roles" aria-labelledby="rolesTitle">
+          <div class="landing-section-head" data-reveal>
             <p class="eyebrow">Accès par responsabilité</p>
-            <h2>Chaque acteur voit son tableau de bord métier</h2>
+            <h2 id="rolesTitle">Chaque acteur voit son tableau de bord métier</h2>
           </div>
           <div class="role-showcase">
-            <article><span>01</span><strong>Superadmin</strong><p>Pilote Somafrik : pays, rôles, droits, établissements, conformité et supervision globale.</p></article>
-            <article><span>02</span><strong>Admin pays</strong><p>Gère les établissements, validations et administrateurs scolaires de son pays.</p></article>
-            <article><span>03</span><strong>Admin établissement</strong><p>Administre son école ou université : utilisateurs, classes, affectations, communication et rapports.</p></article>
-            <article><span>04</span><strong>Rôles configurés</strong><p>Secrétaire, préfet, enseignant, parent et élève accèdent selon les droits accordés.</p></article>
+            <article data-reveal><span aria-hidden="true">01</span><strong>Superadmin</strong><p>Pilote Somafrik : pays, rôles, droits, établissements, conformité et supervision globale.</p></article>
+            <article data-reveal style="--reveal-delay: 80ms"><span aria-hidden="true">02</span><strong>Admin pays</strong><p>Gère les établissements, validations et administrateurs scolaires de son pays.</p></article>
+            <article data-reveal style="--reveal-delay: 160ms"><span aria-hidden="true">03</span><strong>Admin établissement</strong><p>Administre son école ou université : utilisateurs, classes, affectations, communication et rapports.</p></article>
+            <article data-reveal style="--reveal-delay: 240ms"><span aria-hidden="true">04</span><strong>Rôles configurés</strong><p>Secrétaire, préfet, enseignant, parent et élève accèdent selon les droits accordés.</p></article>
           </div>
         </section>
 
-        <section class="landing-section trust-section" id="securite">
-          <div>
+        <section class="landing-section trust-section" id="securite" aria-labelledby="securiteTitle">
+          <div data-reveal>
             <p class="eyebrow">Sécurité et séparation des données</p>
-            <h2>Conçu pour plusieurs pays, plusieurs établissements et plusieurs rôles.</h2>
+            <h2 id="securiteTitle">Conçu pour plusieurs pays, plusieurs établissements et plusieurs rôles.</h2>
           </div>
-          <ul>
+          <ul data-reveal style="--reveal-delay: 80ms">
             <li>Identification par code établissement et identifiant unique utilisateur.</li>
             <li>Données séparées par pays, établissement, rôle et périmètre opérationnel.</li>
             <li>Actions synchronisées avec le backend pour éviter les écarts mobile / web.</li>
@@ -542,6 +582,32 @@
       </form>
     </section>
     <div class="toast hidden" id="toastMessage" role="status" aria-live="polite"></div>
-    <script src="./app.js?v=20260605-2"></script>
+    <script src="./app.js?v=20260620-1"></script>
+    <script>
+      (function () {
+        var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        var els = document.querySelectorAll("[data-reveal]");
+        if (reduceMotion || !("IntersectionObserver" in window)) {
+          els.forEach(function (el) {
+            el.classList.add("is-visible");
+          });
+          return;
+        }
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+        );
+        els.forEach(function (el) {
+          observer.observe(el);
+        });
+      })();
+    </script>
   </body>
 </html>

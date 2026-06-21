@@ -1,0 +1,240 @@
+import type { SessionUser } from "../types";
+import { CRUD_PERMISSION_MODULES, VIEW_PERMISSION_FEATURES } from "./constants";
+import { getInternalRoleDefaults } from "./internalRoleDefaults";
+import { isInternalSchoolRole, normalize, isSchoolAdminRole } from "./format";
+import {
+  isSuperAdminRole,
+  SUPERADMIN_MANAGED_ROLES,
+} from "./orgHierarchy";
+import {
+  isEstablishmentOperationalRole,
+  COUNTRY_ADMIN_ROLE,
+  COUNTRY_SCOPE_MODULES,
+  normalizeManagedRolePermissions,
+} from "./roleGovernance";
+import { SCHOOL_ENTITY_SIDEBAR_VIEWS } from "./entityModules";
+
+const SCHOOL_ADMIN_FORBIDDEN_FEATURES = new Set(["Établissements", "Abonnements"]);
+
+/** Modules plateforme toujours accessibles au Super Admin (consultation + CRUD). */
+const SUPERADMIN_PLATFORM_FEATURES = new Set([
+  "Pays",
+  "Établissements",
+  "Abonnements",
+  "Utilisateurs",
+  "Rapports",
+  "Notifications",
+  "Droits par rôle",
+]);
+
+export interface PermissionContext {
+  user: SessionUser | null;
+  rolePermissions: Record<string, string[]>;
+}
+
+/** Union des droits du compte et de la matrice Super Admin pour le rôle courant. */
+export function resolveEffectivePermissions(
+  role: string | undefined,
+  userPermissions: string[] | undefined,
+  rolePermissions: Record<string, string[]>,
+): string[] {
+  const fromUser = userPermissions ?? [];
+  const fromRole = role && Array.isArray(rolePermissions[role]) ? rolePermissions[role] : [];
+  const fromDefaults = getInternalRoleDefaults(role);
+  return [...new Set([...fromUser, ...fromRole, ...fromDefaults])];
+}
+
+export function getCurrentRolePermissions(ctx: PermissionContext): string[] {
+  return resolveEffectivePermissions(ctx.user?.role, ctx.user?.permissions, ctx.rolePermissions);
+}
+
+const COUNTRY_PRIVILEGE_FEATURES = new Set(["pays", "etablissements", "abonnements", "utilisateurs", "rapports"]);
+
+function countryPrivilegeAllows(normalizedFeature: string, action: string): boolean {
+  if (!COUNTRY_PRIVILEGE_FEATURES.has(normalizedFeature)) return false;
+  if (normalizedFeature === "pays") return action === "READ";
+  return true;
+}
+
+function permissionMatchesFeature(
+  normalizedPermission: string,
+  normalizedFeature: string,
+  action: string,
+): boolean {
+  if (normalizedPermission === "country-privileges") {
+    return countryPrivilegeAllows(normalizedFeature, action);
+  }
+  if (normalizedPermission === "all-privileges") {
+    return true;
+  }
+  if (!normalizedPermission.includes(normalizedFeature)) {
+    return false;
+  }
+  if (action === "READ") {
+    return (
+      normalizedPermission.includes("voir") ||
+      normalizedPermission.includes("lire") ||
+      normalizedPermission.includes("gerer") ||
+      normalizedPermission.includes("auditer") ||
+      normalizedPermission.includes("suivre") ||
+      normalizedPermission.includes("controler") ||
+      normalizedPermission.includes("controle") ||
+      normalizedPermission.includes("valider") ||
+      normalizedPermission.includes("publier") ||
+      normalizedPermission.includes("faire") ||
+      normalizedPermission.includes("organiser") ||
+      normalizedPermission.includes("creer") ||
+      normalizedPermission.includes("modifier") ||
+      normalizedPermission.includes("messages") ||
+      normalizedPermission.includes("annonces") ||
+      normalizedPermission.includes("communications")
+    );
+  }
+  return (
+    normalizedPermission.includes(normalize(action)) ||
+    normalizedPermission.includes("gerer") ||
+    normalizedPermission.includes("crud")
+  );
+}
+
+export function canManageRolePermissions(ctx: PermissionContext): boolean {
+  if (isSuperAdminRole(ctx.user?.role)) return true;
+  return getCurrentRolePermissions(ctx).includes("ALL_PRIVILEGES");
+}
+
+export function hasBackOfficePermission(
+  ctx: PermissionContext,
+  features: string | (string | null)[] | null,
+  action: string = "READ",
+): boolean {
+  if (!ctx.user) return false;
+  const normalizedAction = action === "R" ? "READ" : action;
+  const featureList = Array.isArray(features) ? features : [features];
+
+  if (isSuperAdminRole(ctx.user.role)) {
+    if (
+      featureList.some(
+        (feature) => !feature || SUPERADMIN_PLATFORM_FEATURES.has(feature),
+      )
+    ) {
+      return true;
+    }
+  }
+
+  const permissions = new Set(getCurrentRolePermissions(ctx));
+
+  if (
+    isInternalSchoolRole(ctx.user.role) &&
+    featureList.some((feature) => feature && SCHOOL_ADMIN_FORBIDDEN_FEATURES.has(feature))
+  ) {
+    return false;
+  }
+
+  if (permissions.has("ALL_PRIVILEGES")) return true;
+  if (permissions.has("COUNTRY_PRIVILEGES")) {
+    return featureList.some((feature) => {
+      if (!feature) return true;
+      return countryPrivilegeAllows(normalize(feature), normalizedAction);
+    });
+  }
+  if (featureList.includes("Droits par rôle")) return canManageRolePermissions(ctx);
+
+  return featureList.some((feature) => {
+    if (!feature) return true;
+    if (permissions.has(`${feature}:${normalizedAction}`) || permissions.has(`${feature}:CRUD`)) {
+      return true;
+    }
+    if (normalizedAction === "READ" && (permissions.has(`${feature}:R`) || permissions.has(`${feature}:READ`))) {
+      return true;
+    }
+
+    if ((CRUD_PERMISSION_MODULES as readonly string[]).includes(feature)) {
+      return false;
+    }
+
+    const normalizedFeature = normalize(feature);
+    return [...permissions].some((permission) => {
+      const normalizedPermission = normalize(permission);
+      if (
+        normalizedPermission === "country-privileges" &&
+        ["etablissements", "abonnements", "utilisateurs", "rapports"].includes(normalizedFeature)
+      ) {
+        return true;
+      }
+      return permissionMatchesFeature(normalizedPermission, normalizedFeature, normalizedAction);
+    });
+  });
+}
+
+export function canReadView(ctx: PermissionContext, viewName: string): boolean {
+  if (viewName === "overview") return true;
+  if (ctx.user?.role === COUNTRY_ADMIN_ROLE) {
+    if (SCHOOL_ENTITY_SIDEBAR_VIEWS.has(viewName) || viewName === "establishment" || viewName === "configuration") {
+      return false;
+    }
+    const feature = VIEW_PERMISSION_FEATURES[viewName];
+    if (feature && !COUNTRY_SCOPE_MODULES.has(feature) && feature !== "Rapports") {
+      return false;
+    }
+  }
+  if (viewName === "establishment") {
+    return isInternalSchoolRole(ctx.user?.role);
+  }
+  if (viewName === "configuration") {
+    if (!isInternalSchoolRole(ctx.user?.role)) return false;
+    return (
+      hasBackOfficePermission(ctx, "Paramètres Établissement", "READ") ||
+      isSchoolAdminRole(ctx.user?.role) ||
+      hasBackOfficePermission(ctx, "Élèves", "READ") ||
+      hasBackOfficePermission(ctx, "Enseignants", "READ") ||
+      hasBackOfficePermission(ctx, "Utilisateurs", "READ")
+    );
+  }
+  return hasBackOfficePermission(ctx, VIEW_PERMISSION_FEATURES[viewName] ?? null, "READ");
+}
+
+export function hasSchoolPilotageAccess(ctx: PermissionContext): boolean {
+  const schoolFeatures = [
+    "Utilisateurs",
+    "Classes",
+    "Élèves",
+    "Enseignants",
+    "Affectations",
+    "Présences",
+    "Notes",
+    "Bulletins",
+    "Paiements",
+    "Messages",
+    "Documents",
+    "Rapports",
+  ];
+  return (
+    isInternalSchoolRole(ctx.user?.role) &&
+    schoolFeatures.some((feature) => hasBackOfficePermission(ctx, feature, "READ"))
+  );
+}
+
+export function getSuperadminManagedRoles(): string[] {
+  return [...SUPERADMIN_MANAGED_ROLES];
+}
+
+export function getPermissionRoles(_ctx?: PermissionContext): string[] {
+  return getSuperadminManagedRoles();
+}
+
+export function mergeSuperadminRolePermissions(
+  current: Record<string, string[]>,
+  requested: Record<string, string[]>,
+): Record<string, string[]> {
+  const next = { ...current };
+  for (const role of SUPERADMIN_MANAGED_ROLES) {
+    if (Array.isArray(requested[role])) {
+      next[role] = normalizeManagedRolePermissions(role, requested[role]);
+    }
+  }
+  return next;
+}
+
+export function isLocalManagedRole(role?: string): boolean {
+  return isEstablishmentOperationalRole(role);
+}

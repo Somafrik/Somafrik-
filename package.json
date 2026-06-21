@@ -6,11 +6,16 @@
     "backend": "npm --prefix backend run dev",
     "backend:start": "npm --prefix backend run start",
     "mobile": "npm --prefix Mobile run start --",
-    "mobile:clear": "npm --prefix Mobile run start -- --clear",
+    "mobile:lan": "npm --prefix Mobile run start:lan --",
+    "mobile:tunnel": "npm --prefix Mobile run start:tunnel --",
+    "mobile:clear": "npm --prefix Mobile run start:clear --",
     "mobile:web": "npm --prefix Mobile run web",
     "mobile:android": "npm --prefix Mobile run android",
     "mobile:ios": "npm --prefix Mobile run ios",
     "check": "node -c backend/server.js && node -c backend/db/postgresRepository.js && node --check BackOffice/app.js && cd Mobile && npx tsc --noEmit",
-    "check:api": "node scripts/verify-api-connections.js"
+    "check:api": "node scripts/verify-api-connections.js",
+    "check:suspension": "node scripts/verify-suspension.js",
+    "web:build": "npm --prefix web run build",
+    "web:dev": "npm --prefix web run dev"
   }
 }

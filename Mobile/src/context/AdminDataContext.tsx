@@ -4,6 +4,10 @@ import {
   AcademicManagementConfig,
   CountryProfile,
   Course,
+  DEFAULT_CLASS_NAMES,
+  DEFAULT_LEVELS,
+  DEFAULT_SUBJECTS,
+  DEFAULT_TRACKS,
   NoteItem,
   PaymentItem,
   PaymentStatus,
@@ -17,7 +21,10 @@ import {
   TeacherAssignment,
   UserAccount,
 } from "../data/catalog";
+import { resolveEffectivePermissions, roleLabelFromSessionRole } from "../domain/security/permissions";
+import { removeSchoolClassFromState } from "../lib/classRules";
 import { getAcademicConfig, getBackOfficeState, getClasses, getCourses, getNotes, getPresences, getStudents, saveBackOfficeState, BackOfficeStatePayload } from "../services/api";
+import { SYNC_INTERVAL_MS } from "../config/env";
 import { useAuth } from "./AuthContext";
 
 export type AdminEntity =
@@ -74,6 +81,10 @@ const emptyAcademicConfig: AcademicManagementConfig = {
   evaluationTypes: [],
   defaultScale: 20,
   reportCardMode: "period",
+  levels: DEFAULT_LEVELS,
+  tracks: DEFAULT_TRACKS,
+  classNames: DEFAULT_CLASS_NAMES,
+  subjects: DEFAULT_SUBJECTS,
 };
 
 export function AdminDataProvider({ children }: { children: React.ReactNode }) {
@@ -161,7 +172,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         setSyncStatus("offline");
       });
     refresh();
-    const intervalId = setInterval(refresh, 5000);
+    const intervalId = setInterval(refresh, SYNC_INTERVAL_MS);
 
     return () => {
       mounted = false;
@@ -195,7 +206,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
         if (mounted) setSyncStatus("offline");
       });
     refresh();
-    const intervalId = setInterval(refresh, 5000);
+    const intervalId = setInterval(refresh, SYNC_INTERVAL_MS);
 
     return () => {
       mounted = false;
@@ -237,26 +248,22 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const roleLabel = roleLabelFromSession(session.role);
-    const permissions = roleLabel ? rolePermissionsData[roleLabel] : undefined;
-    if (!permissions?.length) {
-      return;
-    }
-
+    const roleLabel = roleLabelFromSessionRole(session.role);
+    const merged = resolveEffectivePermissions(roleLabel, session.user?.permissions ?? session.permissions, rolePermissionsData);
     const currentPermissions = session.permissions ?? session.user.permissions ?? [];
-    if (sameStringSet(currentPermissions, permissions)) {
+    if (sameStringSet(currentPermissions, merged)) {
       return;
     }
 
     setSession({
       ...session,
-      permissions,
+      permissions: merged,
       user: {
         ...session.user,
-        permissions,
+        permissions: merged,
       },
     });
-  }, [rolePermissionsData, session, setSession]);
+  }, [rolePermissionsData, session?.accessToken, session?.role]);
 
   const persistSyncedState = (nextState: BackOfficeStatePayload) => {
     if (!canSyncBackOfficeState(session?.role, session?.accessToken)) {
@@ -356,8 +363,29 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       createItem: (entity, item) => commitEntity(entity, (items) => [applyItemScope(entity, item, session, state), ...items]),
       updateItem: (entity, item) =>
         commitEntity(entity, (items) => items.map((row) => (row.id === item.id ? applyItemScope(entity, item, session, state) : row))),
-      deleteItem: (entity, id) =>
-        commitEntity(entity, (items) => items.filter((row) => row.id !== id)),
+      deleteItem: (entity, id) => {
+        if (entity === "classes") {
+          const item = classesData.find((row) => row.id === id);
+          if (!item) return;
+          const schoolCode = session?.user?.schoolCode ?? session?.school?.code;
+          const result = removeSchoolClassFromState(stateSnapshot, item, schoolCode);
+          if (!result.ok) return;
+          const nextClasses = (result.patch.classes ?? []) as SchoolClass[];
+          setClassesData(nextClasses);
+          if (result.patch.academicConfigs && schoolCode) {
+            const nextConfig = (result.patch.academicConfigs as Record<string, AcademicManagementConfig>)[schoolCode];
+            if (nextConfig) setAcademicConfigData(nextConfig);
+          }
+          persistSyncedState({
+            ...stateSnapshot,
+            classes: nextClasses,
+            academicConfigs: (result.patch.academicConfigs as Record<string, AcademicManagementConfig>) ?? stateSnapshot.academicConfigs,
+          });
+          return;
+        }
+
+        commitEntity(entity, (items) => items.filter((row) => row.id !== id));
+      },
       upsertPresenceItems: (items) =>
         setPresencesData((current) => {
           const scopedItems = items.map((item) => applyItemScope("presences", item, session, state));
@@ -578,18 +606,6 @@ function filterAcademicConfigs(value: unknown, schoolCode: string) {
 
   const config = (value as Record<string, AcademicManagementConfig>)[schoolCode];
   return config ? { [schoolCode]: config } : {};
-}
-
-function roleLabelFromSession(role?: string) {
-  if (role === "super_admin") return "Super Administrateur OKAFRIK";
-  if (role === "country_admin") return "Admin Pays";
-  if (role === "school_admin") return "Admin School";
-  if (role === "principal" || role === "prefet") return "Préfet des études";
-  if (role === "secretary") return "Secrétaire";
-  if (role === "teacher") return "Enseignant";
-  if (role === "parent_student") return "Parent";
-  if (role === "student") return "Élève / Étudiant";
-  return undefined;
 }
 
 function sameStringSet(left: string[], right: string[]) {

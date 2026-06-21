@@ -1,8 +1,19 @@
 const { BusinessError } = require("./authService");
 
+const SUPER_ADMIN_ROLES = new Set(["Super Administrateur Somafrik", "Super Administrateur OKAFRIK"]);
+
 class TenantScopeService {
-  filterRows(rows, principal, { schoolField = "schoolCode", countryField = "countryCode" } = {}) {
-    if (!principal || principal.role === "Super Administrateur OKAFRIK") {
+  filterRows(rows, principal, options = {}) {
+    const {
+      schoolField = "schoolCode",
+      countryField = "countryCode",
+      studentField = "studentId",
+      classField = "className",
+      schoolStudentIds = null,
+      schoolClassNames = null,
+    } = options;
+
+    if (!principal || SUPER_ADMIN_ROLES.has(principal.role)) {
       return rows;
     }
 
@@ -11,11 +22,44 @@ class TenantScopeService {
     if (principal.role === "Admin Pays") {
       return roleScoped.filter((row) => {
         const countryCode = row[countryField] ?? this.countryCodeFromCountry(row.country) ?? this.countryCodeFromSchool(row[schoolField]);
-        return !countryCode || countryCode === principal.countryCode;
+        return Boolean(countryCode) && countryCode === principal.countryCode;
       });
     }
 
-    return roleScoped.filter((row) => !row[schoolField] || row[schoolField] === principal.schoolCode);
+    // Périmètre établissement : un compte ne doit jamais voir les données d'un autre
+    // établissement (SOM-SAA-002). On rattache chaque ligne à l'établissement par son
+    // code, son élève ou sa/ses classe(s). Les anciennes lignes sans code établissement
+    // ne sont plus diffusées globalement : elles doivent être reliées à l'établissement.
+    const studentIds = new Set([...(principal.studentIds ?? []), ...(schoolStudentIds ?? [])]);
+    const classNames = new Set([...(principal.classNames ?? []), ...(schoolClassNames ?? [])]);
+
+    return roleScoped.filter((row) => {
+      const rowSchool = row[schoolField];
+      if (rowSchool) {
+        return rowSchool === principal.schoolCode;
+      }
+
+      const studentId = row[studentField];
+      if (studentId) {
+        return studentIds.has(studentId);
+      }
+
+      const directClass = row[classField] ?? (row.level && row.track ? row.name : undefined);
+      if (directClass) {
+        return classNames.has(directClass);
+      }
+
+      const assignmentClasses = [
+        ...((row.assignments ?? []).map((assignment) => assignment.className)),
+        ...(row.assignedClasses ?? []),
+      ].filter(Boolean);
+      if (assignmentClasses.length) {
+        return assignmentClasses.some((className) => classNames.has(className));
+      }
+
+      // Donnée sans rattachement établissement : exclue du périmètre école (SOM-SAA-002).
+      return false;
+    });
   }
 
   filterByRoleOwnership(rows, principal) {
@@ -48,7 +92,7 @@ class TenantScopeService {
   }
 
   assertSchoolAccess(principal, schoolCode) {
-    if (!principal || principal.role === "Super Administrateur OKAFRIK") {
+    if (!principal || SUPER_ADMIN_ROLES.has(principal.role)) {
       return;
     }
 

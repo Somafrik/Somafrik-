@@ -15,10 +15,11 @@ export default function SchoolManagementScreen({
   navigation,
 }: Props) {
   const { session } = useAuth();
+  const isSchoolAdmin = session?.role === "school_admin";
   const items = [
     { title: "🏫 Établissements", entity: "schools" },
     { title: "👤 Utilisateurs", entity: "users" },
-    { title: "👥 Élèves", entity: "students" },
+    ...(isSchoolAdmin ? [] : [{ title: "👥 Élèves", entity: "students" as const }]),
     { title: "👨‍🏫 Enseignants", entity: "teachers" },
     { title: "📚 Classes", entity: "classes" },
     { title: "📖 Cours", entity: "courses" },

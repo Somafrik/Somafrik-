@@ -1,3 +1,4 @@
+const { applySystemActivePeriod } = require("../lib/academicPeriods");
 const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
@@ -5,6 +6,7 @@ const { hashSecret } = require("../services/credentialService");
 const seedData = require("../data");
 
 const roleToDb = {
+  "Super Administrateur Somafrik": "SUPER_ADMIN",
   "Super Administrateur OKAFRIK": "SUPER_ADMIN",
   "Admin Pays": "COUNTRY_ADMIN",
   "Admin School": "SCHOOL_ADMIN",
@@ -18,7 +20,10 @@ const roleToDb = {
   "Élève / Étudiant": "STUDENT",
 };
 
-const roleFromDb = Object.fromEntries(Object.entries(roleToDb).map(([label, code]) => [code, label]));
+const roleFromDb = Object.fromEntries(
+  Object.entries(roleToDb).map(([label, code]) => [code, label]),
+);
+roleFromDb.SUPER_ADMIN = "Super Administrateur Somafrik";
 
 class PostgresRepository {
   constructor(databaseConfig) {
@@ -373,7 +378,7 @@ class PostgresRepository {
         }))
       : defaultAcademicPeriods();
 
-    return {
+    return withSystemActivePeriods({
       schoolCode: normalizedSchoolCode,
       periodMode: storedConfig?.periodMode ?? inferPeriodMode(periods),
       periods: Array.isArray(storedConfig?.periods) && storedConfig.periods.length ? storedConfig.periods : periods,
@@ -385,7 +390,19 @@ class PostgresRepository {
       allowCustomClasses: storedConfig?.allowCustomClasses !== false,
       allowCustomCourses: storedConfig?.allowCustomCourses !== false,
       allowCustomReportCards: storedConfig?.allowCustomReportCards !== false,
-    };
+      levels: Array.isArray(storedConfig?.levels) && storedConfig.levels.length
+        ? storedConfig.levels
+        : seedData.demoLevels,
+      tracks: Array.isArray(storedConfig?.tracks) && storedConfig.tracks.length
+        ? storedConfig.tracks
+        : seedData.demoTracks,
+      classNames: Array.isArray(storedConfig?.classNames) && storedConfig.classNames.length
+        ? storedConfig.classNames
+        : seedData.demoClassNames,
+      subjects: Array.isArray(storedConfig?.subjects) && storedConfig.subjects.length
+        ? storedConfig.subjects
+        : seedData.demoSubjects,
+    });
   }
 
   async saveAcademicConfig(schoolCode, config) {
@@ -395,7 +412,7 @@ class PostgresRepository {
     const academicConfigs = currentState.academicConfigs && typeof currentState.academicConfigs === "object"
       ? currentState.academicConfigs
       : {};
-    const savedConfig = {
+    const savedConfig = withSystemActivePeriods({
       schoolCode: normalizedSchoolCode,
       periodMode: config.periodMode ?? "trimestre",
       periods: Array.isArray(config.periods) && config.periods.length ? config.periods : defaultAcademicPeriods(),
@@ -407,7 +424,11 @@ class PostgresRepository {
       allowCustomClasses: config.allowCustomClasses !== false,
       allowCustomCourses: config.allowCustomCourses !== false,
       allowCustomReportCards: config.allowCustomReportCards !== false,
-    };
+      levels: Array.isArray(config.levels) && config.levels.length ? config.levels : seedData.demoLevels,
+      tracks: Array.isArray(config.tracks) && config.tracks.length ? config.tracks : seedData.demoTracks,
+      classNames: Array.isArray(config.classNames) && config.classNames.length ? config.classNames : seedData.demoClassNames,
+      subjects: Array.isArray(config.subjects) && config.subjects.length ? config.subjects : seedData.demoSubjects,
+    });
     await this.saveBackOfficeState({
       ...currentState,
       academicConfigs: {
@@ -1019,7 +1040,7 @@ class PostgresRepository {
     const schoolRows = await this.all("SELECT school_code, id FROM schools");
     const schoolIds = new Map(schoolRows.map((school) => [school.school_code, school.id]));
     const platformRoles = new Set([
-      "Super Administrateur OKAFRIK",
+      "Super Administrateur Somafrik",
       "Admin Pays",
       "Admin School",
       "Proviseur",
@@ -1570,7 +1591,7 @@ class PostgresRepository {
       email: user.email,
       role,
       secondaryRoles: [],
-      scopeLevel: role === "Super Administrateur OKAFRIK" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
+      scopeLevel: role === "Super Administrateur Somafrik" ? "Global" : role === "Admin Pays" ? "Pays" : "Établissement",
       countryScope,
       countryCode,
       schoolCode: role === "Admin Pays" ? "*" : user.school_code ?? "*",
@@ -2043,4 +2064,12 @@ function inferPeriodMode(periods) {
   if (names.some((name) => name.includes("semestre"))) return "semestre";
   if (names.some((name) => name.includes("trimestre"))) return "trimestre";
   return "periode";
+}
+
+function withSystemActivePeriods(config) {
+  if (!config || !Array.isArray(config.periods)) return config;
+  return {
+    ...config,
+    periods: applySystemActivePeriod(config.periods),
+  };
 }

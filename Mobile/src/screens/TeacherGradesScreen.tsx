@@ -2,8 +2,9 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { AcademicGrade, GradeBookService } from "../domain/academics/GradeBookService";
 import { useAdminData } from "../context/AdminDataContext";
+import { AcademicGrade, GradeBookService } from "../domain/academics/GradeBookService";
+import { resolveActivePeriodName } from "../lib/academicPeriods";
 import { hasSecurityPermission } from "../domain/security/permissions";
 import { saveNote } from "../services/api";
 
@@ -50,7 +51,7 @@ export default function TeacherGradesScreen({ navigation }: any) {
   const periods = academicConfigData.periods.length
     ? academicConfigData.periods
     : [{ name: "Trimestre 1", type: "Trimestre", startDate: "", endDate: "", active: true }];
-  const activePeriod = periods.find((period) => period.active)?.name ?? periods[0]?.name ?? "Trimestre 1";
+  const activePeriod = resolveActivePeriodName(periods) ?? "Trimestre 1";
 
   const sessions = useMemo(
     () => buildSessionSummaries(notesData, assignments, studentsData),

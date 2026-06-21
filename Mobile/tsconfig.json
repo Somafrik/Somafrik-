@@ -4,5 +4,9 @@
     "strict": true,
     "module": "esnext",
     "forceConsistentCasingInFileNames": true
-  }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ]
 }

@@ -46,6 +46,9 @@ export default function HomeScreen({ navigation }: any) {
   const canReadMessages = canReadEntity(session, "messages");
   const canReadAttendance = canReadRoute(session, "TeacherAttendance");
   const canOpenSchoolManagement = canReadRoute(session, "SchoolManagement");
+  const isSchoolAdmin = session?.role === "school_admin";
+  const openUsers = () =>
+    isSchoolAdmin ? navigation.navigate("Utilisateurs") : navigation.navigate("AdminCrud", { entity: "users" });
 
   if (session?.role === "teacher") {
     const assignedClasses = session.user.assignedClasses ?? [];
@@ -499,26 +502,26 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <View style={styles.statsGrid}>
-          {canReadStudents && (
-            <StatCard
-              icon="people-outline"
-              value={String(studentsData.length)}
-              label="Élèves"
-              color="#2563EB"
-              bg="#EFF6FF"
-              onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
-            />
-          )}
-
           {canReadUsers && (
             <StatCard
               icon="person-outline"
               value={String(activeUsersCount)}
               label="Utilisateurs"
               meta="Comptes actifs"
+              color="#2563EB"
+              bg="#EFF6FF"
+              onPress={openUsers}
+            />
+          )}
+
+          {!isSchoolAdmin && canReadStudents && (
+            <StatCard
+              icon="people-outline"
+              value={String(studentsData.length)}
+              label="Élèves"
               color="#7C3AED"
               bg="#F5F3FF"
-              onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
+              onPress={() => navigation.navigate("AdminCrud", { entity: "students" })}
             />
           )}
 
@@ -563,7 +566,17 @@ export default function HomeScreen({ navigation }: any) {
             />
           )}
 
-          {canReadStudents && (
+          {canReadUsers && (
+            <ActivityItem
+              icon="person-add-outline"
+              title="Comptes utilisateurs"
+              description={`${activeUsersCount} compte(s) actif(s)`}
+              color="#2563EB"
+              onPress={openUsers}
+            />
+          )}
+
+          {!isSchoolAdmin && canReadStudents && (
             <ActivityItem
               icon="person-add-outline"
               title="Élèves inscrits"
@@ -603,10 +616,10 @@ export default function HomeScreen({ navigation }: any) {
             <QuickAction
               icon="person-circle-outline"
               label="Utilisateurs"
-              onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
+              onPress={openUsers}
             />
           )}
-          {canReadEntity(session, "students") && (
+          {!isSchoolAdmin && canReadEntity(session, "students") && (
             <QuickAction
               icon="add-circle-outline"
               label="Élèves"

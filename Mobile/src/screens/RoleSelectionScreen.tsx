@@ -15,7 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
-import { SchoolInfo, getSchoolByCode } from "../services/api";
+import { SchoolInfo, getApiBaseUrl, getSchoolByCode } from "../services/api";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RoleSelection">;
 const somafrikLogo = require("../../assets/somafrik-logo.png");
@@ -24,7 +24,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
   const [accessCode, setAccessCode] = useState("CD-2026-0001");
   const [school, setSchool] = useState<SchoolInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Mode test: CD-2026-0001 puis mot de passe 1234.");
+  const [statusMessage, setStatusMessage] = useState(`API : ${getApiBaseUrl()}`);
 
   const verifyAccess = async () => {
     const normalizedAccess = accessCode.trim().toUpperCase();
@@ -92,7 +92,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
           </View>
           <View style={styles.headerText}>
             <Text style={styles.brand}>Somafrik</Text>
-            <Text style={styles.subtitle}>ERP scolaire par OKAFRIK</Text>
+            <Text style={styles.subtitle}>ERP scolaire par Somafrik</Text>
           </View>
         </View>
 
@@ -114,7 +114,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
               onChangeText={(value) => {
                 setAccessCode(value);
                 setSchool(null);
-                setStatusMessage("Mode test: CD-2026-0001 puis mot de passe 1234.");
+                setStatusMessage(`API : ${getApiBaseUrl()}`);
               }}
               autoCapitalize="characters"
               autoCorrect={false}
@@ -190,7 +190,7 @@ function getPlatformSchool(scope: string): SchoolInfo {
     name: scope === "Global" ? "Somafrik Global" : `Somafrik ${scope}`,
     city: scope === "Global" ? "Plateforme" : scope,
     country: scope,
-    slogan: "ERP scolaire mobile et tablette par OKAFRIK",
+    slogan: "ERP scolaire mobile et tablette par Somafrik",
     status: "Actif",
   };
 }

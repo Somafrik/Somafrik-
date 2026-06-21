@@ -210,13 +210,20 @@ class DocumentService {
 }
 
 class SecurityPolicyService {
+  constructor(roleGovernance = null) {
+    this.roleGovernance = roleGovernance;
+  }
+
   getPolicy() {
     return {
       authentication: "Identifiant + mot de passe",
       passwordReset: "À formaliser",
       twoFactorAuthentication: "Prévu MVP+",
       sessionManagement: "Session applicative locale",
-      rolePermissions: "Permissions par rôle déjà formalisées",
+      rolePermissions: "Matrice Module:ACTION pilotée par RoleGovernanceService",
+      countryScopeModules: this.roleGovernance?.countryScopeModules
+        ? [...this.roleGovernance.countryScopeModules]
+        : ["Pays", "Établissements", "Abonnements", "Utilisateurs"],
       transportEncryption: "HTTPS requis en production",
     };
   }
@@ -260,6 +267,10 @@ class MvpBusinessService {
     this.documents = new DocumentService();
     this.security = new SecurityPolicyService();
     this.mobileRoles = new MobileRolePolicyService();
+  }
+
+  attachRoleGovernance(roleGovernance) {
+    this.security = new SecurityPolicyService(roleGovernance);
   }
 
   getReadiness() {

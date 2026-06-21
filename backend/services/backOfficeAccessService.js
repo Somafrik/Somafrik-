@@ -2,6 +2,14 @@ const { BusinessError } = require("./authService");
 const { CommunicationService } = require("./communicationService");
 const { verifySecret } = require("./credentialService");
 
+const SUPER_ADMIN_ROLE = "Super Administrateur Somafrik";
+const LEGACY_SUPER_ADMIN_ROLE = "Super Administrateur OKAFRIK";
+const PENDING_VALIDATION_STATUS = "En attente de validation";
+
+function isSuperAdminRole(role) {
+  return role === SUPER_ADMIN_ROLE || role === LEGACY_SUPER_ADMIN_ROLE;
+}
+
 class BackOfficeAccessService {
   constructor({ school, schools = [school], userAccounts, countries = [], subscriptions = [], notifications = [] }) {
     this.school = school;
@@ -20,13 +28,20 @@ class BackOfficeAccessService {
 
     const normalizedIdentifier = String(identifier).trim().toLowerCase();
     const user = this.userAccounts.find((account) =>
-      [account.identifier, account.phone, account.publicId].some(
+      [account.identifier, account.email, account.phone, account.publicId].some(
         (value) => String(value ?? "").trim().toLowerCase() === normalizedIdentifier
       )
     );
 
     if (!user || !this.verifyPassword(user, password)) {
       throw new BusinessError(401, "Identifiants BackOffice incorrects");
+    }
+
+    if (this.isPendingValidation(user)) {
+      throw new BusinessError(
+        403,
+        "Compte en attente de validation par le Super Administrateur. Connexion indisponible."
+      );
     }
 
     if (user.status !== "Actif") {
@@ -37,12 +52,17 @@ class BackOfficeAccessService {
       throw new BusinessError(403, "Ce compte n'a pas accès au BackOffice");
     }
 
+    if (user.role === "Admin Pays" && this.isCountrySuspended(this.getCountryCode(user.countryScope))) {
+      throw new BusinessError(403, "Pays suspendu. Connexion indisponible pour ce pays.");
+    }
+
     if (!this.isPlatformAdmin(user) && !String(schoolCode ?? "").trim()) {
       throw new BusinessError(400, "Code établissement obligatoire pour ce compte");
     }
 
     const schoolContext = this.resolveSchoolContext(schoolCode || this.getDefaultSchoolCodeForUser(user));
     this.assertScopeCanAccessSchool(user, schoolContext);
+    this.assertSchoolCountryActive(user, schoolContext);
 
     const { password: _password, temporaryPassword: _temporaryPassword, ...safeUser } = user;
 
@@ -61,6 +81,13 @@ class BackOfficeAccessService {
     };
   }
 
+  isPendingValidation(user) {
+    return (
+      user?.validationStatus === PENDING_VALIDATION_STATUS ||
+      user?.status === PENDING_VALIDATION_STATUS
+    );
+  }
+
   verifyPassword(user, password) {
     if (user.passwordHash) {
       return verifySecret(password, user.passwordHash);
@@ -74,12 +101,13 @@ class BackOfficeAccessService {
   }
 
   isPlatformAdmin(user) {
-    return user.role === "Super Administrateur OKAFRIK" || user.role === "Admin Pays";
+    return isSuperAdminRole(user.role) || user.role === "Admin Pays";
   }
 
   isBackOfficeRole(user) {
     return [
-      "Super Administrateur OKAFRIK",
+      SUPER_ADMIN_ROLE,
+      LEGACY_SUPER_ADMIN_ROLE,
       "Admin Pays",
       "Admin School",
       "Secrétaire",
@@ -102,6 +130,16 @@ class BackOfficeAccessService {
 
     if (school.status === "Suspendu") {
       throw new BusinessError(403, "Établissement suspendu. Connexion indisponible.");
+    }
+
+    if (
+      school.validationStatus === "En attente de validation" ||
+      school.validationStatus === "En attente"
+    ) {
+      throw new BusinessError(
+        403,
+        "Établissement en attente de validation par le Super Administrateur. Connexion indisponible."
+      );
     }
 
     return school;
@@ -127,7 +165,7 @@ class BackOfficeAccessService {
   }
 
   assertScopeCanAccessSchool(user, school) {
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return;
     }
 
@@ -147,8 +185,36 @@ class BackOfficeAccessService {
     }
   }
 
+  isCountrySuspended(countryCode) {
+    if (!countryCode) {
+      return false;
+    }
+
+    const normalized = String(countryCode).trim().toUpperCase();
+    return this.countries.some(
+      (country) =>
+        String(country.code ?? "").trim().toUpperCase() === normalized &&
+        country.status === "Suspendu"
+    );
+  }
+
+  assertSchoolCountryActive(user, school) {
+    if (isSuperAdminRole(user.role) || !school) {
+      return;
+    }
+
+    const countryCode =
+      this.getCountryCode(school.country) ||
+      this.getCountryCode(school.countryCode) ||
+      String(school.code ?? "").slice(0, 2).toUpperCase();
+
+    if (this.isCountrySuspended(countryCode)) {
+      throw new BusinessError(403, "Pays suspendu. Connexion indisponible pour cet établissement.");
+    }
+  }
+
   getScopedSchools(user) {
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return this.schools;
     }
 
@@ -160,7 +226,7 @@ class BackOfficeAccessService {
   }
 
   getScopedCountries(user) {
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return this.countries;
     }
 
@@ -172,7 +238,7 @@ class BackOfficeAccessService {
   }
 
   getScopedSubscriptions(user) {
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return this.subscriptions;
     }
 
@@ -184,7 +250,7 @@ class BackOfficeAccessService {
   }
 
   getScopedNotifications(user) {
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return this.communicationService.enrichNotifications(this.notifications);
     }
 
@@ -197,7 +263,7 @@ class BackOfficeAccessService {
   }
 
   getMenus(user) {
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return [
         "Dashboard",
         "Pays",
@@ -243,7 +309,7 @@ class BackOfficeAccessService {
     const annualRevenue = scopedSubscriptions.reduce((total, subscription) => total + Number(subscription.annualPrice || 0), 0);
     const schoolAdmins = scopedUsers.filter((account) => account.role === "Admin School").length;
 
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return {
         profile: "Super Administrateur",
         privilegeLevel: "ALL_PRIVILEGES",
@@ -315,8 +381,10 @@ class BackOfficeAccessService {
   }
 
   getScopedUsers(user) {
-    if (user.role === "Super Administrateur OKAFRIK") {
-      return this.userAccounts;
+    if (isSuperAdminRole(user.role)) {
+      return this.userAccounts.filter((account) =>
+        ["Admin Pays", "Admin School"].includes(account.role),
+      );
     }
 
     if (user.role === "Admin Pays") {
@@ -336,10 +404,10 @@ class BackOfficeAccessService {
   }
 
   getScope(user) {
-    if (user.role === "Super Administrateur OKAFRIK") {
+    if (isSuperAdminRole(user.role)) {
       return {
         label: "Périmètre global",
-        hint: "Vous contrôlez tous les pays, établissements et comptes.",
+        hint: "Vous contrôlez tous les pays et établissements de la plateforme Somafrik.",
       };
     }
 
