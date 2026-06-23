@@ -7,6 +7,7 @@ import { AcademicGrade, GradeBookService } from "../domain/academics/GradeBookSe
 import { resolveActivePeriodName } from "../lib/academicPeriods";
 import { hasSecurityPermission } from "../domain/security/permissions";
 import { saveNote } from "../services/api";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 type Assignment = {
   className: string;
@@ -35,6 +36,8 @@ type SessionSummary = {
 };
 
 export default function TeacherGradesScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const contentStyle = [styles.content, { paddingBottom: scrollContentPaddingBottom }];
   const { session } = useAuth();
   const { studentsData, coursesData, notesData, presencesData, academicConfigData, upsertNoteItem } = useAdminData();
   const [gradeSession, setGradeSession] = useState<GradeSession | null>(null);
@@ -208,7 +211,7 @@ export default function TeacherGradesScreen({ navigation }: any) {
 
   if (gradeSession) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.container} contentContainerStyle={contentStyle}>
         <TouchableOpacity style={styles.backButton} onPress={() => setGradeSession(null)}>
           <Ionicons name="arrow-back" size={18} color="#0F172A" />
           <Text style={styles.backText}>Retour aux sessions</Text>
@@ -298,7 +301,7 @@ export default function TeacherGradesScreen({ navigation }: any) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>Notes</Text>
       <Text style={styles.subtitle}>Sessions classées par {academicConfigData.periodMode} selon la configuration de l'établissement.</Text>
 
@@ -420,7 +423,7 @@ function formatIsoDate(date: Date) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 20, paddingBottom: 120 },
+  content: { padding: 20 },
   title: { fontSize: 32, fontWeight: "900", color: "#0F172A" },
   subtitle: { marginTop: 6, marginBottom: 20, color: "#64748B", fontWeight: "700" },
   assignmentCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 16, marginBottom: 16 },

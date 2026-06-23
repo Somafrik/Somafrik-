@@ -4,8 +4,11 @@ import { reportCards } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
 import { getReportCardPdfUrl } from "../services/api";
+import { useStackScreenBottomPadding } from "../lib/screenLayout";
 
 export default function ReportCardsScreen() {
+  const stackPaddingBottom = useStackScreenBottomPadding();
+  const contentStyle = [styles.content, { paddingBottom: stackPaddingBottom }];
   const { session, selectedStudentId } = useAuth();
   const { studentsData } = useAdminData();
   const visibleStudentIds =
@@ -37,7 +40,7 @@ export default function ReportCardsScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>Bulletins</Text>
       <Text style={styles.subtitle}>{rows.length} bulletin(s) disponible(s)</Text>
 
@@ -91,7 +94,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 20, paddingBottom: 120 },
+  content: { padding: 20 },
   title: { color: "#0F172A", fontSize: 28, fontWeight: "900" },
   subtitle: { color: "#64748B", fontWeight: "800", marginTop: 4, marginBottom: 18 },
   card: {

@@ -458,7 +458,7 @@ export const rolePermissions: Record<string, string[]> = {
     "Voir élèves",
     "Gérer élèves",
     "Voir enseignants",
-    "Gérer enseignants",
+    "Ajouter enseignants",
     "Voir classes",
     "Gérer classes",
     "Gérer cours",
@@ -540,7 +540,7 @@ const securityMatrix: Record<string, Record<string, "R" | "CRUD" | "-">> = {
   Utilisateurs: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "-", Parent: "-", "Élève / Étudiant": "-" },
   Classes: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
   Élèves: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
-  Enseignants: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "CRUD", "Préfet des études": "R", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
+  Enseignants: { "Super Administrateur Somafrik": "CRUD", "Admin Pays": "CRUD", "Admin School": "R", "Préfet des études": "R", Enseignant: "-", Secrétaire: "R", Parent: "-", "Élève / Étudiant": "-" },
   Présences: { "Super Administrateur Somafrik": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "CRUD", Parent: "R", "Élève / Étudiant": "R" },
   Notes: { "Super Administrateur Somafrik": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "CRUD", Secrétaire: "-", Parent: "R", "Élève / Étudiant": "R" },
   Bulletins: { "Super Administrateur Somafrik": "R", "Admin Pays": "R", "Admin School": "R", "Préfet des études": "CRUD", Enseignant: "R", Secrétaire: "R", Parent: "R", "Élève / Étudiant": "R" },
@@ -574,6 +574,18 @@ for (const role of Object.keys(rolePermissions)) {
 rolePermissions["Super Administrateur Somafrik"] = [
   ...new Set(Object.values(rolePermissions).flat()),
 ];
+
+{
+  const schoolPerms = new Set(rolePermissions["Admin School"] ?? []);
+  ["Enseignants:UPDATE", "Enseignants:DELETE", "Enseignants:SUSPEND", "Gérer enseignants"].forEach((token) =>
+    schoolPerms.delete(token),
+  );
+  schoolPerms.add("Enseignants:READ");
+  schoolPerms.add("Enseignants:CREATE");
+  schoolPerms.add("Ajouter enseignants");
+  schoolPerms.add("Voir enseignants");
+  rolePermissions["Admin School"] = [...schoolPerms].sort((a, b) => a.localeCompare(b, "fr"));
+}
 
 export const userAccounts: UserAccount[] = [
   {

@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { IdentifyResponse, changePassword, identifyAccount, login, LoginResponse } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 const somafrikLogo = require("../../assets/somafrik-logo.png");
@@ -160,7 +161,7 @@ export default function LoginScreen({ navigation, route }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.schoolLogo}>
         {school.logoUrl ? (
           <Image source={{ uri: school.logoUrl }} style={styles.schoolLogoImage} />
@@ -260,7 +261,7 @@ export default function LoginScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 

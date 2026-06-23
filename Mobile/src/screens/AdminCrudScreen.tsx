@@ -21,6 +21,8 @@ import { canMutateEntity, canReadEntity, hasSecurityPermission, isSuperAdminRole
 import { resetUserPassword as resetUserPasswordOnBackend } from "../services/api";
 import { removeSchoolClassFromState } from "../lib/classRules";
 import { formatTeacherClasses } from "../lib/teacherClasses";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
+import { isTeacherUserRole, upsertTeacherFromUser } from "../lib/userTeacherSync";
 
 type Props = NativeStackScreenProps<RootStackParamList, "AdminCrud">;
 
@@ -124,6 +126,7 @@ const configs: Record<
     fields: [
       { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
       { key: "name", label: "Nom du cours", placeholder: "Choisir une matière", type: "select" },
+      { key: "teacherId", label: "Enseignant", placeholder: "Choisir un enseignant", type: "select" },
       { key: "coefficient", label: "Coefficient", placeholder: "2", keyboardType: "numeric" },
     ],
   },
@@ -246,6 +249,8 @@ const configs: Record<
 };
 
 export default function AdminCrudScreen({ route }: Props) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const contentStyle = [styles.content, { paddingBottom: scrollContentPaddingBottom }];
   const { entity, filter } = route.params;
   const { session } = useAuth();
   const {
@@ -503,15 +508,75 @@ export default function AdminCrudScreen({ route }: Props) {
       createItem(entity as any, nextItem as any);
     }
 
+    if (entity === "users" && isTeacherUserRole(nextItem.role)) {
+      const syncedTeachers = upsertTeacherFromUser(teachersData, nextItem);
+      const syncedTeacher = syncedTeachers.find(
+        (teacher) =>
+          String(teacher.userId ?? "") === String(nextItem.id) ||
+          normalize(String(teacher.identifier ?? "")) === normalize(String(nextItem.identifier ?? ""))
+      );
+      if (syncedTeacher) {
+        const existsInTeachers = teachersData.some(
+          (teacher) => String(teacher.id) === String(syncedTeacher.id)
+        );
+        if (existsInTeachers) {
+          updateItem("teachers", syncedTeacher);
+        } else {
+          createItem("teachers", syncedTeacher);
+        }
+      }
+    }
+
     if (entity === "assignments") {
       syncTeacherCourseAssignment(nextItem, editingItem);
     }
 
     if (entity === "courses") {
       setSelectedCourseClass(String(nextItem.className ?? ""));
+      syncCourseTeacherAssignment(nextItem, editingItem);
     }
 
     setVisible(false);
+  };
+
+  const syncCourseTeacherAssignment = (course: any, previousCourse?: any) => {
+    if (previousCourse?.teacherId) {
+      removeTeacherCourseAssignment({
+        teacherId: previousCourse.teacherId,
+        className: previousCourse.className,
+        course: previousCourse.name,
+      });
+      const previousAssignment = assignmentsData.find(
+        (assignment: any) =>
+          normalize(assignment.className) === normalize(previousCourse.className) &&
+          normalize(assignment.course) === normalize(previousCourse.name)
+      );
+      if (previousAssignment?.id) {
+        deleteItem("assignments", String(previousAssignment.id));
+      }
+    }
+
+    const existingAssignment = assignmentsData.find(
+      (assignment: any) =>
+        normalize(assignment.className) === normalize(course.className) &&
+        normalize(assignment.course) === normalize(course.name)
+    );
+
+    const assignmentPayload = {
+      id: existingAssignment?.id ?? createInternalId("ASSIGN"),
+      schoolCode: course.schoolCode,
+      teacherId: course.teacherId,
+      className: course.className,
+      course: course.name,
+    };
+
+    if (existingAssignment) {
+      updateItem("assignments", assignmentPayload);
+    } else {
+      createItem("assignments", assignmentPayload);
+    }
+
+    syncTeacherCourseAssignment(assignmentPayload, existingAssignment);
   };
 
   const confirmDelete = (item: any) => {
@@ -703,7 +768,7 @@ export default function AdminCrudScreen({ route }: Props) {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false}>
         {!canRead ? (
           <View style={styles.emptyState}>
             <Ionicons name="lock-closed-outline" size={24} color="#DC2626" />
@@ -1325,6 +1390,13 @@ function itemToForm(entity: AdminEntity, item: any) {
     };
   }
 
+  if (entity === "courses" && item.teacherId) {
+    return {
+      ...Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value ?? "")])),
+      teacherId: formatSelectOption(String(item.teacherId), String(item.teacherName ?? "")),
+    };
+  }
+
   if (entity === "users") {
     return {
       ...Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value ?? "")])),
@@ -1436,7 +1508,9 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
   }
 
   if (entity === "courses") {
-    if (!form.className || !form.name) return null;
+    if (!form.className || !form.name || !form.teacherId) return null;
+    const teacherId = parseSelectId(form.teacherId);
+    const teacher = (context?.teachersData ?? []).find((item: any) => matchesEntityId(item, teacherId));
     return {
       id: nextId,
       publicId: form.publicId || generatePublicId("COU", year, context?.coursesData ?? [], 6),
@@ -1444,6 +1518,8 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       className: form.className,
       name: form.name,
       coefficient: Number(form.coefficient) || 1,
+      teacherId,
+      teacherName: teacher?.name ?? "",
     };
   }
 
@@ -1672,7 +1748,7 @@ function getSecondaryText(
   }
   if (entity === "classes") return `${item.publicId ?? item.id} • ${item.level ?? "Niveau non renseigné"} • ${item.track ?? "Filière non renseignée"} • Responsable : ${item.teacherId || "Non assigné"}`;
   if (entity === "countries") return `${item.phonePrefix} • ${item.currency} • ${item.timezone} • ${item.status}`;
-  if (entity === "courses") return `${item.publicId ?? item.id} • ${item.className} • Coefficient : ${item.coefficient}`;
+  if (entity === "courses") return `${item.publicId ?? item.id} • ${item.className} • Prof : ${item.teacherName || item.teacherId || "Non assigné"} • Coef. ${item.coefficient}`;
   if (entity === "assignments") return `Enseignant : ${item.teacherId}`;
   if (entity === "subscriptions") return `${item.country} • ${item.monthlyPrice} ${item.currency}/mois • ${item.paymentStatus} • fin ${item.endDate}`;
   if (entity === "paymentStatuses") return `Code : ${item.value}`;
@@ -1755,6 +1831,18 @@ function validateBusinessRules({
 
     if (duplicatePhone) {
       return "Utilisateur impossible : ce téléphone est déjà utilisé par un autre compte.";
+    }
+
+    if (isTeacherUserRole(item.role)) {
+      const teacherConflict = teachersData.find(
+        (teacher) =>
+          normalize(teacher.identifier) === identifier &&
+          teacher.userId &&
+          String(teacher.userId) !== String(item.id ?? editingId ?? "")
+      );
+      if (teacherConflict) {
+        return "Utilisateur impossible : cet identifiant est déjà attribué à un autre enseignant.";
+      }
     }
 
     if (item.photoUrl && !isValidPhotoReference(item.photoUrl)) {
@@ -1857,6 +1945,42 @@ function validateBusinessRules({
 
     if (!teacherExists) {
       return "Classe impossible : cet ID responsable n'est pas enregistré dans les enseignants.";
+    }
+
+    return null;
+  }
+
+  if (entity !== "assignments" && entity !== "courses") {
+    return null;
+  }
+
+  if (entity === "courses") {
+    const className = normalize(item.className);
+    const courseName = normalize(item.name);
+    const teacherId = normalize(item.teacherId);
+
+    if (!teacherId) {
+      return "Cours impossible : sélectionnez l'enseignant responsable pour cette classe.";
+    }
+
+    const duplicateCourse = coursesData.find(
+      (courseItem) =>
+        String(courseItem.id ?? "") !== String(editingId ?? "") &&
+        normalize(courseItem.className) === className &&
+        normalize(courseItem.name) === courseName
+    );
+
+    if (duplicateCourse && normalize(duplicateCourse.teacherId) !== teacherId) {
+      return `Cours impossible : « ${item.name} » est déjà affecté à un autre enseignant pour la classe ${item.className}.`;
+    }
+
+    const duplicateAssignment = assignmentsData.find(
+      (assignment) =>
+        normalize(assignment.className) === className && normalize(assignment.course) === courseName
+    );
+
+    if (duplicateAssignment && normalize(duplicateAssignment.teacherId) !== teacherId) {
+      return `Cours impossible : « ${item.name} » est déjà affecté à un autre enseignant pour la classe ${item.className}.`;
     }
 
     return null;
@@ -2436,7 +2560,7 @@ function buildCalendarDays(date: Date) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 20, paddingBottom: 120 },
+  content: { padding: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
-import type { PermissionContext } from "./permissions";
+import type { FeaturePermissions, PermissionContext } from "./permissions";
+import { getFeaturePermissions } from "./permissions";
 
 export function usePermissionContext(): PermissionContext {
   const { session } = useAuth();
@@ -13,4 +14,10 @@ export function usePermissionContext(): PermissionContext {
     }),
     [session?.user, state.rolePermissions],
   );
+}
+
+/** Droits CRUD d'un module — chaque bouton UI doit s'aligner sur ces flags. */
+export function useFeaturePermissions(feature: string): FeaturePermissions {
+  const ctx = usePermissionContext();
+  return useMemo(() => getFeaturePermissions(ctx, feature), [ctx, feature]);
 }

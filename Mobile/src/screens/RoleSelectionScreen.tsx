@@ -16,11 +16,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { SchoolInfo, getApiBaseUrl, getSchoolByCode } from "../services/api";
+import { useStackScreenBottomPadding } from "../lib/screenLayout";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RoleSelection">;
 const somafrikLogo = require("../../assets/somafrik-logo.png");
 
 export default function RoleSelectionScreen({ navigation }: Props) {
+  const stackPaddingBottom = useStackScreenBottomPadding();
+  const containerStyle = [styles.container, { paddingBottom: stackPaddingBottom }];
   const [accessCode, setAccessCode] = useState("CD-2026-0001");
   const [school, setSchool] = useState<SchoolInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -84,7 +87,7 @@ export default function RoleSelectionScreen({ navigation }: Props) {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={containerStyle}
       >
         <View style={styles.header}>
           <View style={styles.mark}>
@@ -204,7 +207,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 54,
-    paddingBottom: 28,
   },
   header: {
     flexDirection: "row",

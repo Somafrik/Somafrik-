@@ -12,6 +12,7 @@ import { getStudentById, notes, payments, presences } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { canReadRoute } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -22,6 +23,8 @@ export default function StudentDetailScreen({
   route,
   navigation,
 }: Partial<Props>) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const containerStyle = [styles.container, { paddingBottom: scrollContentPaddingBottom }];
   const { session, selectedStudentId } = useAuth();
   const studentId = selectedStudentId ?? route?.params?.studentId;
   const canSeeNotes = canReadRoute(session, "StudentNotes");
@@ -39,7 +42,7 @@ export default function StudentDetailScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={containerStyle}>
       <StudentSwitcher />
 
       <View style={styles.profileCard}>

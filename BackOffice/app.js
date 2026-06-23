@@ -240,7 +240,6 @@ const internalRoleDefaultPermissions = {
     "Élèves:SUSPEND",
     "Enseignants:READ",
     "Enseignants:CREATE",
-    "Enseignants:UPDATE",
     "Affectations:READ",
     "Affectations:CREATE",
     "Affectations:UPDATE",
@@ -3321,6 +3320,42 @@ function saveUserForm() {
   };
 
   state.users.unshift(user);
+  if (user.role === "Enseignant") {
+    const syncService = {
+      upsertTeacherFromUser(teachers, account) {
+        const schoolCode = String(account.schoolCode ?? "").trim();
+        if (!schoolCode || schoolCode === "*") return teachers;
+        const next = [...teachers];
+        const index = next.findIndex(
+          (teacher) =>
+            String(teacher.userId ?? "") === String(account.id) ||
+            (normalize(teacher.identifier) === normalize(account.identifier) &&
+              (!teacher.userId || String(teacher.userId) === String(account.id))),
+        );
+        const row = {
+          ...(index >= 0 ? next[index] : {}),
+          id: index >= 0 ? next[index].id : `TEACHER-${Date.now()}`,
+          userId: account.id,
+          publicId: account.publicId ?? `${schoolCode}-${account.identifier}`,
+          identifier: account.identifier,
+          schoolCode,
+          name: account.lastName,
+          firstName: account.firstName,
+          gender: account.gender ?? "Non renseigné",
+          phone: account.phone ?? "",
+          email: account.email ?? "",
+          status: account.status === "Suspendu" ? "Suspendu" : "Actif",
+          password: account.temporaryPassword ?? "1234",
+          assignments: index >= 0 ? next[index].assignments ?? [] : [],
+          assignedClasses: index >= 0 ? next[index].assignedClasses ?? [] : [],
+        };
+        if (index >= 0) next[index] = row;
+        else next.unshift(row);
+        return next;
+      },
+    };
+    state.teachers = syncService.upsertTeacherFromUser(state.teachers, user);
+  }
   addAudit("Création utilisateur", user.identifier, `${user.firstName} ${user.lastName} créé avec le rôle ${user.role}`);
   closeDetail();
   renderOperationalViews();

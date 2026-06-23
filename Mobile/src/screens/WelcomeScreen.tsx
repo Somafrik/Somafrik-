@@ -2,6 +2,7 @@ import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from "react
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useRef } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { RootStackParamList } from "../navigation/AppNavigator";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Welcome">;
@@ -23,7 +24,7 @@ export default function WelcomeScreen({ navigation }: Props) {
   }, [buttonOffset, opacity, scale]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <Animated.View style={[styles.logoBox, { opacity, transform: [{ scale }] }]}>
         <Image source={somafrikLogo} style={styles.logoImage} />
       </Animated.View>
@@ -42,7 +43,7 @@ export default function WelcomeScreen({ navigation }: Props) {
           <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </Animated.View>
-    </View>
+    </SafeAreaView>
   );
 }
 

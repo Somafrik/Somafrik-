@@ -4,15 +4,18 @@ import { getTeacherClasses, getTeacherCourses } from "../data/catalog";
 import { useAdminData } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
 import { canMutateEntity } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 export default function TeachersScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const contentStyle = [styles.content, { paddingBottom: scrollContentPaddingBottom }];
   const { session } = useAuth();
   const { teachersData } = useAdminData();
   const canCreate = canMutateEntity(session, "teachers", "CREATE");
   const canUpdate = canMutateEntity(session, "teachers", "UPDATE");
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>Enseignants</Text>
       <Text style={styles.subtitle}>Équipe pédagogique active</Text>
 
@@ -62,7 +65,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 120,
   },
   title: {
     fontSize: 32,

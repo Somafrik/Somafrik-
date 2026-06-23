@@ -11,8 +11,11 @@ import { getPresenceRate } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
 import { canMutateEntity, canReadRoute } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 export default function ClassesScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const scrollContentStyle = [styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }];
   const { session } = useAuth();
   const { classesData, studentsData, teachersData } = useAdminData();
   const assignedClasses = session?.role === "teacher" ? session.user.assignedClasses ?? [] : [];
@@ -32,7 +35,7 @@ export default function ClassesScreen({ navigation }: any) {
     <View style={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={scrollContentStyle}
       >
         <View style={styles.header}>
           <View>
@@ -136,7 +139,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 52,
     paddingHorizontal: 20,
-    paddingBottom: 120,
   },
 
   header: {

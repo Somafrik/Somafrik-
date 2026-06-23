@@ -2,8 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { scopedNotifications } from "../lib/scope";
-import { hasBackOfficePermission } from "../lib/permissions";
-import { usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions } from "../lib/usePermissionContext";
 import { Card, SectionHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge, StatusBadge } from "../components/ui/Badge";
@@ -43,15 +42,11 @@ function newId(): string {
 export function NotificationsPage() {
   const { session } = useAuth();
   const { state, update } = useData();
-  const ctx = usePermissionContext();
-  const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const [composing, setComposing] = useState<PlatformNotification | null>(null);
 
   const rows = scopedNotifications(session?.user ?? null, state);
-  const canCreate = hasBackOfficePermission(ctx, "Notifications", "CREATE");
-  const canUpdate = hasBackOfficePermission(ctx, "Notifications", "UPDATE");
-  const canDelete = hasBackOfficePermission(ctx, "Notifications", "DELETE");
+  const { canCreate, canUpdate, canDelete } = useFeaturePermissions("Notifications");
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();

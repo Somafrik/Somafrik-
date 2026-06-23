@@ -17,7 +17,7 @@ import {
   SCHOOL_ADMIN_ROLE,
   SUPER_ADMIN_ROLE,
 } from "./orgHierarchy";
-import { resolveEffectivePermissions } from "./permissions";
+import { isTeacherUserRole } from "./userTeacherSync";
 
 const PLATFORM_ROLES = new Set([SUPER_ADMIN_ROLE, COUNTRY_ADMIN_ROLE, SCHOOL_ADMIN_ROLE]);
 
@@ -314,6 +314,7 @@ export function getCountryScopeOptions(countries: Country[]) {
 export interface ValidateUserAccountOptions {
   creator?: SessionUser | null;
   allowedSchoolCodes?: string[];
+  teachers?: unknown[];
 }
 
 export function validateUserAccount(
@@ -345,6 +346,19 @@ export function validateUserAccount(
   );
   if (duplicate) {
     return `L'identifiant « ${identifier} » est déjà utilisé.`;
+  }
+
+  if (isTeacherUserRole(user.role)) {
+    const teachers = (options.teachers ?? []) as Array<{ id?: string; userId?: string; identifier?: string }>;
+    const teacherConflict = teachers.find(
+      (teacher) =>
+        normalize(String(teacher.identifier ?? "")) === normalize(identifier) &&
+        teacher.userId &&
+        teacher.userId !== user.id,
+    );
+    if (teacherConflict) {
+      return `L'identifiant « ${identifier} » est déjà attribué à un autre enseignant.`;
+    }
   }
 
   const defaults = getRoleDefaults(user.role, user.schoolCode ?? "");

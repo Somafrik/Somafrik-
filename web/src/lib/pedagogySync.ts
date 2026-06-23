@@ -119,12 +119,23 @@ function upsertCourse(
   const idx = courses.findIndex(
     (course) =>
       normalize(course.name) === normalize(link.subject) &&
-      normalize(String(course.className ?? "")) === normalize(link.className) &&
-      (String(course.teacherId ?? "") === teacherId ||
-        normalize(course.teacherName) === normalize(teacherName)),
+      normalize(String(course.className ?? "")) === normalize(link.className),
   );
 
   if (idx >= 0) {
+    const existing = courses[idx];
+    const sameTeacher =
+      (teacherId && String(existing.teacherId ?? "") === teacherId) ||
+      (teacherName && normalize(existing.teacherName) === normalize(teacherName));
+
+    if (
+      (String(existing.teacherId ?? "") || String(existing.teacherName ?? "")) &&
+      (teacherId || teacherName) &&
+      !sameTeacher
+    ) {
+      return courses;
+    }
+
     return courses.map((course, index) =>
       index === idx
         ? {
@@ -163,12 +174,23 @@ function upsertAssignment(
   const idx = assignments.findIndex(
     (assignment) =>
       normalize(assignment.subject ?? assignment.course) === normalize(link.subject) &&
-      normalize(String(assignment.className ?? "")) === normalize(link.className) &&
-      (String(assignment.teacherId ?? "") === teacherId ||
-        normalize(assignment.teacherName) === normalize(teacherName)),
+      normalize(String(assignment.className ?? "")) === normalize(link.className),
   );
 
   if (idx >= 0) {
+    const existing = assignments[idx];
+    const sameTeacher =
+      (teacherId && String(existing.teacherId ?? "") === teacherId) ||
+      (teacherName && normalize(existing.teacherName) === normalize(teacherName));
+
+    if (
+      (String(existing.teacherId ?? "") || String(existing.teacherName ?? "")) &&
+      (teacherId || teacherName) &&
+      !sameTeacher
+    ) {
+      return assignments;
+    }
+
     return assignments.map((assignment, index) =>
       index === idx
         ? {

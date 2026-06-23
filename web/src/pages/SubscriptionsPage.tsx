@@ -3,8 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { scopedSubscriptions } from "../lib/scope";
 import { formatMetric } from "../lib/format";
-import { hasBackOfficePermission } from "../lib/permissions";
-import { usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions } from "../lib/usePermissionContext";
 import { Card, SectionHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { StatusBadge } from "../components/ui/Badge";
@@ -20,7 +19,7 @@ export function SubscriptionsPage() {
   const [busy, setBusy] = useState(false);
 
   const rows = scopedSubscriptions(session?.user ?? null, state);
-  const canRenew = hasBackOfficePermission(ctx, "Abonnements", "UPDATE");
+  const { canUpdate: canRenew } = useFeaturePermissions("Abonnements");
 
   async function renew(subscription: Subscription) {
     setBusy(true);

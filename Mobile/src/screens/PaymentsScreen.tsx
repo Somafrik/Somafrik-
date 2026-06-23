@@ -4,8 +4,11 @@ import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats } from "../domain/metrics/schoolMetrics";
 import { useAuth } from "../context/AuthContext";
 import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 export default function PaymentsScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const contentStyle = [styles.content, { paddingBottom: scrollContentPaddingBottom }];
   const { session } = useAuth();
   const { paymentsData, studentsData } = useAdminData();
   const paymentStats = getPaymentStats(paymentsData);
@@ -15,7 +18,7 @@ export default function PaymentsScreen({ navigation }: any) {
   const canOpenPaymentAdmin = canReadPayments || canCreate || canUpdate;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>Paiements</Text>
 
       <TouchableOpacity
@@ -97,7 +100,7 @@ export default function PaymentsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F7FB" },
-  content: { padding: 20, paddingBottom: 100 },
+  content: { padding: 20 },
   title: { fontSize: 28, fontWeight: "800", color: "#111827", marginBottom: 20 },
   summaryCard: {
     backgroundColor: "#2563EB",

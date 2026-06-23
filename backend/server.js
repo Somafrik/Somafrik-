@@ -15,6 +15,8 @@ const { PaginationService } = require("./services/paginationService");
 const { CacheService } = require("./services/cacheService");
 const { TenantScopeService } = require("./services/tenantScopeService");
 const { RoleGovernanceService } = require("./services/roleGovernanceService");
+const { PedagogyGovernanceService } = require("./services/pedagogyGovernanceService");
+const { UserTeacherSyncService } = require("./services/userTeacherSyncService");
 const { AuditService } = require("./services/auditService");
 
 const app = express();
@@ -25,6 +27,8 @@ const paginationService = new PaginationService();
 const cacheService = new CacheService();
 const tenantScopeService = new TenantScopeService();
 const roleGovernanceService = new RoleGovernanceService();
+const pedagogyGovernanceService = new PedagogyGovernanceService();
+const userTeacherSyncService = new UserTeacherSyncService();
 let auditService = new AuditService(repository);
 
 app.disable("x-powered-by");
@@ -505,6 +509,13 @@ app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
   const currentState = await getAuthoritativeBackOfficeState();
   const requestedState = sanitizeBackOfficeState(req.body ?? {});
   const nextState = mergeScopedBackOfficeState(currentState, requestedState, req.principal);
+  const courseValidationError = pedagogyGovernanceService.validateCoursesCollection(
+    nextState.courses ?? [],
+    nextState.assignments ?? [],
+  );
+  if (courseValidationError) {
+    throw new BusinessError(400, courseValidationError);
+  }
   const saved = await repository.saveBackOfficeState(nextState);
   await auditService.record(req, "sync_backoffice_state", "backoffice_state", "default", {
     schools: saved.schools?.length ?? 0,
@@ -1280,24 +1291,46 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
   const scopedCurrent = scopeBackOfficeState(current, principal);
   const scopedRequested = scopeBackOfficeState(requested, principal);
   const editableEntities = getEditableEntitiesForPrincipal(principal);
-  const deletedRows = mergeDeletedRows(
-    current.deletedRows,
-    detectDeletedRows(scopedCurrent, scopedRequested, editableEntities)
+  const deletedRows = pedagogyGovernanceService.filterSchoolAdminDeletedRows(
+    mergeDeletedRows(
+      current.deletedRows,
+      detectDeletedRows(scopedCurrent, scopedRequested, editableEntities),
+    ),
+    principal,
   );
+
+  const mergedTeachers = mergeScopedRows(current.teachers, scopedRequested.teachers, scopedCurrent.teachers);
+  const mergedUsers = mergeScopedRows(current.users, scopedRequested.users, scopedCurrent.users);
+  const syncedTeachers = userTeacherSyncService.syncTeachersFromUserAccounts({
+    ...current,
+    users: mergedUsers,
+    teachers: mergedTeachers,
+  });
 
   return applyDeletedRows({
     ...current,
     schools: mergeScopedRows(current.schools, scopedRequested.schools, scopedCurrent.schools),
-    users: mergeScopedRows(current.users, scopedRequested.users, scopedCurrent.users),
+    users: mergedUsers,
     countries: principal.role === "Admin Pays"
       ? mergeScopedRows(current.countries, scopedRequested.countries, scopedCurrent.countries)
       : current.countries,
     subscriptions: principal.role === "Admin School" ? current.subscriptions : mergeScopedRows(current.subscriptions, scopedRequested.subscriptions, scopedCurrent.subscriptions),
     notifications: current.notifications,
     students: mergeScopedRows(current.students, scopedRequested.students, scopedCurrent.students),
-    teachers: mergeScopedRows(current.teachers, scopedRequested.teachers, scopedCurrent.teachers),
+    teachers:
+      principal.role === "Admin School"
+        ? pedagogyGovernanceService.enforceSchoolAdminTeachers(
+            current.teachers,
+            syncedTeachers,
+            scopedCurrent.teachers,
+          )
+        : syncedTeachers,
     classes: mergeScopedRows(current.classes, scopedRequested.classes, scopedCurrent.classes),
-    courses: mergeScopedRows(current.courses, scopedRequested.courses, scopedCurrent.courses),
+    courses: pedagogyGovernanceService.enforceCourseTeacherUniqueness(
+      current.courses,
+      mergeScopedRows(current.courses, scopedRequested.courses, scopedCurrent.courses),
+      scopedCurrent.courses,
+    ),
     assignments: mergeScopedRows(current.assignments, scopedRequested.assignments, scopedCurrent.assignments),
     payments: mergeScopedRows(current.payments, scopedRequested.payments, scopedCurrent.payments),
     paymentStatuses: mergeScopedRows(current.paymentStatuses, scopedRequested.paymentStatuses, scopedCurrent.paymentStatuses),

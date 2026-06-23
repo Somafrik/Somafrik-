@@ -5,9 +5,8 @@ import { scopedSchools } from "../lib/scope";
 import { normalize } from "../lib/format";
 import {
   canManageRolePermissions,
-  hasBackOfficePermission,
 } from "../lib/permissions";
-import { usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
 import {
   COUNTRY_ADMIN_ROLE,
   isSchoolAwaitingSuperadminValidation,
@@ -46,9 +45,7 @@ export function SchoolsPage() {
   const allSchools = scopedSchools(session?.user ?? null, state);
   const canValidateSchool = canManageRolePermissions(ctx);
   const isCountryAdminView = session?.user?.role === COUNTRY_ADMIN_ROLE;
-  const canCreate = hasBackOfficePermission(ctx, "Établissements", "CREATE");
-  const canUpdate = hasBackOfficePermission(ctx, "Établissements", "UPDATE");
-  const canSuspend = hasBackOfficePermission(ctx, "Établissements", "SUSPEND");
+  const { canCreate, canUpdate, canSuspend } = useFeaturePermissions("Établissements");
 
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("");

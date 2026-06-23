@@ -2,6 +2,7 @@ import type { SessionUser } from "../types";
 import { CRUD_PERMISSION_MODULES, VIEW_PERMISSION_FEATURES } from "./constants";
 import { getInternalRoleDefaults } from "./internalRoleDefaults";
 import { isInternalSchoolRole, normalize, isSchoolAdminRole } from "./format";
+import { canSchoolAdminMutateTeachers } from "./pedagogyGovernance";
 import {
   isSuperAdminRole,
   SUPERADMIN_MANAGED_ROLES,
@@ -18,6 +19,7 @@ const SCHOOL_ADMIN_FORBIDDEN_FEATURES = new Set(["Établissements", "Abonnements
 
 /** Modules plateforme toujours accessibles au Super Admin (consultation + CRUD). */
 const SUPERADMIN_PLATFORM_FEATURES = new Set([
+  "Organisations",
   "Pays",
   "Établissements",
   "Abonnements",
@@ -30,6 +32,14 @@ const SUPERADMIN_PLATFORM_FEATURES = new Set([
 export interface PermissionContext {
   user: SessionUser | null;
   rolePermissions: Record<string, string[]>;
+}
+
+export interface FeaturePermissions {
+  canRead: boolean;
+  canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canSuspend: boolean;
 }
 
 /** Union des droits du compte et de la matrice Super Admin pour le rôle courant. */
@@ -50,10 +60,8 @@ export function getCurrentRolePermissions(ctx: PermissionContext): string[] {
 
 const COUNTRY_PRIVILEGE_FEATURES = new Set(["pays", "etablissements", "abonnements", "utilisateurs", "rapports"]);
 
-function countryPrivilegeAllows(normalizedFeature: string, action: string): boolean {
-  if (!COUNTRY_PRIVILEGE_FEATURES.has(normalizedFeature)) return false;
-  if (normalizedFeature === "pays") return action === "READ";
-  return true;
+function countryPrivilegeAllowsRead(normalizedFeature: string): boolean {
+  return COUNTRY_PRIVILEGE_FEATURES.has(normalizedFeature);
 }
 
 function permissionMatchesFeature(
@@ -62,7 +70,7 @@ function permissionMatchesFeature(
   action: string,
 ): boolean {
   if (normalizedPermission === "country-privileges") {
-    return countryPrivilegeAllows(normalizedFeature, action);
+    return action === "READ" && countryPrivilegeAllowsRead(normalizedFeature);
   }
   if (normalizedPermission === "all-privileges") {
     return true;
@@ -84,6 +92,7 @@ function permissionMatchesFeature(
       normalizedPermission.includes("faire") ||
       normalizedPermission.includes("organiser") ||
       normalizedPermission.includes("creer") ||
+      normalizedPermission.includes("ajouter") ||
       normalizedPermission.includes("modifier") ||
       normalizedPermission.includes("messages") ||
       normalizedPermission.includes("annonces") ||
@@ -93,13 +102,65 @@ function permissionMatchesFeature(
   return (
     normalizedPermission.includes(normalize(action)) ||
     normalizedPermission.includes("gerer") ||
-    normalizedPermission.includes("crud")
+    normalizedPermission.includes("crud") ||
+    (action === "CREATE" && normalizedPermission.includes("ajouter"))
   );
+}
+
+function hasGranularPermission(permissions: Set<string>, feature: string, action: string): boolean {
+  if (permissions.has(`${feature}:${action}`)) return true;
+  if (permissions.has(`${feature}:CRUD`)) return true;
+  if (action === "READ" && (permissions.has(`${feature}:READ`) || permissions.has(`${feature}:R`))) {
+    return true;
+  }
+  return false;
+}
+
+function hasLegacyPermission(permissions: Set<string>, feature: string, action: string): boolean {
+  const normalizedFeature = normalize(feature);
+  return [...permissions].some((permission) =>
+    permissionMatchesFeature(normalize(permission), normalizedFeature, action),
+  );
+}
+
+function hasPrivilegeBundlePermission(
+  permissions: Set<string>,
+  feature: string,
+  action: string,
+): boolean {
+  if (permissions.has("ALL_PRIVILEGES")) return true;
+  if (permissions.has("COUNTRY_PRIVILEGES") && action === "READ") {
+    return countryPrivilegeAllowsRead(normalize(feature));
+  }
+  return false;
+}
+
+function hasPermissionForFeature(
+  ctx: PermissionContext,
+  feature: string,
+  action: string,
+): boolean {
+  const permissions = new Set(getCurrentRolePermissions(ctx));
+
+  if (hasGranularPermission(permissions, feature, action)) return true;
+  if (hasLegacyPermission(permissions, feature, action)) return true;
+  if (hasPrivilegeBundlePermission(permissions, feature, action)) return true;
+  return false;
 }
 
 export function canManageRolePermissions(ctx: PermissionContext): boolean {
   if (isSuperAdminRole(ctx.user?.role)) return true;
   return getCurrentRolePermissions(ctx).includes("ALL_PRIVILEGES");
+}
+
+export function getFeaturePermissions(ctx: PermissionContext, feature: string): FeaturePermissions {
+  return {
+    canRead: hasBackOfficePermission(ctx, feature, "READ"),
+    canCreate: hasBackOfficePermission(ctx, feature, "CREATE"),
+    canUpdate: hasBackOfficePermission(ctx, feature, "UPDATE"),
+    canDelete: hasBackOfficePermission(ctx, feature, "DELETE"),
+    canSuspend: hasBackOfficePermission(ctx, feature, "SUSPEND"),
+  };
 }
 
 export function hasBackOfficePermission(
@@ -111,6 +172,14 @@ export function hasBackOfficePermission(
   const normalizedAction = action === "R" ? "READ" : action;
   const featureList = Array.isArray(features) ? features : [features];
 
+  if (
+    isSchoolAdminRole(ctx.user.role) &&
+    featureList.some((feature) => feature === "Enseignants") &&
+    !canSchoolAdminMutateTeachers(normalizedAction)
+  ) {
+    return false;
+  }
+
   if (isSuperAdminRole(ctx.user.role)) {
     if (
       featureList.some(
@@ -121,8 +190,6 @@ export function hasBackOfficePermission(
     }
   }
 
-  const permissions = new Set(getCurrentRolePermissions(ctx));
-
   if (
     isInternalSchoolRole(ctx.user.role) &&
     featureList.some((feature) => feature && SCHOOL_ADMIN_FORBIDDEN_FEATURES.has(feature))
@@ -130,39 +197,11 @@ export function hasBackOfficePermission(
     return false;
   }
 
-  if (permissions.has("ALL_PRIVILEGES")) return true;
-  if (permissions.has("COUNTRY_PRIVILEGES")) {
-    return featureList.some((feature) => {
-      if (!feature) return true;
-      return countryPrivilegeAllows(normalize(feature), normalizedAction);
-    });
-  }
   if (featureList.includes("Droits par rôle")) return canManageRolePermissions(ctx);
 
   return featureList.some((feature) => {
     if (!feature) return true;
-    if (permissions.has(`${feature}:${normalizedAction}`) || permissions.has(`${feature}:CRUD`)) {
-      return true;
-    }
-    if (normalizedAction === "READ" && (permissions.has(`${feature}:R`) || permissions.has(`${feature}:READ`))) {
-      return true;
-    }
-
-    if ((CRUD_PERMISSION_MODULES as readonly string[]).includes(feature)) {
-      return false;
-    }
-
-    const normalizedFeature = normalize(feature);
-    return [...permissions].some((permission) => {
-      const normalizedPermission = normalize(permission);
-      if (
-        normalizedPermission === "country-privileges" &&
-        ["etablissements", "abonnements", "utilisateurs", "rapports"].includes(normalizedFeature)
-      ) {
-        return true;
-      }
-      return permissionMatchesFeature(normalizedPermission, normalizedFeature, normalizedAction);
-    });
+    return hasPermissionForFeature(ctx, feature, normalizedAction);
   });
 }
 

@@ -5,10 +5,13 @@ import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { GradeBookService } from "../domain/academics/GradeBookService";
 import { useAdminData } from "../context/AdminDataContext";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentNotes">;
 
 export default function StudentNotesScreen({ route, navigation }: Partial<Props>) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const listContentStyle = [styles.listContent, { paddingBottom: scrollContentPaddingBottom }];
   const { selectedStudentId } = useAuth();
   const { studentsData, notesData, coursesData } = useAdminData();
   const studentId = selectedStudentId ?? route?.params?.studentId;
@@ -53,7 +56,7 @@ export default function StudentNotesScreen({ route, navigation }: Partial<Props>
       <FlatList
         data={studentNotes}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={listContentStyle}
         ListEmptyComponent={<Text style={styles.empty}>Aucune note enregistrée.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -136,9 +139,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 4,
   },
-  listContent: {
-    paddingBottom: 40,
-  },
+  listContent: {},
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,

@@ -6,10 +6,13 @@ import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { getPaymentStats } from "../domain/metrics/schoolMetrics";
 import { useAdminData } from "../context/AdminDataContext";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPayments">;
 
 export default function StudentPaymentsScreen({ route }: Partial<Props>) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const listContentStyle = [styles.listContent, { paddingBottom: scrollContentPaddingBottom }];
   const { selectedStudentId } = useAuth();
   const { paymentsData, studentsData } = useAdminData();
   const studentId = route?.params?.studentId ?? selectedStudentId;
@@ -50,7 +53,7 @@ export default function StudentPaymentsScreen({ route }: Partial<Props>) {
       <FlatList
         data={sortedPayments}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={listContentStyle}
         ListEmptyComponent={<Text style={styles.empty}>Aucun paiement enregistré.</Text>}
         renderItem={({ item }) => (
           <View style={styles.card}>
@@ -110,7 +113,7 @@ const styles = StyleSheet.create({
   balanceValue: { marginTop: 6, color: "#16A34A", fontWeight: "900", fontSize: 18 },
   pendingValue: { color: "#EA580C" },
   sectionTitle: { fontSize: 18, fontWeight: "900", color: "#0F172A", marginBottom: 12 },
-  listContent: { paddingBottom: 80 },
+  listContent: { paddingTop: 8 },
   card: {
     backgroundColor: "#fff",
     padding: 15,

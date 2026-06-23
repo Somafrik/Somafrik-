@@ -114,13 +114,15 @@ function permissionMatchesFeature(
       normalizedPermission.includes("faire") ||
       normalizedPermission.includes("organiser") ||
       normalizedPermission.includes("creer") ||
+      normalizedPermission.includes("ajouter") ||
       normalizedPermission.includes("modifier")
     );
   }
   return (
     normalizedPermission.includes(normalize(action)) ||
     normalizedPermission.includes("gerer") ||
-    normalizedPermission.includes("crud")
+    normalizedPermission.includes("crud") ||
+    (action === "CREATE" && normalizedPermission.includes("ajouter"))
   );
 }
 
@@ -221,6 +223,13 @@ export function canReadEntity(session: any, entity?: AdminEntity) {
 
 export function canMutateEntity(session: any, entity: AdminEntity, action: Exclude<SecurityAction, "READ">) {
   const feature = entityFeatureMap[entity];
+  if (
+    (session?.role === "school_admin" || session?.user?.role === "Admin School") &&
+    entity === "teachers" &&
+    action !== "CREATE"
+  ) {
+    return false;
+  }
   return Boolean(feature) && hasSecurityPermission(session, feature, action);
 }
 

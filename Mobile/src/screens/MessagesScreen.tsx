@@ -16,11 +16,14 @@ import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { MessagePriority, MessageService } from "../domain/communication/MessageService";
 import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 const messageService = new MessageService();
 const priorities: MessagePriority[] = ["Faible", "Moyenne", "Haute", "Critique"];
 
 export default function MessagesScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const contentStyle = [styles.content, { paddingBottom: scrollContentPaddingBottom }];
   const { session, selectedStudentId } = useAuth();
   const { createItem, updateItem, messagesData, studentsData, teachersData } = useAdminData();
   const [theme, setTheme] = useState(messageThemes[0]);
@@ -157,7 +160,7 @@ export default function MessagesScreen({ navigation }: any) {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={contentStyle} showsVerticalScrollIndicator={false}>
         {role === "parent_student" && <StudentSwitcher />}
 
         <View style={styles.header}>
@@ -554,7 +557,7 @@ function isReceivedMessage(message: any, role: string | undefined, session: any)
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 20, paddingBottom: 120 },
+  content: { padding: 20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",

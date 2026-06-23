@@ -5,6 +5,7 @@ import MenuCard from "../components/MenuCard";
 import { AdminEntity } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
 import { canReadEntity, canReadRoute } from "../domain/security/permissions";
+import { useStackScreenBottomPadding } from "../lib/screenLayout";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -14,6 +15,8 @@ type Props = NativeStackScreenProps<
 export default function SchoolManagementScreen({
   navigation,
 }: Props) {
+  const stackPaddingBottom = useStackScreenBottomPadding();
+  const containerStyle = [styles.container, { paddingBottom: stackPaddingBottom }];
   const { session } = useAuth();
   const isSchoolAdmin = session?.role === "school_admin";
   const items = [
@@ -34,7 +37,7 @@ export default function SchoolManagementScreen({
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={containerStyle}>
       <Text style={styles.title}>Gestion de l'école</Text>
 
       {visibleItems.map((item) => (

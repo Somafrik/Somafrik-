@@ -4,10 +4,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { getTeacherById, timetable } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
+import { useStackScreenBottomPadding } from "../lib/screenLayout";
 
 const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
 
 export default function TimetableScreen() {
+  const stackPaddingBottom = useStackScreenBottomPadding();
+  const contentStyle = [styles.content, { paddingBottom: stackPaddingBottom }];
   const { session, selectedStudentId } = useAuth();
   const { studentsData } = useAdminData();
   const rows = useMemo(() => {
@@ -25,7 +28,7 @@ export default function TimetableScreen() {
   }, [selectedStudentId, session, studentsData]);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>Emploi du temps</Text>
       <Text style={styles.subtitle}>{rows.length} créneau(x) planifié(s)</Text>
 
@@ -64,7 +67,7 @@ export default function TimetableScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 20, paddingBottom: 120 },
+  content: { padding: 20 },
   title: { color: "#0F172A", fontSize: 28, fontWeight: "900" },
   subtitle: { color: "#64748B", fontWeight: "800", marginTop: 4, marginBottom: 18 },
   dayBlock: { marginBottom: 18 },

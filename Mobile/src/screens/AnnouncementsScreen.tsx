@@ -3,8 +3,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAdminData } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
 import { canMutateEntity, canReadEntity } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 export default function AnnouncementsScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const contentStyle = [styles.content, { paddingBottom: scrollContentPaddingBottom }];
   const { session } = useAuth();
   const { announcementsData, deleteItem } = useAdminData();
   const canRead = canReadEntity(session, "announcements");
@@ -29,7 +32,7 @@ export default function AnnouncementsScreen({ navigation }: any) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>Annonces</Text>
       <Text style={styles.subtitle}>Communications envoyées aux familles</Text>
 
@@ -106,7 +109,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 120,
   },
   title: {
     fontSize: 32,

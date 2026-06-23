@@ -20,8 +20,12 @@ import StudentSwitcher from "../components/StudentSwitcher";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats, getPresenceStats, getStudentAcademicSummary } from "../domain/metrics/schoolMetrics";
 import { canReadEntity, canReadRoute } from "../domain/security/permissions";
+import { buildOverflowQuickActionItems } from "../navigation/roleTabPreferences";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 export default function HomeScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const scrollContentStyle = [styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }];
   const { session, selectedStudentId } = useAuth();
   const { studentsData, paymentsData, presencesData, announcementsData, messagesData, schoolsData, usersData } = useAdminData();
   const currentSchool =
@@ -66,7 +70,7 @@ export default function HomeScreen({ navigation }: any) {
       <View style={styles.screen}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={scrollContentStyle}
         >
           <TouchableOpacity
             activeOpacity={0.85}
@@ -190,6 +194,12 @@ export default function HomeScreen({ navigation }: any) {
                 onPress={() => navigation.navigate("Messages")}
               />
             )}
+            <OverflowQuickActionsGrid
+              session={session}
+              navigation={navigation}
+              unreadMessages={unreadMessages}
+              excludeTabNames={["Classes", "TeacherStudents", "TeacherAttendance", "TeacherGrades"]}
+            />
           </View>
         </ScrollView>
       </View>
@@ -210,7 +220,7 @@ export default function HomeScreen({ navigation }: any) {
       <View style={styles.screen}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={scrollContentStyle}
         >
           <StudentSwitcher />
 
@@ -367,7 +377,7 @@ export default function HomeScreen({ navigation }: any) {
 
     return (
       <View style={styles.screen}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={scrollContentStyle}>
           <TouchableOpacity activeOpacity={0.85} style={styles.schoolCard} onPress={() => navigation.navigate("Classes")}>
             <View style={styles.schoolIconBox}>
               <Ionicons name={isSecretary ? "briefcase-outline" : "analytics-outline"} size={28} color="#2563EB" />
@@ -433,6 +443,12 @@ export default function HomeScreen({ navigation }: any) {
             {canReadEntity(session, "payments") && <QuickAction icon="card-outline" label="Paiements" onPress={() => navigation.navigate("Payments")} />}
             {canReadRoute(session, "Messages") && <QuickAction icon="chatbubbles-outline" label={unreadMessages > 0 ? `Messages (${unreadMessages})` : "Messages"} onPress={() => navigation.navigate("Messages")} />}
             {canReadRoute(session, "Announcements") && <QuickAction icon="megaphone-outline" label="Annonces" onPress={() => navigation.navigate("Announcements")} />}
+            <OverflowQuickActionsGrid
+              session={session}
+              navigation={navigation}
+              unreadMessages={unreadMessages}
+              excludeTabNames={["TeacherStudents", "TeacherAttendance", "TeacherGrades", "Paiements", "Messages"]}
+            />
           </View>
         </ScrollView>
       </View>
@@ -443,7 +459,7 @@ export default function HomeScreen({ navigation }: any) {
     <View style={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={scrollContentStyle}
       >
         {/* Header Somafrik
         <View style={styles.topHeader}>
@@ -696,6 +712,7 @@ export default function HomeScreen({ navigation }: any) {
               onPress={() => navigation.navigate("ReportCards")}
             />
           )}
+          <OverflowQuickActionsGrid session={session} navigation={navigation} unreadMessages={unreadMessages} />
         </View>
       </ScrollView>
     </View>
@@ -874,6 +891,33 @@ type QuickActionProps = {
   onPress: () => void;
 };
 
+type OverflowQuickActionsGridProps = {
+  session: any;
+  navigation: any;
+  unreadMessages?: number;
+  excludeTabNames?: string[];
+};
+
+function OverflowQuickActionsGrid({
+  session,
+  navigation,
+  unreadMessages = 0,
+  excludeTabNames = [],
+}: OverflowQuickActionsGridProps) {
+  const items = buildOverflowQuickActionItems(session, unreadMessages).filter(
+    (item) => !excludeTabNames.includes(item.tabName),
+  );
+
+  return items.map((item) => (
+    <QuickAction
+      key={item.tabName}
+      icon={item.icon}
+      label={item.label}
+      onPress={() => navigation.navigate(item.tabName)}
+    />
+  ));
+}
+
 function QuickAction({ icon, label, onPress }: QuickActionProps) {
   return (
     <TouchableOpacity activeOpacity={0.85} style={styles.quickAction} onPress={onPress}>
@@ -895,7 +939,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 48,
     paddingHorizontal: 20,
-    paddingBottom: 120,
   },
 
   topHeader: {

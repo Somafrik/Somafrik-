@@ -12,8 +12,11 @@ import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats, getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
 import { canMutateEntity, canReadRoute } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 export default function StudentsScreen({ route, navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const scrollContentStyle = [styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }];
   const { session } = useAuth();
   const { studentsData, paymentsData, presencesData } = useAdminData();
   const className = route?.params?.className ?? "Toutes les classes";
@@ -63,7 +66,7 @@ export default function StudentsScreen({ route, navigation }: any) {
     <View style={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={scrollContentStyle}
       >
         <View style={styles.header}>
           <TouchableOpacity
@@ -216,7 +219,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 42,
     paddingHorizontal: 14,
-    paddingBottom: 120,
   },
 
   header: {

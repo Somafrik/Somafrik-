@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../context/AdminDataContext";
 import { getPaymentStats, getPresenceStats } from "../domain/metrics/schoolMetrics";
 import { canReadRoute } from "../domain/security/permissions";
+import { useStackScreenBottomPadding } from "../lib/screenLayout";
 
 function ScreenShell({
   title,
@@ -14,8 +15,11 @@ function ScreenShell({
   subtitle: string;
   children: React.ReactNode;
 }) {
+  const stackPaddingBottom = useStackScreenBottomPadding();
+  const contentStyle = [styles.content, { paddingBottom: stackPaddingBottom }];
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.screen} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
       {children}
@@ -294,7 +298,7 @@ function labelForSync(status: "idle" | "syncing" | "synced" | "offline") {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F4F7FB" },
-  content: { padding: 20, paddingBottom: 110 },
+  content: { padding: 20 },
   title: { fontSize: 28, fontWeight: "900", color: "#0F172A" },
   subtitle: { marginTop: 8, marginBottom: 18, color: "#64748B", fontWeight: "700", lineHeight: 21 },
   card: {

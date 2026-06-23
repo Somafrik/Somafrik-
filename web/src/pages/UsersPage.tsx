@@ -4,8 +4,8 @@ import { useData } from "../context/DataContext";
 import { scopedCountries, scopedSchools, scopedUsers } from "../lib/scope";
 import { getCurrentSchool } from "../lib/establishment";
 import { isInternalSchoolRole, normalize, getInitials, resolveCountryScopeFromSchool } from "../lib/format";
-import { canManageRolePermissions, hasBackOfficePermission } from "../lib/permissions";
-import { usePermissionContext } from "../lib/usePermissionContext";
+import { canManageRolePermissions } from "../lib/permissions";
+import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
 import {
   applyRoleChangeToUser,
   buildNewUserDraft,
@@ -15,6 +15,7 @@ import {
   getUserFormFieldPolicy,
   validateUserAccount,
 } from "../lib/userAccounts";
+import { applyUserTeacherSync, isTeacherUserRole, syncSingleUserToTeachers } from "../lib/userTeacherSync";
 import {
   COUNTRY_ADMIN_ROLE,
   isPendingValidationStatus,
@@ -61,9 +62,7 @@ export function UsersPage() {
   const isCountryAdminView = session?.user?.role === COUNTRY_ADMIN_ROLE;
   const school = getCurrentSchool(session?.user ?? null, state);
   const schoolCode = session?.user?.schoolCode;
-  const canCreate = hasBackOfficePermission(ctx, "Utilisateurs", "CREATE");
-  const canUpdate = hasBackOfficePermission(ctx, "Utilisateurs", "UPDATE");
-  const canSuspend = hasBackOfficePermission(ctx, "Utilisateurs", "SUSPEND");
+  const { canCreate, canUpdate, canSuspend } = useFeaturePermissions("Utilisateurs");
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -112,10 +111,14 @@ export function UsersPage() {
     });
   }, [allUsers, search, roleFilter]);
 
-  async function persistUsers(next: UserAccount[], message: string) {
+  async function persistUsers(next: UserAccount[], message: string, syncedUser?: UserAccount) {
     setBusy(true);
     try {
-      await update({ users: next });
+      const baseState = { ...state, users: next };
+      const teacherPatch = syncedUser
+        ? syncSingleUserToTeachers(baseState, syncedUser)
+        : applyUserTeacherSync(baseState);
+      await update({ users: next, teachers: teacherPatch.teachers });
       showToast(message, "success");
     } catch {
       showToast("Échec de la synchronisation", "error");
@@ -185,6 +188,7 @@ export function UsersPage() {
     const error = validateUserAccount(editing, state.users, creatableRoles, {
       creator: session.user,
       allowedSchoolCodes,
+      teachers: state.teachers,
     });
     if (error) {
       showToast(error, "error");
@@ -214,7 +218,10 @@ export function UsersPage() {
         ];
 
     try {
-      await persistUsers(next, exists ? "Utilisateur modifié" : "Utilisateur créé");
+      const savedUser = exists
+        ? (next.find((u) => u.id === editing.id) ?? payload)
+        : (next[0] ?? payload);
+      await persistUsers(next, exists ? "Utilisateur modifié" : "Utilisateur créé", savedUser);
       if (!exists && payload.temporaryPassword) {
         showToast(`Mot de passe temporaire : ${payload.temporaryPassword}`, "success");
       }

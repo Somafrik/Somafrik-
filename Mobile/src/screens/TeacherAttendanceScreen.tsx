@@ -6,6 +6,7 @@ import { useAdminData } from "../context/AdminDataContext";
 import { getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
 import { canReadRoute, hasSecurityPermission } from "../domain/security/permissions";
 import { savePresences } from "../services/api";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 type AttendanceStatus = "Présent" | "Absent" | "Retard" | "Justifié";
 
@@ -29,6 +30,8 @@ type SavedCall = {
 };
 
 export default function TeacherAttendanceScreen({ navigation }: any) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const contentStyle = [styles.content, { paddingBottom: scrollContentPaddingBottom }];
   const { session } = useAuth();
   const { studentsData, classesData, presencesData, upsertPresenceItems } = useAdminData();
   const assignedClasses =
@@ -195,7 +198,7 @@ export default function TeacherAttendanceScreen({ navigation }: any) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={contentStyle}>
       <Text style={styles.title}>Présences</Text>
       <Text style={styles.subtitle}>
         {selectedClass ? `Appel de ${selectedClass}` : "Sélectionnez une classe"} • {todayLabel} à {currentHour}
@@ -437,7 +440,7 @@ function getStatusStyle(status: AttendanceStatus) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
-  content: { padding: 20, paddingBottom: 120 },
+  content: { padding: 20 },
   title: { fontSize: 32, fontWeight: "900", color: "#0F172A" },
   subtitle: { marginTop: 6, marginBottom: 16, color: "#64748B", fontWeight: "700" },
   sectionTitle: { color: "#0F172A", fontSize: 20, fontWeight: "900", marginBottom: 12 },

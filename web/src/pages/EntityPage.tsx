@@ -8,8 +8,7 @@ import { Table, type Column } from "../components/ui/Table";
 import { Modal } from "../components/ui/Modal";
 import { Field, Input, Select } from "../components/ui/Field";
 import { useToast } from "../components/ui/Toast";
-import { hasBackOfficePermission } from "../lib/permissions";
-import { usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions } from "../lib/usePermissionContext";
 import {
   applySchoolScopeToItem,
   deleteScopedEntityRow,
@@ -24,6 +23,7 @@ import {
   prepareAssignmentForSave,
   validateAssignmentConflict,
 } from "../lib/assignments";
+import { validateCourseTeacherRule } from "../lib/pedagogyGovernance";
 import {
   getCurrentSchool,
   scopedClasses,
@@ -35,6 +35,8 @@ import {
   syncAssignmentPedagogy,
   syncCoursePedagogy,
   syncTeacherPedagogy,
+  getTeacherDisplayName,
+  findTeacherByName,
 } from "../lib/pedagogySync";
 import type { BackOfficeState, SessionUser } from "../types";
 import { getSchoolAcademicLists, getSubjectsForClass, mergeSelectOptions } from "../lib/academicConfig";
@@ -92,17 +94,13 @@ export function EntityPage({ entity }: EntityPageProps) {
   const module = getEntityModule(entity);
   const { session } = useAuth();
   const { state, update } = useData();
-  const ctx = usePermissionContext();
   const { showToast } = useToast();
 
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const canRead = module ? hasBackOfficePermission(ctx, module.feature, "READ") : false;
-  const canCreate = module ? hasBackOfficePermission(ctx, module.feature, "CREATE") : false;
-  const canUpdate = module ? hasBackOfficePermission(ctx, module.feature, "UPDATE") : false;
-  const canDelete = module ? hasBackOfficePermission(ctx, module.feature, "DELETE") : false;
+  const { canRead, canCreate, canUpdate, canDelete } = useFeaturePermissions(module?.feature ?? "Élèves");
   const schoolCode = session?.user?.schoolCode;
   const academicLists = useMemo(
     () => getSchoolAcademicLists(state, schoolCode),
@@ -170,7 +168,14 @@ export function EntityPage({ entity }: EntityPageProps) {
       return academicLists.subjects.map((option) => ({ value: option, label: option }));
     }
     if (field.optionsKey === "teachers") {
-      return assignmentOptions?.teachers ?? [];
+      const teacherOptions =
+        module?.key === "courses"
+          ? scopedTeachers(session?.user ?? null, state).map((teacher) => ({
+              value: getTeacherDisplayName(teacher),
+              label: getTeacherDisplayName(teacher),
+            }))
+          : (assignmentOptions?.teachers ?? []);
+      return teacherOptions;
     }
     if (field.optionsKey === "classes") {
       return assignmentOptions?.classes ?? [];
@@ -286,6 +291,27 @@ export function EntityPage({ entity }: EntityPageProps) {
       return;
     }
 
+    if (module.key === "courses") {
+      const teachers = scopedTeachers(session?.user ?? null, state);
+      const teacherName = String(workingItem.teacherName ?? "").trim();
+      const teacher = findTeacherByName(teachers, teacherName);
+      workingItem = {
+        ...workingItem,
+        teacherName: teacher ? getTeacherDisplayName(teacher) : teacherName,
+        teacherId: String(teacher?.id ?? workingItem.teacherId ?? ""),
+      };
+      const courseConflict = validateCourseTeacherRule(
+        workingItem,
+        getScopedEntityRows("courses", session?.user ?? null, state),
+        getScopedEntityRows("assignments", session?.user ?? null, state),
+        editing.id ? String(editing.id) : undefined,
+      );
+      if (courseConflict) {
+        showToast(courseConflict, "error");
+        return;
+      }
+    }
+
     if (module.key === "assignments") {
       const teachers = scopedTeachers(session?.user ?? null, state);
       workingItem = prepareAssignmentForSave(workingItem, teachers, schoolCode);
@@ -322,6 +348,21 @@ export function EntityPage({ entity }: EntityPageProps) {
     const linkedItem = linkStudentFromName(module.key, scopedItem, session?.user ?? null, state);
     const current = getScopedEntityRows(module.key, session?.user ?? null, state);
     const exists = Boolean(linkedItem.id) && current.some((row) => row.id === linkedItem.id);
+
+    if (exists && !canUpdate) {
+      showToast(
+        module.key === "teachers"
+          ? "Modification des enseignants réservée au préfet des études ou à un rôle habilité."
+          : "Modification non autorisée pour votre rôle.",
+        "error",
+      );
+      return;
+    }
+
+    if (!exists && !canCreate) {
+      showToast("Création non autorisée pour votre rôle.", "error");
+      return;
+    }
 
     let preparedItem = { ...linkedItem };
 
@@ -469,7 +510,7 @@ export function EntityPage({ entity }: EntityPageProps) {
                     return;
                   }
                   if (module.key === "courses") {
-                    setEditing({ className: "", name: "" });
+                    setEditing({ className: "", name: "", teacherName: "" });
                     return;
                   }
                   if (module.key === "teachers") {
@@ -520,7 +561,11 @@ export function EntityPage({ entity }: EntityPageProps) {
             <Button variant="secondary" onClick={() => setEditing(null)}>
               Annuler
             </Button>
-            <Button form={`entity-form-${entity}`} type="submit" disabled={busy || (!canCreate && !canUpdate)}>
+            <Button
+              form={`entity-form-${entity}`}
+              type="submit"
+              disabled={busy || (editing?.id ? !canUpdate : !canCreate)}
+            >
               Enregistrer
             </Button>
           </>

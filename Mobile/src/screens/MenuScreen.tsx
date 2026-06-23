@@ -1,10 +1,11 @@
 import React from "react";
-import { Alert, View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Alert, ScrollView, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
 import { canReadEntity, canReadRoute } from "../domain/security/permissions";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 type MenuItem = {
   label: string;
@@ -84,6 +85,7 @@ export default function MenuScreen() {
   const navigation = useNavigation<any>();
   const { session, logout } = useAuth();
   const { messagesData, studentsData } = useAdminData();
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
   const isParentStudent = session?.role === "parent_student";
   const isStudent = session?.role === "student";
   const isTeacher = session?.role === "teacher";
@@ -105,7 +107,11 @@ export default function MenuScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }]}
+      showsVerticalScrollIndicator={false}
+    >
       <Text style={styles.title}>Menu</Text>
       <Text style={styles.userName}>{session?.user.name ?? "Utilisateur"}</Text>
 
@@ -159,7 +165,7 @@ export default function MenuScreen() {
       <TouchableOpacity style={styles.logout} onPress={handleLogout}>
         <Text style={styles.logoutText}>Déconnexion</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -202,7 +208,8 @@ function getUnreadMessagesCount(session: any, messagesData: any[], studentsData:
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F7FB", padding: 20 },
+  container: { flex: 1, backgroundColor: "#F4F7FB" },
+  scrollContent: { flexGrow: 1, padding: 20 },
   title: { fontSize: 28, fontWeight: "800", marginBottom: 24, color: "#111827" },
   userName: {
     marginTop: -16,

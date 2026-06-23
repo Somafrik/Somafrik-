@@ -6,10 +6,13 @@ import { useAuth } from "../context/AuthContext";
 import StudentSwitcher from "../components/StudentSwitcher";
 import { getPresenceStats, normalizePresenceStatus } from "../domain/metrics/schoolMetrics";
 import { useAdminData } from "../context/AdminDataContext";
+import { useFloatingTabBarLayout } from "../lib/screenLayout";
 
 type Props = NativeStackScreenProps<RootStackParamList, "StudentPresences">;
 
 export default function StudentPresencesScreen({ route, navigation }: Partial<Props>) {
+  const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
+  const listContentStyle = { paddingBottom: scrollContentPaddingBottom };
   const { selectedStudentId } = useAuth();
   const { presencesData } = useAdminData();
   const studentId = selectedStudentId ?? route?.params?.studentId;
@@ -41,6 +44,7 @@ export default function StudentPresencesScreen({ route, navigation }: Partial<Pr
       <FlatList
         data={presencesEleve}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={listContentStyle}
         ListEmptyComponent={<Text style={styles.empty}>Aucune présence enregistrée.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity

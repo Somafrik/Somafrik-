@@ -99,7 +99,8 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
     label: "Enseignants",
     feature: "Enseignants",
     group: "utilisateurs",
-    description: "Équipe pédagogique et affectations.",
+    description:
+      "Équipe pédagogique. L'admin établissement peut uniquement ajouter un enseignant (pas de modification ni suppression).",
     fields: [
       { key: "name", label: "Nom complet", placeholder: "Nom de l'enseignant", required: true },
       { key: "firstName", label: "Prénom", placeholder: "Prénom", required: true },
@@ -177,7 +178,8 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
     label: "Matières",
     feature: "Matières",
     group: "pedagogie",
-    description: "Cours et matières enseignées.",
+    description:
+      "Cours et matières enseignées. Chaque matière dans une classe est affectée à un seul enseignant.",
     fields: [
       {
         key: "className",
@@ -192,8 +194,16 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
         placeholder: "Choisir une matière",
         inputType: "select",
         optionsKey: "subjects",
+        required: true,
       },
-      { key: "teacherName", label: "Enseignant", placeholder: "Nom enseignant" },
+      {
+        key: "teacherName",
+        label: "Enseignant",
+        placeholder: "Choisir un enseignant",
+        inputType: "select",
+        optionsKey: "teachers",
+        required: true,
+      },
     ],
     columns: ["name", "className", "teacherName"],
   },

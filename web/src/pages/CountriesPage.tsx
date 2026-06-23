@@ -8,8 +8,7 @@ import {
   normalize,
   schoolMatchesCountryScope,
 } from "../lib/format";
-import { hasBackOfficePermission } from "../lib/permissions";
-import { usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions } from "../lib/usePermissionContext";
 import { Card, SectionHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { StatusBadge } from "../components/ui/Badge";
@@ -79,10 +78,7 @@ export function CountriesPage() {
   const [originalCode, setOriginalCode] = useState("");
 
   const rows = scopedCountries(session?.user ?? null, state);
-  const canCreate = hasBackOfficePermission(ctx, "Pays", "CREATE");
-  const canUpdate = hasBackOfficePermission(ctx, "Pays", "UPDATE");
-  const canDelete = hasBackOfficePermission(ctx, "Pays", "DELETE");
-  const canSuspend = hasBackOfficePermission(ctx, "Pays", "SUSPEND");
+  const { canCreate, canUpdate, canDelete, canSuspend } = useFeaturePermissions("Pays");
 
   async function persistCountries(next: Country[], message: string) {
     setBusy(true);

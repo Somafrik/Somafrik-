@@ -12,6 +12,7 @@
       "backgroundColor": "#FFFFFF"
     },
     "plugins": [
+      "expo-font",
       [
         "expo-image-picker",
         {

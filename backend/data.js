@@ -69,7 +69,7 @@ const rolePermissions = {
     "Voir élèves",
     "Gérer élèves",
     "Voir enseignants",
-    "Gérer enseignants",
+    "Ajouter enseignants",
     "Voir classes",
     "Gérer classes",
     "Gérer cours",
@@ -176,7 +176,7 @@ const securityMatrix = {
   Enseignants: {
     "Super Administrateur Somafrik": "CRUD",
     "Admin Pays": "-",
-    "Admin School": "CRUD",
+    "Admin School": "R",
     "Préfet des études": "R",
     Enseignant: "-",
     Secrétaire: "R",
@@ -332,6 +332,11 @@ for (const role of Object.keys(rolePermissions)) {
 rolePermissions["Super Administrateur Somafrik"] = [
   ...new Set(Object.values(rolePermissions).flat()),
 ];
+
+const { PedagogyGovernanceService } = require("./services/pedagogyGovernanceService");
+const pedagogyGovernance = new PedagogyGovernanceService();
+const sanitizedSchoolPermissions = pedagogyGovernance.sanitizeSchoolAdminRolePermissions(rolePermissions);
+rolePermissions["Admin School"] = sanitizedSchoolPermissions["Admin School"];
 
 const countries = [
   {

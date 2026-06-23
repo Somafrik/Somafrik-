@@ -31,7 +31,7 @@ import { isPlatformBackOfficeRole } from "../lib/orgHierarchy";
 import { CONFIGURATION_USER_ACCOUNTS, CONFIGURATION_USER_MODULES } from "../lib/entityModules";
 import { scopedUsers } from "../lib/scope";
 import { hasBackOfficePermission } from "../lib/permissions";
-import { usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
 import { isInternalSchoolRole, isSchoolAdminRole, formatMetric, displayRoleName } from "../lib/format";
 import {
   applyRoleRenames,
@@ -79,7 +79,8 @@ export function ConfigurationPage() {
   const school = getCurrentSchool(user, state);
   const users = scopedUsers(user, state);
   const metrics = getEstablishmentMetrics(user, state, users);
-  const canConfigure = hasBackOfficePermission(ctx, "Paramètres Établissement", "UPDATE");
+  const settingsPermissions = useFeaturePermissions("Paramètres Établissement");
+  const canConfigure = settingsPermissions.canUpdate;
   const showRolePilotage = isSchoolAdminRole(user?.role);
   const configuredUserRoles = useMemo(
     () => getSchoolPilotageRoles(state, schoolCode).filter((role) => !isPlatformBackOfficeRole(role)),

@@ -53,6 +53,10 @@ export function resolveApiRootUrl(): string {
   let configured = fromExtra || fromEnv;
 
   if (configured) {
+    // APK release : pas de Metro → conserver l'URL injectée au build (ex. IP LAN).
+    if (!Constants.expoGoConfig && !isLocalhostUrl(configured)) {
+      return configured;
+    }
     return rewriteLocalhostForDevice(configured);
   }
 
