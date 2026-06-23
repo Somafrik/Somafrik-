@@ -517,6 +517,7 @@ app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
     throw new BusinessError(400, courseValidationError);
   }
   const saved = await repository.saveBackOfficeState(nextState);
+  await auditCriticalStateChanges(req, currentState, saved);
   await auditService.record(req, "sync_backoffice_state", "backoffice_state", "default", {
     schools: saved.schools?.length ?? 0,
     users: saved.users?.length ?? 0,
@@ -1405,6 +1406,62 @@ function isPlatformBackOfficeRole(role) {
 
 function isSchoolRolePermissionAllowed(permission) {
   return roleGovernanceService.isSchoolRolePermissionAllowed(permission);
+}
+
+const CRITICAL_AUDIT_COLLECTIONS = [
+  { key: "users", entityType: "user", label: (row) => `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim() || row.identifier },
+  { key: "payments", entityType: "payment", label: (row) => row.publicId ?? row.id },
+  { key: "bulletins", entityType: "bulletin", label: (row) => row.studentName ?? row.id },
+  { key: "rolePermissions", entityType: "role_permissions", label: (row) => row.role ?? row.id },
+];
+
+async function auditCriticalStateChanges(req, beforeState = {}, afterState = {}) {
+  for (const collection of CRITICAL_AUDIT_COLLECTIONS) {
+    if (collection.key === "rolePermissions") {
+      const beforeRoles = beforeState.rolePermissions ?? {};
+      const afterRoles = afterState.rolePermissions ?? {};
+      for (const role of new Set([...Object.keys(beforeRoles), ...Object.keys(afterRoles)])) {
+        const beforePermissions = JSON.stringify(beforeRoles[role] ?? []);
+        const afterPermissions = JSON.stringify(afterRoles[role] ?? []);
+        if (beforePermissions !== afterPermissions) {
+          await auditService.record(req, "update_role_permissions", "role_permissions", role, {
+            role,
+            permissions: afterRoles[role] ?? [],
+          });
+        }
+      }
+      continue;
+    }
+
+    const beforeRows = Array.isArray(beforeState[collection.key]) ? beforeState[collection.key] : [];
+    const afterRows = Array.isArray(afterState[collection.key]) ? afterState[collection.key] : [];
+    const beforeMap = new Map(beforeRows.map((row) => [rowKey(row), row]));
+    const afterMap = new Map(afterRows.map((row) => [rowKey(row), row]));
+
+    for (const [key, row] of afterMap.entries()) {
+      if (!beforeMap.has(key)) {
+        await auditService.record(req, `create_${collection.entityType}`, collection.entityType, key, {
+          label: collection.label(row),
+          snapshot: row,
+        });
+      } else if (JSON.stringify(beforeMap.get(key)) !== JSON.stringify(row)) {
+        await auditService.record(req, `update_${collection.entityType}`, collection.entityType, key, {
+          label: collection.label(row),
+          before: beforeMap.get(key),
+          after: row,
+        });
+      }
+    }
+
+    for (const [key, row] of beforeMap.entries()) {
+      if (!afterMap.has(key)) {
+        await auditService.record(req, `delete_${collection.entityType}`, collection.entityType, key, {
+          label: collection.label(row),
+          snapshot: row,
+        });
+      }
+    }
+  }
 }
 
 function rowKey(row = {}) {

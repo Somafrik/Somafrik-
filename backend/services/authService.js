@@ -14,7 +14,28 @@ const managedMobileRoles = {
   Directeur: { role: "principal", roleLabel: "Proviseur" },
   "Préfet des études": { role: "prefet", roleLabel: "Préfet des études" },
   Secrétaire: { role: "secretary", roleLabel: "Secrétaire" },
+  Enseignant: { role: "teacher", roleLabel: "Enseignant" },
+  Parent: { role: "parent_student", roleLabel: "Parent" },
+  "Élève / Étudiant": { role: "student", roleLabel: "Élève" },
 };
+
+function normalizeText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isTeacherRole(role) {
+  const key = normalizeText(role);
+  return key === "enseignant" || key.includes("prof");
+}
+
+function isStudentRole(role) {
+  const key = normalizeText(role);
+  return key.includes("eleve") || key.includes("etudiant");
+}
 
 class BusinessError extends Error {
   constructor(statusCode, message) {
@@ -37,33 +58,25 @@ class AuthService {
     this.assertRequiredFields({ schoolCode, identifier }, "Champs manquants");
     this.assertSchoolCanConnect(schoolCode);
 
-    const accountIdentifier = new AccountIdentifier(schoolCode, identifier);
     const managedUser = this.findManagedUser(identifier, schoolCode);
+    if (!managedUser) {
+      throw new BusinessError(
+        404,
+        "Aucun compte utilisateur trouvé. Contactez l'administration de l'établissement."
+      );
+    }
 
     this.assertManagedUserCanUseMobile(managedUser);
 
     const managedMobileRole = this.getManagedMobileRole(managedUser);
-    if (managedMobileRole) {
-      return managedMobileRole;
+    if (!managedMobileRole) {
+      throw new BusinessError(
+        403,
+        "Ce compte utilisateur n'est pas autorisé sur l'application mobile."
+      );
     }
 
-    if (accountIdentifier.isAdmin()) {
-      return { role: "school_admin", roleLabel: "Admin Établissement" };
-    }
-
-    if (this.findTeacher(accountIdentifier)) {
-      return { role: "teacher", roleLabel: "Enseignant" };
-    }
-
-    if (this.findStudent(accountIdentifier)) {
-      return { role: "student", roleLabel: "Élève" };
-    }
-
-    if (this.findParentStudents(accountIdentifier).length > 0) {
-      return { role: "parent_student", roleLabel: "Parent" };
-    }
-
-    throw new BusinessError(404, "Aucun compte trouve pour cet identifiant");
+    return managedMobileRole;
   }
 
   login({ role, schoolCode, identifier, pin }) {
@@ -73,122 +86,92 @@ class AuthService {
     const loginKey = this.getLoginAttemptKey(schoolCode, identifier);
     this.assertLoginNotLocked(loginKey);
 
-    const accountIdentifier = new AccountIdentifier(schoolCode, identifier);
     const managedUser = this.findManagedUser(identifier, schoolCode);
+    if (!managedUser) {
+      this.recordFailedLoginAttempt(loginKey);
+      throw new BusinessError(
+        401,
+        "Compte utilisateur requis. Contactez l'administration de l'établissement."
+      );
+    }
 
     this.assertManagedUserCanUseMobile(managedUser);
 
     const managedMobileRole = this.getManagedMobileRole(managedUser);
-    if (managedMobileRole?.role === role && this.verifyUserSecret(managedUser, pin)) {
-      this.clearFailedLoginAttempts(loginKey);
-      return {
-        role,
-        user: this.buildManagedMobileUser(managedUser),
-        school: schoolContext,
-      };
+    if (!managedMobileRole || managedMobileRole.role !== role) {
+      this.recordFailedLoginAttempt(loginKey);
+      throw new BusinessError(401, "Identifiants incorrects");
     }
 
-    if (role === "teacher") {
-      const teacher = this.findTeacher(accountIdentifier, pin);
-
-      if (teacher) {
-        const assignedClasses = [...new Set(teacher.assignments.map((item) => item.className))];
-        const courses = [...new Set(teacher.assignments.map((item) => item.course))];
-        const { password: _password, passwordHash: _passwordHash, pinHash: _pinHash, ...safeTeacher } = teacher;
-
-        this.clearFailedLoginAttempts(loginKey);
-        return {
-          role,
-          user: {
-            ...safeTeacher,
-            assignedClasses,
-            courses,
-          },
-          school: schoolContext,
-        };
-      }
+    if (!this.verifyUserSecret(managedUser, pin)) {
+      this.recordFailedLoginAttempt(loginKey);
+      throw new BusinessError(401, "Identifiants incorrects");
     }
 
-    if (role === "student") {
-      const student = this.findStudent(accountIdentifier, pin);
-
-      if (student) {
-        const { pin: _pin, pinHash: _pinHash, ...safeStudent } = student;
-        this.clearFailedLoginAttempts(loginKey);
-        return { role, user: safeStudent, school: schoolContext };
-      }
-    }
-
-    if (role === "parent_student") {
-      const matchedStudents = this.findParentStudents(accountIdentifier, pin);
-
-      if (matchedStudents.length > 0) {
-        const children = matchedStudents.map(({ pin: _pin, pinHash: _pinHash, ...safeStudent }) => safeStudent);
-        const firstStudent = children[0];
-
-        this.clearFailedLoginAttempts(loginKey);
-        return {
-          role,
-          user: {
-            id: `PARENT-${firstStudent.parentPhone}`,
-            name: "Parent Somafrik",
-            parentPhone: firstStudent.parentPhone,
-            children,
-          },
-          school: schoolContext,
-        };
-      }
-    }
-
-    this.recordFailedLoginAttempt(loginKey);
-    throw new BusinessError(401, "Identifiants incorrects");
-  }
-
-  findTeacher(accountIdentifier, password) {
-    return this.teachers.find(
-      (teacher) =>
-        (!teacher.schoolCode || teacher.schoolCode === accountIdentifier.schoolCode) &&
-        (accountIdentifier.matches(teacher.id) ||
-          accountIdentifier.matches(teacher.publicId) ||
-          accountIdentifier.matches(teacher.identifier) ||
-          accountIdentifier.matches(teacher.phone)) &&
-        (password === undefined || this.verifyUserSecret(teacher, password))
-    );
-  }
-
-  findStudent(accountIdentifier, pin) {
-    return this.students.find(
-      (student) =>
-        student.schoolCode === accountIdentifier.schoolCode &&
-        (accountIdentifier.matches(student.matricule) || accountIdentifier.matches(student.publicId)) &&
-        (pin === undefined || this.verifyUserSecret(student, pin))
-    );
-  }
-
-  findParentStudents(accountIdentifier, pin) {
-    return this.students.filter(
-      (student) =>
-        student.schoolCode === accountIdentifier.schoolCode &&
-        accountIdentifier.matches(student.parentPhone) &&
-        (pin === undefined || this.verifyUserSecret(student, pin))
-    );
+    this.clearFailedLoginAttempts(loginKey);
+    return {
+      role,
+      user: this.buildManagedMobileUser(managedUser),
+      school: schoolContext,
+    };
   }
 
   findManagedUser(identifier, schoolCode) {
     const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
-    const normalizedIdentifier = String(identifier).trim().toLowerCase();
+    const normalizedIdentifier = normalizeText(identifier);
 
     return this.userAccounts.find(
       (user) =>
         (user.schoolCode === "*" || user.schoolCode === normalizedSchoolCode) &&
-        [user.identifier, user.phone, user.publicId].some(
-          (value) => String(value ?? "").trim().toLowerCase() === normalizedIdentifier
+        [user.identifier, user.phone, user.publicId, user.email].some(
+          (value) => normalizeText(value) === normalizedIdentifier
         )
     );
   }
 
+  findLinkedTeacher(user) {
+    const userId = String(user.id ?? "");
+    const userIdentifier = normalizeText(user.identifier);
+    const schoolCode = normalizeText(user.schoolCode);
+
+    return this.teachers.find((teacher) => {
+      if (userId && String(teacher.userId ?? "") === userId) {
+        return true;
+      }
+      if (schoolCode && teacher.schoolCode && normalizeText(teacher.schoolCode) !== schoolCode) {
+        return false;
+      }
+      return userIdentifier && normalizeText(teacher.identifier) === userIdentifier;
+    });
+  }
+
+  findLinkedStudent(user, schoolCode) {
+    const accountIdentifier = new AccountIdentifier(schoolCode, user.identifier);
+    return this.students.find(
+      (student) =>
+        student.schoolCode === accountIdentifier.schoolCode &&
+        (accountIdentifier.matches(student.matricule) ||
+          accountIdentifier.matches(student.publicId) ||
+          String(student.id) === String(user.id))
+    );
+  }
+
+  findLinkedParentChildren(user, schoolCode) {
+    const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
+    const parentPhone = normalizeText(user.identifier) || normalizeText(user.phone);
+    if (!parentPhone) {
+      return [];
+    }
+
+    return this.students.filter(
+      (student) =>
+        student.schoolCode === normalizedSchoolCode &&
+        normalizeText(student.parentPhone) === parentPhone
+    );
+  }
+
   buildManagedMobileUser(user) {
-    return {
+    const base = {
       id: user.id,
       publicId: user.publicId,
       name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.identifier,
@@ -202,7 +185,48 @@ class AuthService {
       countryCode: user.countryCode,
       schoolCode: user.role === "Admin Pays" ? "*" : user.schoolCode,
       permissions: user.permissions,
+      mustChangePassword: Boolean(user.temporaryPassword),
     };
+
+    if (isTeacherRole(user.role)) {
+      const teacher = this.findLinkedTeacher(user);
+      if (teacher) {
+        const assignedClasses = [...new Set((teacher.assignments ?? []).map((item) => item.className))];
+        const courses = [...new Set((teacher.assignments ?? []).map((item) => item.course))];
+        const { password: _password, passwordHash: _passwordHash, pinHash: _pinHash, ...safeTeacher } = teacher;
+        return {
+          ...base,
+          ...safeTeacher,
+          assignedClasses,
+          courses,
+        };
+      }
+    }
+
+    if (user.role === "Parent") {
+      const children = this.findLinkedParentChildren(user, user.schoolCode).map(
+        ({ pin: _pin, pinHash: _pinHash, password: _password, ...safeStudent }) => safeStudent
+      );
+      return {
+        ...base,
+        children,
+        parentPhone: user.phone ?? user.identifier,
+      };
+    }
+
+    if (isStudentRole(user.role)) {
+      const student = this.findLinkedStudent(user, user.schoolCode);
+      if (student) {
+        const { pin: _pin, pinHash: _pinHash, password: _password, ...safeStudent } = student;
+        return {
+          ...base,
+          ...safeStudent,
+          matricule: safeStudent.matricule ?? user.identifier,
+        };
+      }
+    }
+
+    return base;
   }
 
   getManagedMobileRole(user) {
