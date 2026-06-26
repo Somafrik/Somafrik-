@@ -60,6 +60,50 @@ class PedagogyGovernanceService {
     return null;
   }
 
+  /** Complète teacherId/teacherName depuis les affectations si absents (données legacy). */
+  hydrateCoursesFromAssignments(courses = [], assignments = []) {
+    return courses.map((course) => {
+      if (String(course.teacherId ?? "").trim() || String(course.teacherName ?? "").trim()) {
+        return course;
+      }
+
+      const className = String(course.className ?? "").trim();
+      const subject = String(course.name ?? course.subject ?? "").trim();
+      const match = assignments.find((assignment) => {
+        return (
+          String(assignment.className ?? "").trim() === className
+          && normalize(String(assignment.course ?? assignment.subject ?? "")) === normalize(subject)
+        );
+      });
+
+      if (!match) return course;
+
+      return {
+        ...course,
+        teacherId: match.teacherId ?? course.teacherId,
+        teacherName: match.teacherName ?? course.teacherName,
+      };
+    });
+  }
+
+  /** Cours créés ou modifiés depuis l'état courant (évite de bloquer toute la sync). */
+  listChangedCourses(before = [], after = []) {
+    const beforeMap = new Map(before.map((row) => [rowKey(row), row]).filter(([key]) => key));
+
+    return after.filter((row) => {
+      const key = rowKey(row);
+      const previous = key ? beforeMap.get(key) : undefined;
+      if (!previous) return true;
+
+      return (
+        normalize(previous.className) !== normalize(row.className)
+        || normalize(previous.name ?? previous.subject) !== normalize(row.name ?? row.subject)
+        || normalize(previous.teacherId) !== normalize(row.teacherId)
+        || normalize(previous.teacherName) !== normalize(row.teacherName)
+      );
+    });
+  }
+
   /** Admin School : conserve les enseignants existants, autorise uniquement les créations. */
   enforceSchoolAdminTeachers(currentTeachers = [], mergedTeachers = [], scopedCurrentTeachers = []) {
     const currentByKey = new Map(

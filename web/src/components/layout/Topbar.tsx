@@ -5,7 +5,7 @@ import { Button } from "../ui/Button";
 
 export function Topbar({ title }: { title: string }) {
   const { session, logout } = useAuth();
-  const { loading, refresh } = useData();
+  const { loading, error, refresh } = useData();
   const user = session?.user;
   const scope = session?.scope;
 
@@ -17,6 +17,11 @@ export function Topbar({ title }: { title: string }) {
       </div>
 
       <div className="flex items-center gap-3">
+        {error ? (
+          <p className="max-w-xs truncate text-xs text-danger" title={error}>
+            {error}
+          </p>
+        ) : null}
         <Button variant="secondary" size="sm" onClick={() => void refresh()} disabled={loading}>
           {loading ? "Synchronisation…" : "Rafraîchir"}
         </Button>

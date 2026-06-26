@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config({ path: path.join(__dirname, "..", ".env.local"), override: true });
 require("dotenv").config();
 const { AuthService, BusinessError } = require("./services/authService");
 const { BackOfficeAccessService } = require("./services/backOfficeAccessService");
@@ -509,14 +510,25 @@ app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
   const currentState = await getAuthoritativeBackOfficeState();
   const requestedState = sanitizeBackOfficeState(req.body ?? {});
   const nextState = mergeScopedBackOfficeState(currentState, requestedState, req.principal);
-  const courseValidationError = pedagogyGovernanceService.validateCoursesCollection(
+  const hydratedCourses = pedagogyGovernanceService.hydrateCoursesFromAssignments(
     nextState.courses ?? [],
     nextState.assignments ?? [],
   );
+  const nextStateWithCourses = { ...nextState, courses: hydratedCourses };
+  const changedCourses = pedagogyGovernanceService.listChangedCourses(
+    currentState.courses ?? [],
+    hydratedCourses,
+  );
+  const courseValidationError = changedCourses.length
+    ? pedagogyGovernanceService.validateCoursesCollection(
+        changedCourses,
+        nextStateWithCourses.assignments ?? [],
+      )
+    : null;
   if (courseValidationError) {
     throw new BusinessError(400, courseValidationError);
   }
-  const saved = await repository.saveBackOfficeState(nextState);
+  const saved = await repository.saveBackOfficeState(nextStateWithCourses);
   await auditCriticalStateChanges(req, currentState, saved);
   await auditService.record(req, "sync_backoffice_state", "backoffice_state", "default", {
     schools: saved.schools?.length ?? 0,
@@ -861,7 +873,14 @@ async function getAuthoritativeBackOfficeState() {
   }
 
   const merged = mergeBackOfficeRuntimeState(runtime, storedState);
-  return sanitizeBackOfficeState(stripLegacyOrganizationFields(merged));
+  const sanitized = sanitizeBackOfficeState(stripLegacyOrganizationFields(merged));
+  return {
+    ...sanitized,
+    courses: pedagogyGovernanceService.hydrateCoursesFromAssignments(
+      sanitized.courses ?? [],
+      sanitized.assignments ?? [],
+    ),
+  };
 }
 
 function stripLegacyOrganizationFields(state = {}) {
@@ -1848,6 +1867,10 @@ function asyncHandler(handler) {
   };
 }
 
+function isLocalDevOrigin(origin) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
+}
+
 function buildCorsOptions() {
   const rawOrigins = process.env.CORS_ORIGINS ?? "*";
   const devOrigins = [
@@ -1856,13 +1879,14 @@ function buildCorsOptions() {
     "http://localhost:5174",
     "http://127.0.0.1:5174",
   ];
+  const allowDevOrigins = process.env.CORS_ALLOW_DEV_ORIGINS !== "false";
   const allowedOrigins = [
     ...new Set(
       rawOrigins
         .split(",")
         .map((origin) => origin.trim())
         .filter(Boolean)
-        .concat(process.env.CORS_ALLOW_DEV_ORIGINS === "false" ? [] : devOrigins),
+        .concat(allowDevOrigins ? devOrigins : []),
     ),
   ];
 
@@ -1872,7 +1896,11 @@ function buildCorsOptions() {
 
   return {
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin
+        || allowedOrigins.includes(origin)
+        || (allowDevOrigins && isLocalDevOrigin(origin))
+      ) {
         return callback(null, true);
       }
 

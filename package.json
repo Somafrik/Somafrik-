@@ -2,8 +2,11 @@
   "name": "somafrik-workspace",
   "private": true,
   "scripts": {
-    "start": "npm --prefix backend run start",
-    "backend": "npm --prefix backend run dev",
+    "dev": "npm --prefix web run dev",
+    "start": "npm --prefix backend run dev:memory",
+    "backend": "npm --prefix backend run dev:memory",
+    "backend:memory": "npm --prefix backend run dev:memory",
+    "backend:pg": "npm --prefix backend run dev",
     "backend:start": "npm --prefix backend run start",
     "mobile": "npm --prefix Mobile run start --",
     "mobile:lan": "npm --prefix Mobile run start:lan --",

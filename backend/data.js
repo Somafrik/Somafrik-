@@ -1130,6 +1130,18 @@ const teacherAssignments = teachers.flatMap((teacher) =>
   })),
 );
 
+courses.forEach((course) => {
+  if (course.teacherId || course.teacherName) return;
+  const match = teacherAssignments.find(
+    (assignment) =>
+      assignment.className === course.className
+      && assignment.course === course.name,
+  );
+  if (!match) return;
+  course.teacherId = match.teacherId;
+  course.teacherName = match.teacherName;
+});
+
 while (platformNotifications.length < 50) {
   const index = platformNotifications.length + 1;
   const country = countries[index % countries.length];
