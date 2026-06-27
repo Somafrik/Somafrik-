@@ -11,8 +11,10 @@ export function usePermissionContext(): PermissionContext {
     () => ({
       user: session?.user ?? null,
       rolePermissions: state.rolePermissions ?? {},
+      countryRolePermissions: state.countryRolePermissions ?? {},
+      activeSchoolCode: session?.activeSchoolCode,
     }),
-    [session?.user, state.rolePermissions],
+    [session?.user, session?.activeSchoolCode, state.rolePermissions, state.countryRolePermissions],
   );
 }
 

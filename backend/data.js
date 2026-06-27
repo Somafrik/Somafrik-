@@ -183,6 +183,16 @@ const securityMatrix = {
     Parent: "-",
     "Élève / Étudiant": "-",
   },
+  Affectations: {
+    "Super Administrateur Somafrik": "CRUD",
+    "Admin Pays": "-",
+    "Admin School": "CRUD",
+    "Préfet des études": "CRUD",
+    Enseignant: "R",
+    Secrétaire: "R",
+    Parent: "-",
+    "Élève / Étudiant": "-",
+  },
   Présences: {
     "Super Administrateur Somafrik": "R",
     "Admin Pays": "-",
@@ -337,6 +347,30 @@ const { PedagogyGovernanceService } = require("./services/pedagogyGovernanceServ
 const pedagogyGovernance = new PedagogyGovernanceService();
 const sanitizedSchoolPermissions = pedagogyGovernance.sanitizeSchoolAdminRolePermissions(rolePermissions);
 rolePermissions["Admin School"] = sanitizedSchoolPermissions["Admin School"];
+
+/** Politique Admin Pays par pays (extensions au-delà du socle global). */
+const countryRolePermissions = {
+  CD: {
+    "Admin Pays": [
+      "COUNTRY_PRIVILEGES",
+      "Pays:READ",
+      "Établissements:READ",
+      "Établissements:CREATE",
+      "Établissements:UPDATE",
+      "Abonnements:READ",
+      "Abonnements:UPDATE",
+      "Utilisateurs:READ",
+      "Utilisateurs:CREATE",
+      "Utilisateurs:UPDATE",
+      "Classes:READ",
+      "Élèves:READ",
+      "Enseignants:READ",
+      "Matières:READ",
+      "Affectations:READ",
+      "Rapports:READ",
+    ],
+  },
+};
 
 const countries = [
   {
@@ -1218,6 +1252,7 @@ module.exports = {
   documents,
   teacherAssignments,
   rolePermissions,
+  countryRolePermissions,
   userAccounts,
   countries,
   subscriptions,

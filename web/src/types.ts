@@ -116,12 +116,15 @@ export interface Session {
   refreshToken?: string;
   permissions?: string[];
   menus?: string[];
+  /** Établissement sélectionné par le Superadmin pour piloter la scolarité. */
+  activeSchoolCode?: string;
   schools: School[];
   users: UserAccount[];
   countries?: Country[];
   subscriptions?: Subscription[];
   notifications?: PlatformNotification[];
   rolePermissions?: Record<string, string[]>;
+  countryRolePermissions?: Record<string, Record<string, string[]>>;
   academicConfigs?: Record<string, unknown>;
   auditLog?: unknown[];
 }
@@ -147,6 +150,7 @@ export interface BackOfficeState {
   messages: unknown[];
   paymentStatuses: unknown[];
   rolePermissions: Record<string, string[]>;
+  countryRolePermissions?: Record<string, Record<string, string[]>>;
   academicConfigs: Record<string, unknown>;
 }
 

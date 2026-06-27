@@ -1,37 +1,36 @@
 import type { SessionUser } from "../types";
-import { CRUD_PERMISSION_MODULES, VIEW_PERMISSION_FEATURES } from "./constants";
+import { CRUD_ACTIONS, CRUD_PERMISSION_MODULES, VIEW_PERMISSION_FEATURES } from "./constants";
 import { getInternalRoleDefaults } from "./internalRoleDefaults";
 import { isInternalSchoolRole, normalize, isSchoolAdminRole } from "./format";
 import { canSchoolAdminMutateTeachers } from "./pedagogyGovernance";
 import {
   isSuperAdminRole,
+  LEGACY_SUPER_ADMIN_ROLE,
+  SUPER_ADMIN_ROLE,
   SUPERADMIN_MANAGED_ROLES,
 } from "./orgHierarchy";
 import {
   isEstablishmentOperationalRole,
   COUNTRY_ADMIN_ROLE,
   COUNTRY_SCOPE_MODULES,
+  getSuperadminMatrixModules,
   normalizeManagedRolePermissions,
+  resolveCountryAdminPermissions,
+  type CountryRolePermissions,
 } from "./roleGovernance";
-import { SCHOOL_ENTITY_SIDEBAR_VIEWS } from "./entityModules";
 
 const SCHOOL_ADMIN_FORBIDDEN_FEATURES = new Set(["Établissements", "Abonnements"]);
 
-/** Modules plateforme toujours accessibles au Super Admin (consultation + CRUD). */
-const SUPERADMIN_PLATFORM_FEATURES = new Set([
-  "Organisations",
-  "Pays",
-  "Établissements",
-  "Abonnements",
-  "Utilisateurs",
-  "Rapports",
-  "Notifications",
-  "Droits par rôle",
-]);
+function superadminHasSchoolContext(ctx: PermissionContext): boolean {
+  return Boolean(ctx.activeSchoolCode?.trim());
+}
 
 export interface PermissionContext {
   user: SessionUser | null;
   rolePermissions: Record<string, string[]>;
+  countryRolePermissions?: CountryRolePermissions;
+  /** Établissement actif (Superadmin en mode pilotage). */
+  activeSchoolCode?: string;
 }
 
 export interface FeaturePermissions {
@@ -42,26 +41,104 @@ export interface FeaturePermissions {
   canSuspend: boolean;
 }
 
-/** Union des droits du compte et de la matrice Super Admin pour le rôle courant. */
+/** Union des droits du compte, de la matrice Super Admin et de la politique pays. */
 export function resolveEffectivePermissions(
   role: string | undefined,
   userPermissions: string[] | undefined,
   rolePermissions: Record<string, string[]>,
+  options?: {
+    countryCode?: string;
+    countryRolePermissions?: CountryRolePermissions;
+  },
 ): string[] {
-  const fromUser = userPermissions ?? [];
+  if (role === COUNTRY_ADMIN_ROLE) {
+    const fromCountryPolicy = resolveCountryAdminPermissions(
+      options?.countryCode ?? undefined,
+      rolePermissions,
+      options?.countryRolePermissions ?? {},
+    );
+    const fromUser = userPermissions ?? [];
+    return [...new Set([...fromUser, ...fromCountryPolicy])];
+  }
+
   const fromRole = role && Array.isArray(rolePermissions[role]) ? rolePermissions[role] : [];
+
+  if (
+    role &&
+    SUPERADMIN_MANAGED_ROLES.includes(role as (typeof SUPERADMIN_MANAGED_ROLES)[number]) &&
+    Array.isArray(rolePermissions[role])
+  ) {
+    return normalizeManagedRolePermissions(role, fromRole);
+  }
+
+  const fromUser = userPermissions ?? [];
   const fromDefaults = getInternalRoleDefaults(role);
   return [...new Set([...fromUser, ...fromRole, ...fromDefaults])];
 }
 
+function resolveUserCountryCode(user: SessionUser | null | undefined): string | undefined {
+  if (!user) return undefined;
+  return String(user.countryCode ?? user.countryScope ?? "").trim() || undefined;
+}
+
 export function getCurrentRolePermissions(ctx: PermissionContext): string[] {
-  return resolveEffectivePermissions(ctx.user?.role, ctx.user?.permissions, ctx.rolePermissions);
+  return resolveEffectivePermissions(ctx.user?.role, ctx.user?.permissions, ctx.rolePermissions, {
+    countryCode: resolveUserCountryCode(ctx.user),
+    countryRolePermissions: ctx.countryRolePermissions,
+  });
 }
 
 const COUNTRY_PRIVILEGE_FEATURES = new Set(["pays", "etablissements", "abonnements", "utilisateurs", "rapports"]);
 
 function countryPrivilegeAllowsRead(normalizedFeature: string): boolean {
   return COUNTRY_PRIVILEGE_FEATURES.has(normalizedFeature);
+}
+
+export function legacyPermissionGrantsFeatureAction(
+  permission: string,
+  feature: string,
+  action: string,
+): boolean {
+  return permissionMatchesFeature(normalize(permission), normalize(feature), action);
+}
+
+/** Convertit droits stockés (legacy + granulaires) en cases CRUD pour l'édition Superadmin. */
+export function expandStoredPermissionsToGranular(
+  role: string,
+  permissions: string[] = [],
+  options?: { countryCode?: string },
+): Set<string> {
+  const modules = getSuperadminMatrixModules(role, options?.countryCode);
+  const granular = new Set<string>();
+  const permSet = new Set(permissions);
+
+  if (permSet.has("ALL_PRIVILEGES")) {
+    for (const module of modules) {
+      for (const action of CRUD_ACTIONS) {
+        granular.add(`${module}:${action.key}`);
+      }
+    }
+    return granular;
+  }
+
+  for (const permission of permissions) {
+    if (/^[^:]+:[A-Z]+$/.test(permission)) {
+      const [module] = permission.split(":");
+      if (modules.includes(module)) granular.add(permission);
+    }
+  }
+
+  for (const module of modules) {
+    for (const action of CRUD_ACTIONS) {
+      const key = `${module}:${action.key}`;
+      if (granular.has(key)) continue;
+      if ([...permSet].some((permission) => legacyPermissionGrantsFeatureAction(permission, module, action.key))) {
+        granular.add(key);
+      }
+    }
+  }
+
+  return granular;
 }
 
 function permissionMatchesFeature(
@@ -181,13 +258,7 @@ export function hasBackOfficePermission(
   }
 
   if (isSuperAdminRole(ctx.user.role)) {
-    if (
-      featureList.some(
-        (feature) => !feature || SUPERADMIN_PLATFORM_FEATURES.has(feature),
-      )
-    ) {
-      return true;
-    }
+    return true;
   }
 
   if (
@@ -207,20 +278,15 @@ export function hasBackOfficePermission(
 
 export function canReadView(ctx: PermissionContext, viewName: string): boolean {
   if (viewName === "overview") return true;
-  if (ctx.user?.role === COUNTRY_ADMIN_ROLE) {
-    if (SCHOOL_ENTITY_SIDEBAR_VIEWS.has(viewName) || viewName === "establishment" || viewName === "configuration") {
-      return false;
-    }
-    const feature = VIEW_PERMISSION_FEATURES[viewName];
-    if (feature && !COUNTRY_SCOPE_MODULES.has(feature) && feature !== "Rapports") {
-      return false;
-    }
-  }
   if (viewName === "establishment") {
-    return isInternalSchoolRole(ctx.user?.role);
+    return isInternalSchoolRole(ctx.user?.role) || (isSuperAdminRole(ctx.user?.role) && superadminHasSchoolContext(ctx));
   }
   if (viewName === "configuration") {
-    if (!isInternalSchoolRole(ctx.user?.role)) return false;
+    const canAccess =
+      isInternalSchoolRole(ctx.user?.role) ||
+      (isSuperAdminRole(ctx.user?.role) && superadminHasSchoolContext(ctx));
+    if (!canAccess) return false;
+    if (isSuperAdminRole(ctx.user?.role)) return true;
     return (
       hasBackOfficePermission(ctx, "Paramètres Établissement", "READ") ||
       isSchoolAdminRole(ctx.user?.role) ||
@@ -233,6 +299,9 @@ export function canReadView(ctx: PermissionContext, viewName: string): boolean {
 }
 
 export function hasSchoolPilotageAccess(ctx: PermissionContext): boolean {
+  if (isSuperAdminRole(ctx.user?.role) && superadminHasSchoolContext(ctx)) {
+    return true;
+  }
   const schoolFeatures = [
     "Utilisateurs",
     "Classes",
@@ -271,7 +340,22 @@ export function mergeSuperadminRolePermissions(
       next[role] = normalizeManagedRolePermissions(role, requested[role]);
     }
   }
-  return next;
+  return ensureSuperAdminRolePermissions(next);
+}
+
+/** Le Super Admin conserve toujours ALL_PRIVILEGES dans la matrice système. */
+export function ensureSuperAdminRolePermissions(
+  rolePermissions: Record<string, string[]>,
+): Record<string, string[]> {
+  const merged = new Set([
+    ...(rolePermissions[SUPER_ADMIN_ROLE] ?? []),
+    ...(rolePermissions[LEGACY_SUPER_ADMIN_ROLE] ?? []),
+    "ALL_PRIVILEGES",
+  ]);
+  return {
+    ...rolePermissions,
+    [SUPER_ADMIN_ROLE]: [...merged].sort((left, right) => left.localeCompare(right, "fr")),
+  };
 }
 
 export function isLocalManagedRole(role?: string): boolean {

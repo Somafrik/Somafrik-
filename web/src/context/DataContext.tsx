@@ -11,7 +11,7 @@ import {
 import { api } from "../api/client";
 import { useAuth } from "./AuthContext";
 import { SYNC_INTERVAL_MS } from "../lib/constants";
-import { resolveEffectivePermissions } from "../lib/permissions";
+import { resolveEffectivePermissions, ensureSuperAdminRolePermissions } from "../lib/permissions";
 import type { BackOfficeState, Session } from "../types";
 
 interface DataContextValue {
@@ -43,6 +43,7 @@ const EMPTY_STATE: BackOfficeState = {
   messages: [],
   paymentStatuses: [],
   rolePermissions: {},
+  countryRolePermissions: {},
   academicConfigs: {},
 };
 
@@ -54,7 +55,8 @@ function stateFromSession(session: Session): BackOfficeState {
     countries: session.countries ?? [],
     subscriptions: session.subscriptions ?? [],
     notifications: session.notifications ?? [],
-    rolePermissions: session.rolePermissions ?? {},
+    rolePermissions: ensureSuperAdminRolePermissions(session.rolePermissions ?? {}),
+    countryRolePermissions: (session.countryRolePermissions as Record<string, Record<string, string[]>>) ?? {},
     academicConfigs: (session.academicConfigs as Record<string, unknown>) ?? {},
   };
 }
@@ -83,7 +85,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const remote = await api.get<Partial<BackOfficeState>>("/backoffice/state");
-      setState((prev) => ({ ...prev, ...remote }));
+      setState((prev) => ({
+        ...prev,
+        ...remote,
+        rolePermissions: ensureSuperAdminRolePermissions(remote.rolePermissions ?? prev.rolePermissions ?? {}),
+        countryRolePermissions: remote.countryRolePermissions ?? prev.countryRolePermissions ?? {},
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de chargement");
     } finally {
@@ -116,6 +123,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       session.user.role,
       session.user.permissions,
       state.rolePermissions,
+      {
+        countryCode: session.user.countryCode ?? session.user.countryScope,
+        countryRolePermissions: state.countryRolePermissions,
+      },
     );
     const current = session.permissions ?? session.user.permissions ?? [];
     if (samePermissionSet(current, merged)) return;
@@ -125,7 +136,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       user: { ...session.user, permissions: merged },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.rolePermissions, session?.accessToken, session?.user?.role, setSession]);
+  }, [state.rolePermissions, state.countryRolePermissions, session?.accessToken, session?.user?.role, setSession]);
 
   const update = useCallback(
     async (patch: Partial<BackOfficeState>, options: { sync?: boolean } = {}) => {
@@ -134,7 +145,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (options.sync === false) return;
       try {
         const saved = await api.put<Partial<BackOfficeState>>("/backoffice/state", next);
-        setState((prev) => ({ ...prev, ...saved }));
+        setState((prev) => ({
+          ...prev,
+          ...saved,
+          rolePermissions: ensureSuperAdminRolePermissions(saved.rolePermissions ?? prev.rolePermissions ?? {}),
+          countryRolePermissions: saved.countryRolePermissions ?? prev.countryRolePermissions ?? {},
+        }));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur de synchronisation");
         throw err;

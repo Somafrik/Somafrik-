@@ -33,6 +33,7 @@ import { scopedUsers } from "../lib/scope";
 import { hasBackOfficePermission } from "../lib/permissions";
 import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
 import { isInternalSchoolRole, isSchoolAdminRole, formatMetric, displayRoleName } from "../lib/format";
+import { canAccessSchoolOperationalViews } from "../lib/superadminSchoolContext";
 import {
   applyRoleRenames,
   canDelegateSchoolPermission,
@@ -144,11 +145,11 @@ export function ConfigurationPage() {
     }
   }, [classNamesForSubjects, selectedSubjectClass]);
 
-  if (!isInternalSchoolRole(user?.role)) {
+  if (!canAccessSchoolOperationalViews(session)) {
     return (
       <Card className="p-6">
         <p className="text-sm font-semibold text-muted">
-          La configuration établissement est réservée aux comptes internes d'une école.
+          Sélectionnez un établissement (menu en haut) pour configurer la scolarité et les droits locaux.
         </p>
       </Card>
     );
@@ -773,7 +774,7 @@ export function ConfigurationPage() {
           <Card key={`classNames-${academicFormKey}`} className="p-6">
             <SectionHeader
               title="Classes"
-              description="Une classe par ligne. Utilisées dans les listes déroulantes (élèves, matières, affectations)."
+              description="Une classe par ligne. Référence pour l'écran Classes et les listes déroulantes (élèves, matières, affectations)."
             />
             <form onSubmit={handleClassNamesSubmit} className="mt-4 space-y-4">
               <Field label="Classes">
@@ -793,7 +794,7 @@ export function ConfigurationPage() {
           <Card key={`subjects-${academicFormKey}-${selectedSubjectClass}`} className="p-6">
             <SectionHeader
               title="Matières"
-              description="Sélectionnez une classe, puis saisissez les matières enseignées (une par ligne)."
+              description="Catalogue des matières par classe (sans enseignant). Les affectations enseignants se gèrent dans Affectations."
             />
             {classNamesForSubjects.length ? (
               <form onSubmit={handleSubjectsSubmit} className="mt-4 space-y-4">

@@ -1,7 +1,9 @@
 /**
  * Règles métier pédagogie Somafrik :
+ * - Classes : structure (nom, niveau, filière).
+ * - Matières (courses) : catalogue classe + matière, sans enseignant.
+ * - Affectations : seul lien enseignant ↔ classe ↔ matière.
  * - Admin School : ajout d'enseignants uniquement (pas de modification / suppression).
- * - Un cours (matière + classe) est affecté à un seul enseignant.
  */
 
 const SCHOOL_ADMIN_ROLE = "Admin School";
@@ -16,16 +18,6 @@ function normalize(value) {
 
 function rowKey(row = {}) {
   return String(row.id ?? row.publicId ?? row.code ?? row.schoolCode ?? row.value ?? "");
-}
-
-function sameTeacherReference(left = {}, right = {}) {
-  const leftId = normalize(left.teacherId);
-  const rightId = normalize(right.teacherId);
-  if (leftId && rightId && leftId === rightId) return true;
-
-  const leftName = normalize(left.teacherName);
-  const rightName = normalize(right.teacherName);
-  return Boolean(leftName && rightName && leftName === rightName);
 }
 
 class PedagogyGovernanceService {
@@ -51,39 +43,30 @@ class PedagogyGovernanceService {
     return next;
   }
 
-  /** Valide l'ensemble des cours avant persistance (matière + classe = un seul enseignant). */
-  validateCoursesCollection(courses = [], assignments = []) {
+  /** Valide l'ensemble des matières avant persistance (classe + matière unique). */
+  validateCoursesCollection(courses = []) {
     for (const course of courses) {
-      const error = this.validateCourseTeacherRule(course, courses, assignments, rowKey(course));
+      const error = this.validateCourseCatalogRule(course, courses, rowKey(course));
       if (error) return error;
     }
     return null;
   }
 
-  /** Complète teacherId/teacherName depuis les affectations si absents (données legacy). */
-  hydrateCoursesFromAssignments(courses = [], assignments = []) {
+  /** Nettoie les champs enseignant des matières (source de vérité = affectations). */
+  sanitizeCourseCatalog(courses = []) {
     return courses.map((course) => {
-      if (String(course.teacherId ?? "").trim() || String(course.teacherName ?? "").trim()) {
-        return course;
-      }
-
-      const className = String(course.className ?? "").trim();
-      const subject = String(course.name ?? course.subject ?? "").trim();
-      const match = assignments.find((assignment) => {
-        return (
-          String(assignment.className ?? "").trim() === className
-          && normalize(String(assignment.course ?? assignment.subject ?? "")) === normalize(subject)
-        );
-      });
-
-      if (!match) return course;
-
+      const { teacherId: _teacherId, teacherName: _teacherName, ...rest } = course;
       return {
-        ...course,
-        teacherId: match.teacherId ?? course.teacherId,
-        teacherName: match.teacherName ?? course.teacherName,
+        ...rest,
+        name: String(course.name ?? course.subject ?? "").trim(),
+        className: String(course.className ?? "").trim(),
       };
     });
+  }
+
+  /** @deprecated Conservé pour compatibilité lecture — ne plus hydrater les enseignants dans courses. */
+  hydrateCoursesFromAssignments(courses = [], _assignments = []) {
+    return this.sanitizeCourseCatalog(courses);
   }
 
   /** Cours créés ou modifiés depuis l'état courant (évite de bloquer toute la sync). */
@@ -98,8 +81,6 @@ class PedagogyGovernanceService {
       return (
         normalize(previous.className) !== normalize(row.className)
         || normalize(previous.name ?? previous.subject) !== normalize(row.name ?? row.subject)
-        || normalize(previous.teacherId) !== normalize(row.teacherId)
-        || normalize(previous.teacherName) !== normalize(row.teacherName)
       );
     });
   }
@@ -144,78 +125,63 @@ class PedagogyGovernanceService {
     return next;
   }
 
-  validateCourseTeacherRule(item = {}, courses = [], assignments = [], editingId) {
+  validateCourseCatalogRule(item = {}, courses = [], editingId) {
     const className = String(item.className ?? "").trim();
     const subject = String(item.name ?? item.subject ?? "").trim();
-    const teacherId = String(item.teacherId ?? "").trim();
-    const teacherName = String(item.teacherName ?? "").trim();
 
     if (!className || !subject) {
       return "Classe et matière sont obligatoires.";
     }
 
-    if (!teacherId && !teacherName) {
-      return "Sélectionnez l'enseignant responsable de ce cours pour cette classe.";
-    }
-
     const duplicateCourse = courses.find((course) => {
       if (editingId && String(course.id) === String(editingId)) return false;
       return (
-        normalize(course.name) === normalize(subject) &&
-        normalize(String(course.className ?? "")) === normalize(className)
+        normalize(course.name ?? course.subject) === normalize(subject)
+        && normalize(String(course.className ?? "")) === normalize(className)
       );
     });
 
-    if (duplicateCourse && !sameTeacherReference(duplicateCourse, item)) {
-      const assigned =
-        duplicateCourse.teacherName ||
-        duplicateCourse.teacherId ||
-        "un autre enseignant";
-      return `Le cours « ${subject} » est déjà affecté à ${assigned} pour la classe ${className}.`;
-    }
-
-    const duplicateAssignment = assignments.find((assignment) => {
-      if (editingId && String(assignment.courseId ?? assignment.id) === String(editingId)) return false;
-      return (
-        normalize(String(assignment.className ?? "")) === normalize(className) &&
-        normalize(String(assignment.subject ?? assignment.course ?? "")) === normalize(subject)
-      );
-    });
-
-    if (duplicateAssignment && !sameTeacherReference(duplicateAssignment, item)) {
-      const assigned =
-        duplicateAssignment.teacherName ||
-        duplicateAssignment.teacherId ||
-        "un autre enseignant";
-      return `Le cours « ${subject} » est déjà affecté à ${assigned} pour la classe ${className}.`;
+    if (duplicateCourse) {
+      return `La matière « ${subject} » est déjà enregistrée pour la classe ${className}.`;
     }
 
     return null;
   }
 
+  /** @deprecated Utiliser validateCourseCatalogRule */
+  validateCourseTeacherRule(item = {}, courses = [], _assignments = [], editingId) {
+    return this.validateCourseCatalogRule(item, courses, editingId);
+  }
+
   enforceCourseTeacherUniqueness(currentCourses = [], mergedCourses = [], scopedCurrentCourses = []) {
+    return this.enforceCourseCatalogUniqueness(currentCourses, mergedCourses, scopedCurrentCourses);
+  }
+
+  enforceCourseCatalogUniqueness(currentCourses = [], mergedCourses = [], scopedCurrentCourses = []) {
     const currentByKey = new Map(
       scopedCurrentCourses.map((row) => [rowKey(row), row]).filter(([key]) => key),
     );
 
-    return mergedCourses.map((course) => {
+    const sanitized = this.sanitizeCourseCatalog(mergedCourses);
+
+    return sanitized.map((course) => {
       const key = rowKey(course);
       const previous = key ? currentByKey.get(key) : undefined;
       if (!previous) return course;
 
       const className = normalize(course.className);
-      const subject = normalize(course.name);
-      const conflict = mergedCourses.find((other) => {
+      const subject = normalize(course.name ?? course.subject);
+      const conflict = sanitized.find((other) => {
         if (rowKey(other) === key) return false;
-        return normalize(other.className) === className && normalize(other.name) === subject;
+        return normalize(other.className) === className && normalize(other.name ?? other.subject) === subject;
       });
 
-      if (conflict && !sameTeacherReference(conflict, course)) {
+      if (conflict) {
         return previous;
       }
 
-      const validationError = this.validateCourseTeacherRule(course, mergedCourses, [], key);
-      if (validationError && !sameTeacherReference(previous, course)) {
+      const validationError = this.validateCourseCatalogRule(course, sanitized, key);
+      if (validationError) {
         return previous;
       }
 

@@ -39,7 +39,7 @@ export function validateClassDeletion(
     normalizeClassName(course.className) === target,
   );
   if (courses.length) {
-    return `Suppression refusée : ${courses.length} cours lié(s) à cette classe. Retirez-les d'abord.`;
+    return `Suppression refusée : ${courses.length} matière(s) liée(s) à cette classe. Retirez-les d'abord.`;
   }
 
   const assignments = ((state.assignments ?? []) as Row[]).filter((assignment) =>

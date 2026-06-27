@@ -35,7 +35,7 @@ class RoleGovernanceService {
     return this.isCountryScopeModule(module) ? COUNTRY_ADMIN_ROLE : SCHOOL_ADMIN_ROLE;
   }
 
-  matrixModulesForRole(role) {
+  matrixModulesForRole(role, countryCode) {
     const modules = [
       "Pays",
       "Établissements",
@@ -60,12 +60,26 @@ class RoleGovernanceService {
     ];
 
     if (role === COUNTRY_ADMIN_ROLE) {
+      if (countryCode) return modules;
       return modules.filter((module) => COUNTRY_SCOPE_MODULES.has(module));
     }
     if (role === SCHOOL_ADMIN_ROLE) {
       return modules.filter((module) => !COUNTRY_SCOPE_MODULES.has(module));
     }
     return modules;
+  }
+
+  resolveCountryAdminPermissions(countryCode, rolePermissions = {}, countryRolePermissions = {}) {
+    const global = rolePermissions[COUNTRY_ADMIN_ROLE] ?? [];
+    const code = String(countryCode ?? "").trim();
+    if (!code) {
+      return this.normalizeManagedRolePermissions(COUNTRY_ADMIN_ROLE, global);
+    }
+    const countrySpecific = countryRolePermissions?.[code]?.[COUNTRY_ADMIN_ROLE];
+    if (!Array.isArray(countrySpecific) || !countrySpecific.length) {
+      return this.normalizeManagedRolePermissions(COUNTRY_ADMIN_ROLE, global);
+    }
+    return this.normalizeManagedRolePermissions(COUNTRY_ADMIN_ROLE, countrySpecific);
   }
 
   /** Entités backoffice modifiables par Admin Pays (pas la scolarité opérationnelle). */
@@ -124,6 +138,34 @@ class RoleGovernanceService {
       .replace(/[\u0300-\u036f]/g, "")
       .trim()
       .toLowerCase();
+  }
+
+  /** Le Super Admin conserve toujours ALL_PRIVILEGES (configuration système). */
+  ensureSuperAdminRolePermissions(rolePermissions = {}) {
+    let seed = [];
+    try {
+      seed = require("../data").rolePermissions?.["Super Administrateur Somafrik"] ?? [];
+    } catch {
+      seed = ["ALL_PRIVILEGES"];
+    }
+
+    const merged = new Set([
+      ...(Array.isArray(rolePermissions["Super Administrateur Somafrik"])
+        ? rolePermissions["Super Administrateur Somafrik"]
+        : []),
+      ...(Array.isArray(rolePermissions["Super Administrateur OKAFRIK"])
+        ? rolePermissions["Super Administrateur OKAFRIK"]
+        : []),
+      ...seed,
+      "ALL_PRIVILEGES",
+    ]);
+
+    return {
+      ...rolePermissions,
+      "Super Administrateur Somafrik": [...merged].sort((left, right) =>
+        String(left).localeCompare(String(right), "fr"),
+      ),
+    };
   }
 }
 

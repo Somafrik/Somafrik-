@@ -121,12 +121,11 @@ const configs: Record<
     ],
   },
   courses: {
-    title: "Gestion des cours",
-    addLabel: "Ajouter un cours",
+    title: "Gestion des matières",
+    addLabel: "Ajouter une matière",
     fields: [
       { key: "className", label: "Classe", placeholder: "Choisir une classe", type: "select" },
-      { key: "name", label: "Nom du cours", placeholder: "Choisir une matière", type: "select" },
-      { key: "teacherId", label: "Enseignant", placeholder: "Choisir un enseignant", type: "select" },
+      { key: "name", label: "Matière", placeholder: "Choisir une matière", type: "select" },
       { key: "coefficient", label: "Coefficient", placeholder: "2", keyboardType: "numeric" },
     ],
   },
@@ -531,52 +530,7 @@ export default function AdminCrudScreen({ route }: Props) {
       syncTeacherCourseAssignment(nextItem, editingItem);
     }
 
-    if (entity === "courses") {
-      setSelectedCourseClass(String(nextItem.className ?? ""));
-      syncCourseTeacherAssignment(nextItem, editingItem);
-    }
-
     setVisible(false);
-  };
-
-  const syncCourseTeacherAssignment = (course: any, previousCourse?: any) => {
-    if (previousCourse?.teacherId) {
-      removeTeacherCourseAssignment({
-        teacherId: previousCourse.teacherId,
-        className: previousCourse.className,
-        course: previousCourse.name,
-      });
-      const previousAssignment = assignmentsData.find(
-        (assignment: any) =>
-          normalize(assignment.className) === normalize(previousCourse.className) &&
-          normalize(assignment.course) === normalize(previousCourse.name)
-      );
-      if (previousAssignment?.id) {
-        deleteItem("assignments", String(previousAssignment.id));
-      }
-    }
-
-    const existingAssignment = assignmentsData.find(
-      (assignment: any) =>
-        normalize(assignment.className) === normalize(course.className) &&
-        normalize(assignment.course) === normalize(course.name)
-    );
-
-    const assignmentPayload = {
-      id: existingAssignment?.id ?? createInternalId("ASSIGN"),
-      schoolCode: course.schoolCode,
-      teacherId: course.teacherId,
-      className: course.className,
-      course: course.name,
-    };
-
-    if (existingAssignment) {
-      updateItem("assignments", assignmentPayload);
-    } else {
-      createItem("assignments", assignmentPayload);
-    }
-
-    syncTeacherCourseAssignment(assignmentPayload, existingAssignment);
   };
 
   const confirmDelete = (item: any) => {
@@ -1390,13 +1344,6 @@ function itemToForm(entity: AdminEntity, item: any) {
     };
   }
 
-  if (entity === "courses" && item.teacherId) {
-    return {
-      ...Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value ?? "")])),
-      teacherId: formatSelectOption(String(item.teacherId), String(item.teacherName ?? "")),
-    };
-  }
-
   if (entity === "users") {
     return {
       ...Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value ?? "")])),
@@ -1508,9 +1455,7 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
   }
 
   if (entity === "courses") {
-    if (!form.className || !form.name || !form.teacherId) return null;
-    const teacherId = parseSelectId(form.teacherId);
-    const teacher = (context?.teachersData ?? []).find((item: any) => matchesEntityId(item, teacherId));
+    if (!form.className || !form.name) return null;
     return {
       id: nextId,
       publicId: form.publicId || generatePublicId("COU", year, context?.coursesData ?? [], 6),
@@ -1518,8 +1463,6 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       className: form.className,
       name: form.name,
       coefficient: Number(form.coefficient) || 1,
-      teacherId,
-      teacherName: teacher?.name ?? "",
     };
   }
 
@@ -1748,7 +1691,7 @@ function getSecondaryText(
   }
   if (entity === "classes") return `${item.publicId ?? item.id} • ${item.level ?? "Niveau non renseigné"} • ${item.track ?? "Filière non renseignée"} • Responsable : ${item.teacherId || "Non assigné"}`;
   if (entity === "countries") return `${item.phonePrefix} • ${item.currency} • ${item.timezone} • ${item.status}`;
-  if (entity === "courses") return `${item.publicId ?? item.id} • ${item.className} • Prof : ${item.teacherName || item.teacherId || "Non assigné"} • Coef. ${item.coefficient}`;
+  if (entity === "courses") return `${item.publicId ?? item.id} • ${item.className} • Coef. ${item.coefficient ?? 1}`;
   if (entity === "assignments") return `Enseignant : ${item.teacherId}`;
   if (entity === "subscriptions") return `${item.country} • ${item.monthlyPrice} ${item.currency}/mois • ${item.paymentStatus} • fin ${item.endDate}`;
   if (entity === "paymentStatuses") return `Code : ${item.value}`;
@@ -1957,11 +1900,6 @@ function validateBusinessRules({
   if (entity === "courses") {
     const className = normalize(item.className);
     const courseName = normalize(item.name);
-    const teacherId = normalize(item.teacherId);
-
-    if (!teacherId) {
-      return "Cours impossible : sélectionnez l'enseignant responsable pour cette classe.";
-    }
 
     const duplicateCourse = coursesData.find(
       (courseItem) =>
@@ -1970,17 +1908,8 @@ function validateBusinessRules({
         normalize(courseItem.name) === courseName
     );
 
-    if (duplicateCourse && normalize(duplicateCourse.teacherId) !== teacherId) {
-      return `Cours impossible : « ${item.name} » est déjà affecté à un autre enseignant pour la classe ${item.className}.`;
-    }
-
-    const duplicateAssignment = assignmentsData.find(
-      (assignment) =>
-        normalize(assignment.className) === className && normalize(assignment.course) === courseName
-    );
-
-    if (duplicateAssignment && normalize(duplicateAssignment.teacherId) !== teacherId) {
-      return `Cours impossible : « ${item.name} » est déjà affecté à un autre enseignant pour la classe ${item.className}.`;
+    if (duplicateCourse) {
+      return `Matière impossible : « ${item.name} » est déjà enregistrée pour la classe ${item.className}.`;
     }
 
     return null;

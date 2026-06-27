@@ -23,7 +23,8 @@ import {
   prepareAssignmentForSave,
   validateAssignmentConflict,
 } from "../lib/assignments";
-import { validateCourseTeacherRule } from "../lib/pedagogyGovernance";
+import { validateCourseCatalogRule } from "../lib/pedagogyGovernance";
+import { validateCourseDeletion, sanitizeCourseCatalogItem } from "../lib/pedagogyEntities";
 import {
   getCurrentSchool,
   scopedClasses,
@@ -33,13 +34,15 @@ import {
 } from "../lib/establishment";
 import {
   syncAssignmentPedagogy,
+  syncClassPedagogy,
   syncCoursePedagogy,
+  removeCoursePedagogy,
   syncTeacherPedagogy,
   getTeacherDisplayName,
-  findTeacherByName,
 } from "../lib/pedagogySync";
 import type { BackOfficeState, SessionUser } from "../types";
 import { getSchoolAcademicLists, getSubjectsForClass, mergeSelectOptions } from "../lib/academicConfig";
+import { normalize } from "../lib/format";
 import {
   generateTeacherIdentifiers,
   getTeacherLoginIdentifier,
@@ -155,12 +158,20 @@ export function EntityPage({ entity }: EntityPageProps) {
       const classScopedModules = module?.key === "courses" || module?.key === "assignments";
       if (classScopedModules) {
         if (!className) return [];
+        if (module?.key === "assignments") {
+          const configured = getSubjectsForClass(state, schoolCode, className);
+          const fromCourses = scopedCourses(session?.user ?? null, state)
+            .filter((course) => normalize(String(course.className ?? "")) === normalize(className))
+            .map((course) => String(course.name ?? "").trim())
+            .filter(Boolean);
+          const extra = (assignmentOptions?.subjects ?? []).map((option) => option.value);
+          return mergeSelectOptions(configured, [...fromCourses, ...extra]).map((option) => ({
+            value: option,
+            label: option,
+          }));
+        }
         const configured = getSubjectsForClass(state, schoolCode, className);
-        const extra =
-          module?.key === "assignments"
-            ? (assignmentOptions?.subjects ?? []).map((option) => option.value)
-            : [];
-        return mergeSelectOptions(configured, extra).map((option) => ({
+        return mergeSelectOptions(configured, academicLists.subjects).map((option) => ({
           value: option,
           label: option,
         }));
@@ -168,14 +179,10 @@ export function EntityPage({ entity }: EntityPageProps) {
       return academicLists.subjects.map((option) => ({ value: option, label: option }));
     }
     if (field.optionsKey === "teachers") {
-      const teacherOptions =
-        module?.key === "courses"
-          ? scopedTeachers(session?.user ?? null, state).map((teacher) => ({
-              value: getTeacherDisplayName(teacher),
-              label: getTeacherDisplayName(teacher),
-            }))
-          : (assignmentOptions?.teachers ?? []);
-      return teacherOptions;
+      return assignmentOptions?.teachers ?? scopedTeachers(session?.user ?? null, state).map((teacher) => ({
+        value: String(teacher.id ?? ""),
+        label: getTeacherDisplayName(teacher),
+      }));
     }
     if (field.optionsKey === "classes") {
       return assignmentOptions?.classes ?? [];
@@ -242,21 +249,30 @@ export function EntityPage({ entity }: EntityPageProps) {
         teachers: nextEntityRows.map((row) =>
           String(row.id) === String(synced.teacher.id) ? synced.teacher : row,
         ),
-        courses: synced.courses,
         assignments: synced.assignments,
       };
     }
 
+    if (key === "classes") {
+      const previousName = editing?.id
+        ? String(
+            getScopedEntityRows("classes", session?.user ?? null, state).find(
+              (row) => String(row.id) === String(editing.id),
+            )?.name ?? "",
+          )
+        : undefined;
+      const classPatch = syncClassPedagogy(baseState, nextItem, schoolCode, previousName);
+      return {
+        classes: nextEntityRows,
+        ...classPatch,
+      };
+    }
+
     if (key === "courses") {
-      const synced = syncCoursePedagogy(
-        { ...baseState, courses: nextEntityRows },
-        nextItem,
-        schoolCode,
-      );
+      const synced = syncCoursePedagogy(baseState, nextItem, schoolCode);
       return {
         courses: synced.courses,
-        assignments: synced.assignments,
-        teachers: synced.teachers,
+        academicConfigs: synced.academicConfigs,
       };
     }
 
@@ -268,7 +284,6 @@ export function EntityPage({ entity }: EntityPageProps) {
       );
       return {
         assignments: synced.assignments,
-        courses: synced.courses,
         teachers: synced.teachers,
       };
     }
@@ -292,18 +307,13 @@ export function EntityPage({ entity }: EntityPageProps) {
     }
 
     if (module.key === "courses") {
-      const teachers = scopedTeachers(session?.user ?? null, state);
-      const teacherName = String(workingItem.teacherName ?? "").trim();
-      const teacher = findTeacherByName(teachers, teacherName);
-      workingItem = {
-        ...workingItem,
-        teacherName: teacher ? getTeacherDisplayName(teacher) : teacherName,
-        teacherId: String(teacher?.id ?? workingItem.teacherId ?? ""),
-      };
-      const courseConflict = validateCourseTeacherRule(
+      workingItem = sanitizeCourseCatalogItem(workingItem);
+      const courseConflict = validateCourseCatalogRule(
         workingItem,
         getScopedEntityRows("courses", session?.user ?? null, state),
-        getScopedEntityRows("assignments", session?.user ?? null, state),
+        scopedClasses(session?.user ?? null, state),
+        state,
+        schoolCode,
         editing.id ? String(editing.id) : undefined,
       );
       if (courseConflict) {
@@ -427,6 +437,29 @@ export function EntityPage({ entity }: EntityPageProps) {
       return;
     }
 
+    if (module.key === "courses") {
+      const className = String(row.className ?? "").trim();
+      const subject = String(row.name ?? "").trim();
+      const deleteError = validateCourseDeletion(className, subject, state, schoolCode);
+      if (deleteError) {
+        showToast(deleteError, "error");
+        return;
+      }
+      const nextAllRows = deleteScopedEntityRow(
+        module.key,
+        session?.user ?? null,
+        state,
+        String(row.id),
+      );
+      const coursePatch = removeCoursePedagogy(state, className, subject, schoolCode);
+      try {
+        await persistPatch({ ...coursePatch, courses: nextAllRows }, "Matière supprimée");
+      } catch {
+        /* toast déjà affiché */
+      }
+      return;
+    }
+
     const nextAllRows = deleteScopedEntityRow(
       module.key,
       session?.user ?? null,
@@ -510,7 +543,7 @@ export function EntityPage({ entity }: EntityPageProps) {
                     return;
                   }
                   if (module.key === "courses") {
-                    setEditing({ className: "", name: "", teacherName: "" });
+                    setEditing({ className: "", name: "" });
                     return;
                   }
                   if (module.key === "teachers") {

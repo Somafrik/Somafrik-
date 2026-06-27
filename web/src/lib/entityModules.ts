@@ -145,7 +145,7 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
     label: "Classes",
     feature: "Classes",
     group: "pedagogie",
-    description: "Organisation des classes et niveaux.",
+    description: "Organisation des classes (nom, niveau, filière). Les matières et enseignants se gèrent séparément.",
     fields: [
       {
         key: "name",
@@ -179,7 +179,7 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
     feature: "Matières",
     group: "pedagogie",
     description:
-      "Cours et matières enseignées. Chaque matière dans une classe est affectée à un seul enseignant.",
+      "Programme pédagogique : matières enseignées par classe. L'affectation des enseignants se fait dans Affectations.",
     fields: [
       {
         key: "className",
@@ -187,6 +187,7 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
         placeholder: "Choisir une classe",
         inputType: "select",
         optionsKey: "classNames",
+        required: true,
       },
       {
         key: "name",
@@ -196,16 +197,8 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
         optionsKey: "subjects",
         required: true,
       },
-      {
-        key: "teacherName",
-        label: "Enseignant",
-        placeholder: "Choisir un enseignant",
-        inputType: "select",
-        optionsKey: "teachers",
-        required: true,
-      },
     ],
-    columns: ["name", "className", "teacherName"],
+    columns: ["name", "className"],
   },
   {
     key: "assignments",
@@ -214,7 +207,8 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
     label: "Affectations",
     feature: "Affectations",
     group: "pedagogie",
-    description: "Liens enseignant ↔ classe ↔ matière (sans doublon).",
+    description:
+      "Affectation des enseignants aux matières d'une classe. Une matière par classe ne peut avoir qu'un seul enseignant.",
     fields: [
       {
         key: "className",
@@ -222,13 +216,15 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
         placeholder: "Choisir une classe",
         inputType: "select",
         optionsKey: "classNames",
+        required: true,
       },
       {
         key: "subject",
-        label: "Matière / Cours",
+        label: "Matière",
         placeholder: "Choisir une matière",
         inputType: "select",
         optionsKey: "subjects",
+        required: true,
       },
       {
         key: "teacherId",
@@ -236,6 +232,7 @@ export const SCHOOL_ENTITY_MODULES: EntityModuleConfig[] = [
         placeholder: "Choisir un enseignant",
         inputType: "select",
         optionsKey: "teachers",
+        required: true,
       },
     ],
     columns: ["teacherName", "className", "subject"],

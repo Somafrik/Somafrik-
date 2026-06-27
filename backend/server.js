@@ -180,7 +180,9 @@ app.post("/api/auth/refresh", asyncHandler(async (req, res) => {
   const permissions = mergeRolePermissions(
     session.role,
     [...new Set([...(payload.permissions ?? []), ...rbacService.permissionsFor(session.role)])],
-    rolePermissionsMap,
+    rolePermissionsMap.rolePermissions,
+    session.country_code ?? "",
+    rolePermissionsMap.countryRolePermissions,
   );
   const accessToken = tokenService.createAccessToken({
     sub: session.user_id,
@@ -204,7 +206,9 @@ app.get("/api/auth/effective-permissions", requireAuth, asyncHandler(async (req,
   const permissions = mergeRolePermissions(
     req.principal.role,
     [...new Set([...(req.principal.permissions ?? []), ...rbacService.permissionsFor(req.principal.role)])],
-    rolePermissionsMap,
+    rolePermissionsMap.rolePermissions,
+    req.principal.countryCode ?? "",
+    rolePermissionsMap.countryRolePermissions,
   );
   res.json({ permissions });
 }));
@@ -510,20 +514,14 @@ app.put("/api/backoffice/state", requireAuth, asyncHandler(async (req, res) => {
   const currentState = await getAuthoritativeBackOfficeState();
   const requestedState = sanitizeBackOfficeState(req.body ?? {});
   const nextState = mergeScopedBackOfficeState(currentState, requestedState, req.principal);
-  const hydratedCourses = pedagogyGovernanceService.hydrateCoursesFromAssignments(
-    nextState.courses ?? [],
-    nextState.assignments ?? [],
-  );
+  const hydratedCourses = pedagogyGovernanceService.sanitizeCourseCatalog(nextState.courses ?? []);
   const nextStateWithCourses = { ...nextState, courses: hydratedCourses };
   const changedCourses = pedagogyGovernanceService.listChangedCourses(
-    currentState.courses ?? [],
+    pedagogyGovernanceService.sanitizeCourseCatalog(currentState.courses ?? []),
     hydratedCourses,
   );
   const courseValidationError = changedCourses.length
-    ? pedagogyGovernanceService.validateCoursesCollection(
-        changedCourses,
-        nextStateWithCourses.assignments ?? [],
-      )
+    ? pedagogyGovernanceService.validateCoursesCollection(changedCourses)
     : null;
   if (courseValidationError) {
     throw new BusinessError(400, courseValidationError);
@@ -835,6 +833,7 @@ function sanitizeBackOfficeState(payload = {}) {
     messages: Array.isArray(payload.messages) ? payload.messages : [],
     auditLog: Array.isArray(payload.auditLog) ? payload.auditLog.slice(0, 200) : [],
     rolePermissions: isPlainObject(payload.rolePermissions) ? payload.rolePermissions : {},
+    countryRolePermissions: isPlainObject(payload.countryRolePermissions) ? payload.countryRolePermissions : {},
     deletedRows: sanitizeDeletedRows(payload.deletedRows),
     updatedAt: new Date().toISOString(),
   };
@@ -869,17 +868,22 @@ async function getAuthoritativeBackOfficeState() {
   const storedState = await repository.getBackOfficeState();
 
   if (!hasUserBackOfficeState(storedState)) {
-    return sanitizeBackOfficeState(runtimeState);
+    const seedLookup = buildSeedSchoolLookup();
+    const state = sanitizeBackOfficeState(runtimeState);
+    return {
+      ...state,
+      schools: (state.schools ?? []).map((school) => enrichSchoolValidationFields(school, seedLookup)),
+      rolePermissions: roleGovernanceService.ensureSuperAdminRolePermissions(state.rolePermissions ?? {}),
+      courses: pedagogyGovernanceService.sanitizeCourseCatalog(state.courses ?? []),
+    };
   }
 
   const merged = mergeBackOfficeRuntimeState(runtime, storedState);
   const sanitized = sanitizeBackOfficeState(stripLegacyOrganizationFields(merged));
   return {
     ...sanitized,
-    courses: pedagogyGovernanceService.hydrateCoursesFromAssignments(
-      sanitized.courses ?? [],
-      sanitized.assignments ?? [],
-    ),
+    rolePermissions: roleGovernanceService.ensureSuperAdminRolePermissions(sanitized.rolePermissions ?? {}),
+    courses: pedagogyGovernanceService.sanitizeCourseCatalog(sanitized.courses ?? []),
   };
 }
 
@@ -895,6 +899,14 @@ function hasUserBackOfficeState(state) {
   }
 
   return backOfficeDeletableEntities.some((entity) => Array.isArray(state[entity]));
+}
+
+function loadSeedCountryRolePermissions() {
+  try {
+    return require("./data").countryRolePermissions ?? {};
+  } catch {
+    return {};
+  }
 }
 
 function buildInitialBackOfficeState(runtime = {}) {
@@ -921,6 +933,7 @@ function buildInitialBackOfficeState(runtime = {}) {
     messages: [],
     auditLog: [],
     rolePermissions: {},
+    countryRolePermissions: loadSeedCountryRolePermissions(),
     deletedRows: {},
   };
 }
@@ -950,6 +963,7 @@ function mergeBackOfficeRuntimeState(runtime = {}, storedState = {}) {
     messages: storedState.messages ?? [],
     auditLog: storedState.auditLog ?? [],
     rolePermissions: storedState.rolePermissions ?? {},
+    countryRolePermissions: storedState.countryRolePermissions ?? loadSeedCountryRolePermissions(),
     deletedRows: storedDeletedRows,
   };
   const deletedRows = mergeDeletedRows(storedDeletedRows, inferDeletedRowsFromStoredSnapshot(runtimeState, storedState));
@@ -977,6 +991,10 @@ function mergeBackOfficeRuntimeState(runtime = {}, storedState = {}) {
       ...runtimeState.rolePermissions,
       ...(storedState.rolePermissions ?? {}),
     },
+    countryRolePermissions: {
+      ...(runtimeState.countryRolePermissions ?? {}),
+      ...(storedState.countryRolePermissions ?? {}),
+    },
     academicConfigs: {
       ...runtimeState.academicConfigs,
       ...(storedState.academicConfigs ?? {}),
@@ -1002,21 +1020,55 @@ function schoolRowKey(row = {}) {
 }
 
 function mergeSchoolRows(dbSchools = [], storedSchools = []) {
+  const seedSchoolByCode = buildSeedSchoolLookup();
   const rows = new Map();
 
   dbSchools.forEach((school) => {
     const key = schoolRowKey(school);
-    if (key) rows.set(key, { ...school });
+    if (key) rows.set(key, enrichSchoolValidationFields({ ...school }, seedSchoolByCode));
   });
 
   storedSchools.forEach((school) => {
     const key = schoolRowKey(school);
     if (!key) return;
     const existing = rows.get(key);
-    rows.set(key, existing ? { ...existing, ...school } : { ...school });
+    rows.set(
+      key,
+      enrichSchoolValidationFields(existing ? { ...existing, ...school } : { ...school }, seedSchoolByCode),
+    );
   });
 
   return [...rows.values()];
+}
+
+function buildSeedSchoolLookup() {
+  try {
+    const { platformSchools = [] } = require("./data");
+    return new Map(
+      platformSchools
+        .map((school) => [schoolRowKey(school), school])
+        .filter(([key]) => Boolean(key)),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function enrichSchoolValidationFields(school = {}, seedSchoolByCode = new Map()) {
+  const seed = seedSchoolByCode.get(schoolRowKey(school));
+  const validationStatus =
+    school.validationStatus ??
+    seed?.validationStatus ??
+    MANAGED_PENDING_VALIDATION_STATUS;
+
+  return {
+    ...school,
+    validationStatus,
+    validationRequestedBy: school.validationRequestedBy ?? seed?.validationRequestedBy ?? null,
+    validationRequestedAt: school.validationRequestedAt ?? seed?.validationRequestedAt ?? null,
+    validatedBy: school.validatedBy ?? seed?.validatedBy ?? null,
+    validatedAt: school.validatedAt ?? seed?.validatedAt ?? null,
+  };
 }
 
 function isSuperAdminPrincipal(principal) {
@@ -1029,12 +1081,14 @@ function scopeBackOfficeState(payload = {}, principal) {
     return state;
   }
 
+  const { countryRolePermissions: _countryRolePermissions, ...scopedBase } = state;
+
   if (principal.role === "Admin Pays") {
     const countryCode = principal.countryCode;
-    const schools = state.schools.filter((item) => countryCodeFromSchoolOrCountry(item.code, item.country) === countryCode);
+    const schools = scopedBase.schools.filter((item) => countryCodeFromSchoolOrCountry(item.code, item.country) === countryCode);
     const schoolCodes = new Set(schools.map((item) => item.code));
     const countries = state.countries.filter((item) => item.code === countryCode);
-    const scopedState = scopeStateWithSchools(state, schoolCodes, {
+    const scopedState = scopeStateWithSchools(scopedBase, schoolCodes, {
       countries,
     });
     return {
@@ -1044,7 +1098,7 @@ function scopeBackOfficeState(payload = {}, principal) {
   }
 
   const schoolCodes = new Set([principal.schoolCode].filter(Boolean));
-  return scopeStateWithSchools(state, schoolCodes, { subscriptions: [] });
+  return scopeStateWithSchools(scopedBase, schoolCodes, { subscriptions: [] });
 }
 
 function scopeStateWithSchools(state, schoolCodes, overrides = {}) {
@@ -1269,6 +1323,13 @@ function mergeScopedBackOfficeState(currentPayload = {}, requestedPayload = {}, 
       ...requested,
       schools: finalizeSuperAdminSchoolValidation(requested.schools, current.schools, principal),
       users: finalizeSuperAdminUserValidation(requested.users, current.users, principal),
+      rolePermissions: roleGovernanceService.ensureSuperAdminRolePermissions(
+        mergeScopedRolePermissions(current.rolePermissions, requested.rolePermissions, principal),
+      ),
+      countryRolePermissions: {
+        ...(current.countryRolePermissions ?? {}),
+        ...(requested.countryRolePermissions ?? {}),
+      },
       deletedRows: mergeDeletedRows(
         current.deletedRows,
         detectDeletedRows(current, requested, backOfficeDeletableEntities)
@@ -1679,7 +1740,7 @@ async function sendAuthenticatedResponse(req, res, response, action) {
   });
 }
 
-function buildPrincipal(response, rolePermissionsMap = null) {
+function buildPrincipal(response, permissionsConfig = null) {
   const user = response.user ?? {};
   const school = response.schoolContext ?? response.school ?? {};
   const rawRole = user.role ?? roleLabelFromMobileRole(response.role);
@@ -1687,7 +1748,16 @@ function buildPrincipal(response, rolePermissionsMap = null) {
     rawRole === "Super Administrateur OKAFRIK" ? "Super Administrateur Somafrik" : rawRole;
   const schoolCode = role === "Admin Pays" ? "*" : user.schoolCode ?? school.code ?? "*";
   const countryCode = user.countryCode ?? countryCodeFromScope(user.countryScope) ?? school.countryCode ?? countryCodeFromSchoolOrCountry(schoolCode, school.country);
-  const permissions = mergeRolePermissions(role, user.permissions ?? rbacService.permissionsFor(role), rolePermissionsMap);
+  const rolePermissionsMap = permissionsConfig?.rolePermissions !== undefined
+    ? permissionsConfig
+    : { rolePermissions: permissionsConfig, countryRolePermissions: null };
+  const permissions = mergeRolePermissions(
+    role,
+    user.permissions ?? rbacService.permissionsFor(role),
+    rolePermissionsMap.rolePermissions,
+    countryCode,
+    rolePermissionsMap.countryRolePermissions,
+  );
 
   return {
     sub: user.id ?? user.publicId ?? user.matricule ?? "anonymous",
@@ -1703,15 +1773,37 @@ function buildPrincipal(response, rolePermissionsMap = null) {
 // Récupère la matrice de droits par rôle (configurée par le Super Admin dans le BackOffice).
 async function getRolePermissionsMap() {
   const storedState = await repository.getBackOfficeState();
-  return isPlainObject(storedState) && isPlainObject(storedState.rolePermissions)
-    ? storedState.rolePermissions
-    : null;
+  if (!isPlainObject(storedState)) {
+    return { rolePermissions: null, countryRolePermissions: null };
+  }
+  return {
+    rolePermissions: isPlainObject(storedState.rolePermissions) ? storedState.rolePermissions : null,
+    countryRolePermissions: isPlainObject(storedState.countryRolePermissions)
+      ? storedState.countryRolePermissions
+      : null,
+  };
 }
 
 // Fusionne les droits de base (compte / RBAC) avec les droits accordés au rôle par le Super Admin.
 // Logique métier : un module accordé à un rôle devient visible (dashboard, onglets, menu) pour
 // tous les utilisateurs de ce rôle, sans jamais retirer un privilège déjà détenu par le compte.
-function mergeRolePermissions(role, basePermissions = [], rolePermissionsMap = null) {
+function mergeRolePermissions(
+  role,
+  basePermissions = [],
+  rolePermissionsMap = null,
+  countryCode = null,
+  countryRolePermissionsMap = null,
+) {
+  if (role === "Admin Pays" && countryCode && countryRolePermissionsMap) {
+    const countrySpecific = countryRolePermissionsMap?.[countryCode]?.["Admin Pays"];
+    if (Array.isArray(countrySpecific) && countrySpecific.length) {
+      return enforceBusinessRolePermissions(
+        role,
+        roleGovernanceService.normalizeManagedRolePermissions(role, countrySpecific),
+      );
+    }
+  }
+
   const configured =
     rolePermissionsMap && Array.isArray(rolePermissionsMap[role])
       ? rolePermissionsMap[role]
@@ -1719,6 +1811,11 @@ function mergeRolePermissions(role, basePermissions = [], rolePermissionsMap = n
           Array.isArray(rolePermissionsMap?.["Super Administrateur OKAFRIK"])
         ? rolePermissionsMap["Super Administrateur OKAFRIK"]
         : null;
+
+  const managedPlatformRoles = new Set(["Admin Pays", "Admin School"]);
+  if (managedPlatformRoles.has(role) && Array.isArray(rolePermissionsMap?.[role])) {
+    return enforceBusinessRolePermissions(role, rolePermissionsMap[role]);
+  }
 
   if (!configured || !configured.length) {
     return enforceBusinessRolePermissions(role, basePermissions ?? []);

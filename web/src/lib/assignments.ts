@@ -7,6 +7,7 @@ import {
   scopedTeachers,
 } from "./establishment";
 import { normalize } from "./format";
+import { isKnownClassName, isKnownSubjectForClass } from "./pedagogyEntities";
 import { findTeacherByName, getTeacherDisplayName } from "./pedagogySync";
 
 type Row = Record<string, unknown>;
@@ -19,40 +20,6 @@ function resolveAssignmentSchoolCode(
   if (schoolCode && schoolCode !== "*") return schoolCode;
   if (user?.schoolCode && user.schoolCode !== "*") return user.schoolCode;
   return state.schools[0]?.code;
-}
-
-function isKnownClassName(
-  className: string,
-  classes: Row[],
-  state: BackOfficeState,
-  schoolCode?: string,
-): boolean {
-  if (classes.some((schoolClass) => normalize(String(schoolClass.name ?? "")) === normalize(className))) {
-    return true;
-  }
-  const { classNames } = getSchoolAcademicLists(state, schoolCode);
-  return classNames.some((name) => normalize(name) === normalize(className));
-}
-
-function isKnownSubjectForClass(
-  subject: string,
-  className: string,
-  courses: Row[],
-  state: BackOfficeState,
-  schoolCode?: string,
-): boolean {
-  if (
-    courses.some(
-      (course) =>
-        normalize(String(course.name ?? "")) === normalize(subject) &&
-        normalize(String(course.className ?? "")) === normalize(className),
-    )
-  ) {
-    return true;
-  }
-  return getSubjectsForClass(state, schoolCode, className).some(
-    (name) => normalize(name) === normalize(subject),
-  );
 }
 
 export function normalizeAssignmentForm(row: Row, teachers: Row[]): Row {
@@ -122,7 +89,7 @@ export function validateAssignmentConflict(
   }
 
   if (state && !isKnownSubjectForClass(subject, className, courses, state, resolvedSchoolCode)) {
-    return `La matière « ${subject} » n'est pas configurée pour la classe ${className}. Ajoutez-la dans Configuration → Matières.`;
+    return `La matière « ${subject} » n'est pas enregistrée pour la classe ${className}. Ajoutez-la d'abord dans Matières.`;
   }
 
   if (
