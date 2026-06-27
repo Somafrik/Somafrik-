@@ -997,18 +997,19 @@ const styles = StyleSheet.create({
   },
 
   schoolIconBox: {
-    width: 58,
-    height: 58,
-    borderRadius: 20,
+    width: 180,
+    height: 96,
+    borderRadius: 14,
     backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
+    paddingHorizontal: 8,
   },
   schoolLogoImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 20,
+    width: 164,
+    height: 84,
+    resizeMode: "contain",
   },
 
   schoolInfo: {

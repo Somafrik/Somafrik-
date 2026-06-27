@@ -4,6 +4,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "backend": "node scripts/dev-memory.js",
     "dev": "node server.js",
     "dev:memory": "node scripts/dev-memory.js",
     "dev:nodemon": "nodemon server.js"

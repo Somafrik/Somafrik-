@@ -5,6 +5,7 @@
     "dev": "npm --prefix web run dev",
     "start": "npm --prefix backend run dev:memory",
     "backend": "npm --prefix backend run dev:memory",
+    "backend:ps1": "powershell -ExecutionPolicy Bypass -File scripts/start-backend.ps1",
     "backend:memory": "npm --prefix backend run dev:memory",
     "backend:pg": "npm --prefix backend run dev",
     "backend:start": "npm --prefix backend run start",
@@ -14,11 +15,15 @@
     "mobile:clear": "npm --prefix Mobile run start:clear --",
     "mobile:web": "npm --prefix Mobile run web",
     "mobile:android": "npm --prefix Mobile run android",
+    "mobile:build:aab": "npm --prefix Mobile run build:aab",
+    "mobile:build:play": "npm --prefix Mobile run build:play",
+    "release:prod": "powershell -ExecutionPolicy Bypass -File scripts/release-prod-aligned.ps1",
     "mobile:ios": "npm --prefix Mobile run ios",
     "check": "node -c backend/server.js && node -c backend/db/postgresRepository.js && node --check BackOffice/app.js && cd Mobile && npx tsc --noEmit",
     "check:api": "node scripts/verify-api-connections.js",
-    "check:suspension": "node scripts/verify-suspension.js",
+    "sync:logo": "node scripts/sync-somafrik-logo.js",
     "web:build": "npm --prefix web run build",
+    "web": "npm --prefix web run dev",
     "web:dev": "npm --prefix web run dev"
   }
 }

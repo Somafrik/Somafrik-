@@ -374,6 +374,8 @@ const actionPermissions = {
   "edit-school": ["Établissements", "UPDATE"],
   "validate-schools": ["Établissements", "UPDATE"],
   "validate-school": ["Établissements", "UPDATE"],
+  "validate-users": ["Utilisateurs", "UPDATE"],
+  "validate-user": ["Utilisateurs", "UPDATE"],
   "toggle-school": ["Établissements", "SUSPEND"],
   "renew-subscriptions": ["Abonnements", "UPDATE"],
   "renew-subscription": ["Abonnements", "UPDATE"],
@@ -660,6 +662,28 @@ function renderRoleDashboard() {
   if (!roleDashboard) return;
 
   const dashboard = getRoleDashboard();
+  const pendingSchools = state.schools.filter(isSchoolAwaitingSuperadminValidation);
+  const pendingUsers = state.users.filter(isUserAwaitingSuperadminValidation);
+  const showValidationBanner =
+    canManageRolePermissions() && (pendingSchools.length > 0 || pendingUsers.length > 0);
+  const validationBanner = showValidationBanner
+    ? `
+      <div class="validation-banner">
+        <div>
+          <strong>Validations en attente</strong>
+          <p>
+            ${pendingSchools.length ? `${pendingSchools.length} établissement(s)` : ""}
+            ${pendingSchools.length && pendingUsers.length ? " • " : ""}
+            ${pendingUsers.length ? `${pendingUsers.length} compte(s) Admin École` : ""}
+          </p>
+        </div>
+        <div class="row-actions">
+          ${pendingSchools.length ? `<button class="action-button" type="button" data-action="validate-schools">Valider établissements</button>` : ""}
+          ${pendingUsers.length ? `<button class="action-button" type="button" data-action="validate-users">Valider comptes</button>` : ""}
+        </div>
+      </div>
+    `
+    : "";
   const dashboardCards = dashboard.cards?.length
     ? `
       <div class="role-dashboard-grid">
@@ -687,6 +711,7 @@ function renderRoleDashboard() {
       </div>
       <span class="status">${escapeHtml(dashboard.scope)}</span>
     </div>
+    ${validationBanner}
     ${dashboardCards}
     <div class="role-priority-list">
       ${dashboard.priorities
@@ -1173,11 +1198,12 @@ function renderSchools() {
           <td>${school.country}</td>
           <td>${school.city}</td>
           <td><span class="status">${school.status}</span></td>
+          <td><span class="status ${isSchoolAwaitingSuperadminValidation(school) ? "status-warning" : ""}">${escapeHtml(school.validationStatus ?? "Validé")}</span></td>
           <td>${school.subscriptionPlan}<br><small>${school.subscriptionEndDate}</small></td>
           <td>
             <div class="row-actions">
               ${
-                school.validationStatus === "En attente"
+                isSchoolAwaitingSuperadminValidation(school)
                   ? `<button class="icon-action" type="button" data-action="validate-school" data-id="${school.code}">Valider</button>`
                   : `<button class="icon-action" type="button" data-action="inspect-school" data-id="${school.code}">Voir</button>`
               }
@@ -1496,6 +1522,7 @@ function renderUsers() {
 
 function renderUserListItem(user) {
   const active = isActiveUserAccount(user);
+  const pendingValidation = isUserAwaitingSuperadminValidation(user);
   return `
     <article class="user-list-item">
       <div class="user-avatar">${escapeHtml(getUserInitials(user))}</div>
@@ -1505,7 +1532,7 @@ function renderUserListItem(user) {
             <strong>${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</strong>
             <span>${escapeHtml(displayRoleName(user.role))}</span>
           </div>
-          <span class="status ${active ? "" : "status-danger"}">${escapeHtml(user.status || "Actif")}</span>
+          <span class="status ${pendingValidation ? "status-warning" : active ? "" : "status-danger"}">${escapeHtml(pendingValidation ? PENDING_SCHOOL_VALIDATION_STATUS : user.status || "Actif")}</span>
         </div>
         <div class="user-list-meta">
           <span>Identifiant : ${escapeHtml(user.identifier || "Non renseigné")}</span>
@@ -1516,12 +1543,17 @@ function renderUserListItem(user) {
         ${user.temporaryPassword ? `<p class="user-temp-password">Mot de passe temporaire : ${escapeHtml(user.temporaryPassword)}</p>` : ""}
         <div class="user-list-actions">
           ${
-            canManageUserRow(user, "UPDATE")
+            pendingValidation && canManageRolePermissions()
+              ? `<button class="icon-action" type="button" data-action="validate-user" data-id="${escapeHtml(user.id)}">Valider</button>`
+              : ""
+          }
+          ${
+            !pendingValidation && canManageUserRow(user, "UPDATE")
               ? `<button class="icon-action" type="button" data-action="reset-user-password" data-id="${escapeHtml(user.id)}">Mot de passe</button>`
               : ""
           }
           ${
-            canManageUserRow(user, "SUSPEND")
+            !pendingValidation && canManageUserRow(user, "SUSPEND")
               ? `<button class="icon-action ${user.status === "Suspendu" ? "" : "danger"}" type="button" data-action="toggle-user" data-id="${escapeHtml(user.id)}">
                   ${user.status === "Suspendu" ? "Réactiver" : "Suspendre"}
                 </button>`
@@ -2086,27 +2118,44 @@ async function handleActionClick(event) {
   }
 
   if (action === "validate-schools") {
-    const count = state.schools.filter((school) => school.validationStatus === "En attente").length;
-    state.schools.forEach((school) => {
-      if (school.validationStatus === "En attente") {
-        school.validationStatus = "Validé";
-      }
-    });
-    addAudit("Validation établissements", "bulk", `${count} établissement(s) validé(s)`);
+    const pending = state.schools.filter(isSchoolAwaitingSuperadminValidation);
+    pending.forEach(markSchoolValidated);
+    addAudit("Validation établissements", "bulk", `${pending.length} établissement(s) validé(s)`);
     renderOperationalViews();
     persistSession();
-    showToast(`${count} établissement(s) validé(s).`);
+    showToast(`${pending.length} établissement(s) validé(s).`);
     return;
   }
 
   if (action === "validate-school") {
     const target = state.schools.find((school) => school.code === id);
-    if (!target) return;
-    target.validationStatus = "Validé";
+    if (!target || !isSchoolAwaitingSuperadminValidation(target)) return;
+    markSchoolValidated(target);
     addAudit("Validation établissement", target.code, `${target.name} validé`);
     renderOperationalViews();
     persistSession();
     showToast(`${target.name} validé.`);
+    return;
+  }
+
+  if (action === "validate-users") {
+    const pending = state.users.filter(isUserAwaitingSuperadminValidation);
+    pending.forEach(markUserValidated);
+    addAudit("Validation comptes", "bulk", `${pending.length} compte(s) validé(s)`);
+    renderOperationalViews();
+    persistSession();
+    showToast(`${pending.length} compte(s) Admin École validé(s).`);
+    return;
+  }
+
+  if (action === "validate-user") {
+    const target = state.users.find((user) => user.id === id);
+    if (!target || !isUserAwaitingSuperadminValidation(target)) return;
+    markUserValidated(target);
+    addAudit("Validation compte", target.identifier, `${target.firstName} ${target.lastName} validé`);
+    renderOperationalViews();
+    persistSession();
+    showToast(`${target.firstName} ${target.lastName} validé.`);
     return;
   }
 
@@ -2239,6 +2288,10 @@ async function handleActionClick(event) {
   if (action === "reset-user-password") {
     const target = state.users.find((user) => user.id === id);
     if (!target) return;
+    if (isUserAwaitingSuperadminValidation(target)) {
+      showToast("Compte en attente de validation. Validez-le d'abord.");
+      return;
+    }
     if (!canManageUserRow(target, "UPDATE")) {
       showToast("Action non autorisée sur cet utilisateur.");
       return;
@@ -2582,7 +2635,9 @@ function enforceCountryAdminSchoolAdminCrud() {
   state.rolePermissions["Super Administrateur Somafrik"] = [...superAdminPermissions].sort(sortPermissions);
 
   const countryAdminPermissions = new Set(state.rolePermissions["Admin Pays"] ?? []);
-  countryAdminSchoolAdminPermissions.forEach((permission) => countryAdminPermissions.add(permission));
+  if (!countryAdminPermissions.size) {
+    countryAdminSchoolAdminPermissions.forEach((permission) => countryAdminPermissions.add(permission));
+  }
   state.rolePermissions["Admin Pays"] = [...countryAdminPermissions].sort(sortPermissions);
 
   Object.entries(internalRoleDefaultPermissions).forEach(([roleName, defaults]) => {
@@ -2590,7 +2645,7 @@ function enforceCountryAdminSchoolAdminCrud() {
     if (!rolePermissions.size) {
       defaults.forEach((permission) => rolePermissions.add(permission));
     }
-    if (roleName === "Admin School") {
+    if (roleName === "Admin School" && !rolePermissions.size) {
       rolePermissions.add("Paramètres Établissement:READ");
       rolePermissions.add("Paramètres Établissement:UPDATE");
     }
@@ -2669,12 +2724,13 @@ function canManageRolePermissions() {
 
 function getCurrentRolePermissions() {
   const role = state.session?.user?.role;
-  if (role && Array.isArray(state.rolePermissions[role])) {
-    return [...new Set(state.rolePermissions[role])];
-  }
-
+  const fromMatrix = role && Array.isArray(state.rolePermissions[role]) ? state.rolePermissions[role] : [];
   const userPermissions = state.session?.user?.permissions ?? [];
-  return [...new Set(userPermissions)];
+  const merged = [...new Set([...fromMatrix, ...userPermissions])];
+  if (isSuperAdminRole(role)) {
+    merged.push("ALL_PRIVILEGES");
+  }
+  return [...new Set(merged)];
 }
 
 function hasBackOfficePermission(features, action = "READ") {
@@ -2993,6 +3049,46 @@ function isSuperAdminRole(role) {
   return role === "Super Administrateur Somafrik" || role === "Super Administrateur OKAFRIK";
 }
 
+const PENDING_SCHOOL_VALIDATION_STATUS = "En attente de validation";
+const VALIDATED_SCHOOL_STATUS = "Validé";
+
+function isPendingSchoolValidation(status) {
+  const normalized = normalize(status);
+  return normalized === "en attente de validation" || normalized === "en attente";
+}
+
+/** Établissement créé par Admin Pays, en attente de validation Super Admin. */
+function isSchoolAwaitingSuperadminValidation(school) {
+  if (!school) return false;
+  const status = school.validationStatus;
+  if (status === VALIDATED_SCHOOL_STATUS || status === "Rejeté") return false;
+  return true;
+}
+
+function markSchoolValidated(school) {
+  school.validationStatus = VALIDATED_SCHOOL_STATUS;
+  school.validatedBy =
+    state.session?.user?.identifier ?? state.session?.user?.firstName ?? "Super Admin";
+  school.validatedAt = new Date().toISOString();
+}
+
+const SCHOOL_ADMIN_ROLE_LABEL = "Admin School";
+
+function isUserAwaitingSuperadminValidation(user) {
+  if (!user || user.role !== SCHOOL_ADMIN_ROLE_LABEL) return false;
+  if (user.validationStatus === VALIDATED_SCHOOL_STATUS) return false;
+  if (isPendingSchoolValidation(user.validationStatus) || isPendingSchoolValidation(user.status)) return true;
+  return Boolean(user.validationRequestedBy);
+}
+
+function markUserValidated(user) {
+  user.status = "Actif";
+  user.validationStatus = VALIDATED_SCHOOL_STATUS;
+  user.validatedBy =
+    state.session?.user?.identifier ?? state.session?.user?.firstName ?? "Super Admin";
+  user.validatedAt = new Date().toISOString();
+}
+
 function sortPermissions(a, b) {
   return String(a).localeCompare(String(b), "fr");
 }
@@ -3308,10 +3404,18 @@ function saveUserForm() {
   }
 
   const permissions = state.rolePermissions[payload.role] ?? ["Voir tableau de bord"];
+  const createdByCountryAdmin = state.session?.user?.role === "Admin Pays";
+  const requiresSuperAdminValidation = createdByCountryAdmin && payload.role === SCHOOL_ADMIN_ROLE_LABEL;
   const user = {
     id: `USER-${Date.now()}`,
     publicId: `USR-${Date.now()}`,
     ...payload,
+    status: requiresSuperAdminValidation ? PENDING_SCHOOL_VALIDATION_STATUS : payload.status,
+    validationStatus: requiresSuperAdminValidation ? PENDING_SCHOOL_VALIDATION_STATUS : VALIDATED_SCHOOL_STATUS,
+    validationRequestedBy: requiresSuperAdminValidation
+      ? state.session?.user?.identifier ?? state.session?.user?.firstName ?? "Admin Pays"
+      : undefined,
+    validationRequestedAt: requiresSuperAdminValidation ? new Date().toISOString() : undefined,
     scopeLevel: payload.role === "Admin Pays" ? "Pays" : payload.schoolCode === "*" ? "Global" : "Établissement",
     accessChannel: "Application",
     permissions: [...permissions],
@@ -3361,7 +3465,11 @@ function saveUserForm() {
   renderOperationalViews();
   renderPermissions();
   persistSession();
-  showToast("Utilisateur créé avec le mot de passe temporaire 1234.");
+  showToast(
+    requiresSuperAdminValidation
+      ? "Compte créé. En attente de validation par le Super Administrateur."
+      : "Utilisateur créé avec le mot de passe temporaire 1234.",
+  );
 }
 
 function syncUserScopeInputs() {
@@ -3400,10 +3508,19 @@ function openSchoolDetail(school) {
     <div class="detail-section">
       <strong>Actions</strong>
       <div class="row-actions detail-actions">
-        <button class="icon-action" type="button" data-action="edit-school" data-id="${school.code}">Modifier</button>
+        ${
+          isSchoolAwaitingSuperadminValidation(school) && canManageRolePermissions()
+            ? `<button class="icon-action" type="button" data-action="validate-school" data-id="${school.code}">Valider l'établissement</button>`
+            : ""
+        }
+        ${
+          !isSchoolAwaitingSuperadminValidation(school)
+            ? `<button class="icon-action" type="button" data-action="edit-school" data-id="${school.code}">Modifier</button>
         <button class="icon-action ${school.status === "Suspendu" ? "" : "danger"}" type="button" data-action="toggle-school" data-id="${school.code}">
           ${school.status === "Suspendu" ? "Réactiver" : "Suspendre"}
-        </button>
+        </button>`
+            : ""
+        }
       </div>
     </div>
     <div class="detail-section">
@@ -3483,11 +3600,16 @@ function handleSchoolFormSubmit(event) {
     showToast("Établissement modifié.");
     openSchoolDetail(state.schools[index]);
   } else {
+    const createdByCountryAdmin = state.session?.user?.role === "Admin Pays";
     const school = {
       ...payload,
       id: `SCHOOL-${Date.now()}`,
       publicId: payload.code,
-      validationStatus: "En attente",
+      validationStatus: createdByCountryAdmin ? PENDING_SCHOOL_VALIDATION_STATUS : VALIDATED_SCHOOL_STATUS,
+      validationRequestedBy: createdByCountryAdmin
+        ? state.session?.user?.identifier ?? state.session?.user?.firstName ?? "Admin Pays"
+        : undefined,
+      validationRequestedAt: createdByCountryAdmin ? new Date().toISOString() : undefined,
       subscriptionStartDate: formatDate(new Date()),
       schoolYear: "2025-2026",
       currency: "CDF",
@@ -3501,7 +3623,11 @@ function handleSchoolFormSubmit(event) {
     syncSchoolSubscription(school);
     addAudit("Création établissement", school.code, `${school.name} créé`);
     state.schoolPage = 1;
-    showToast("Établissement créé et mis en attente de validation.");
+    showToast(
+      createdByCountryAdmin
+        ? "Établissement créé. En attente de validation par le Super Administrateur."
+        : "Établissement créé.",
+    );
   }
 
   closeSchoolForm();

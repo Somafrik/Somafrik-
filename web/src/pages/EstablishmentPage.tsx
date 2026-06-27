@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { Card, SectionHeader } from "../components/ui/Card";
-import { formatMetric, isInternalSchoolRole } from "../lib/format";
+import { formatMetric } from "../lib/format";
+import { canAccessSchoolOperationalViews } from "../lib/superadminSchoolContext";
 import { getCurrentSchool, getEstablishmentMetrics } from "../lib/establishment";
 import {
   ENTITY_MODULE_GROUP_LABELS,
@@ -52,11 +53,11 @@ export function EstablishmentPage() {
     [ctx],
   );
 
-  if (!isInternalSchoolRole(user?.role)) {
+  if (!canAccessSchoolOperationalViews(session)) {
     return (
       <Card className="p-6">
         <p className="text-sm font-semibold text-muted">
-          Le pilotage établissement est réservé aux comptes internes d'une école.
+          Sélectionnez un établissement (menu en haut) pour accéder au pilotage établissement.
         </p>
       </Card>
     );

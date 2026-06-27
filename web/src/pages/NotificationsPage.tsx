@@ -42,6 +42,7 @@ function newId(): string {
 export function NotificationsPage() {
   const { session } = useAuth();
   const { state, update } = useData();
+  const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const [composing, setComposing] = useState<PlatformNotification | null>(null);
 

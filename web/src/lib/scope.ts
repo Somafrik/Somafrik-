@@ -85,6 +85,10 @@ export function scopedNotifications(
 export function scopedUsers(user: SessionUser | null, state: ScopeState): UserAccount[] {
   if (!user) return [];
   if (isSuperAdminRole(user.role)) {
+    const schoolCode = user.schoolCode?.trim();
+    if (schoolCode && schoolCode !== "*") {
+      return state.users.filter((account) => normalize(account.schoolCode) === normalize(schoolCode));
+    }
     return state.users.filter((account) => isPlatformUserRole(account.role));
   }
   if (user.role === COUNTRY_ADMIN_ROLE) {

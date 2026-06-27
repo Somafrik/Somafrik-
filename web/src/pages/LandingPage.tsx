@@ -1,5 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { SOMAFRIK_LOGO_URL } from "../lib/brand";
 
 const MODULES = [
   {
@@ -131,13 +132,11 @@ export function LandingPage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <header className="sticky top-3 z-30 mt-3 flex items-center justify-between gap-4 rounded-2xl border border-white/70 bg-white/75 px-4 py-3 shadow-card backdrop-blur-md">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gradient text-sm font-black text-white shadow-brand">
-                SF
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-black">Somafrik</p>
-                <p className="text-xs text-muted">ERP scolaire SaaS</p>
-              </div>
+              <img
+                src={SOMAFRIK_LOGO_URL}
+                alt="Logo Somafrik"
+                className="h-28 w-auto max-w-[min(100%,560px)] object-contain sm:h-36"
+              />
             </div>
 
             <nav className="hidden items-center gap-1 md:flex" aria-label="Navigation vitrine">

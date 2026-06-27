@@ -1,9 +1,11 @@
 import { NavLink } from "react-router-dom";
+import { SOMAFRIK_LOGO_URL } from "../../lib/brand";
 import { NAV_ITEMS } from "../../lib/constants";
 import { SCHOOL_ENTITY_SIDEBAR_VIEWS } from "../../lib/entityModules";
 import { isInternalSchoolRole } from "../../lib/format";
+import { COUNTRY_ADMIN_ROLE, isSuperAdminRole } from "../../lib/orgHierarchy";
 import { canReadView } from "../../lib/permissions";
-import { COUNTRY_ADMIN_ROLE } from "../../lib/orgHierarchy";
+import { canAccessSchoolOperationalViews } from "../../lib/superadminSchoolContext";
 import { usePermissionContext } from "../../lib/usePermissionContext";
 import { useAuth } from "../../context/AuthContext";
 
@@ -15,9 +17,10 @@ export function Sidebar() {
   const { session } = useAuth();
   const role = session?.user?.role;
   const internalSchool = isInternalSchoolRole(role);
+  const superadminSchoolMode = canAccessSchoolOperationalViews(session);
 
   const visible = NAV_ITEMS.filter((item) => {
-    if (item.schoolOnly && !internalSchool) return false;
+    if (item.schoolOnly && !internalSchool && !superadminSchoolMode) return false;
     return canReadView(ctx, item.view);
   });
 
@@ -49,16 +52,16 @@ export function Sidebar() {
     ));
   }
 
+  const activeSchoolCode = session?.activeSchoolCode ?? session?.user?.schoolCode;
+
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-white lg:flex">
-      <div className="flex items-center gap-3 px-6 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-sm font-black text-white">
-          SF
-        </div>
-        <div>
-          <p className="text-sm font-black leading-tight text-ink">Somafrik</p>
-          <p className="text-xs text-muted">BackOffice ERP</p>
-        </div>
+    <aside className="hidden w-72 shrink-0 flex-col border-r border-line bg-white lg:flex">
+      <div className="border-b border-line px-3 py-5">
+        <img
+          src={SOMAFRIK_LOGO_URL}
+          alt="Logo Somafrik"
+          className="mx-auto h-28 w-full max-w-[260px] object-contain"
+        />
       </div>
 
       <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-2">
@@ -66,10 +69,10 @@ export function Sidebar() {
           <NavLinks items={visible.filter((item) => item.view === "overview")} />
         </div>
 
-        {internalSchool && schoolItems.length ? (
+        {(internalSchool || superadminSchoolMode) && schoolItems.length ? (
           <div>
             <p className="px-3 pb-2 text-[11px] font-black uppercase tracking-wide text-brand">
-              Mon établissement
+              {isSuperAdminRole(role) ? "Établissement sélectionné" : "Mon établissement"}
             </p>
             <div className="space-y-1">
               <NavLinks items={schoolItems} />
@@ -77,7 +80,7 @@ export function Sidebar() {
           </div>
         ) : null}
 
-        {!internalSchool && structureItems.length ? (
+        {!internalSchool && !superadminSchoolMode && structureItems.length ? (
           <div>
             <p className="px-3 pb-2 text-[11px] font-black uppercase tracking-wide text-brand">
               {structureTitle}
@@ -88,7 +91,7 @@ export function Sidebar() {
           </div>
         ) : null}
 
-        {!internalSchool && adminItems.length ? (
+        {!internalSchool && !superadminSchoolMode && adminItems.length ? (
           <div>
             <p className="px-3 pb-2 text-[11px] font-black uppercase tracking-wide text-muted">
               Administration
@@ -109,11 +112,22 @@ export function Sidebar() {
             </div>
           </div>
         ) : null}
+
+        {superadminSchoolMode && adminItems.length ? (
+          <div>
+            <p className="px-3 pb-2 text-[11px] font-black uppercase tracking-wide text-muted">
+              Administration plateforme
+            </p>
+            <div className="space-y-1">
+              <NavLinks items={adminItems} />
+            </div>
+          </div>
+        ) : null}
       </nav>
 
-      {internalSchool && session?.user?.schoolCode ? (
+      {activeSchoolCode ? (
         <p className="border-t border-line px-6 py-4 text-xs text-muted">
-          Établissement · {session.user.schoolCode}
+          Établissement · {activeSchoolCode}
         </p>
       ) : (
         <p className="px-6 py-4 text-xs text-muted">SaaS multi-pays · multi-établissements</p>

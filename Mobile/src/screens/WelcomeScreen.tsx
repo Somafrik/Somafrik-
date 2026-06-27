@@ -28,8 +28,6 @@ export default function WelcomeScreen({ navigation }: Props) {
       <Animated.View style={[styles.logoBox, { opacity, transform: [{ scale }] }]}>
         <Image source={somafrikLogo} style={styles.logoImage} />
       </Animated.View>
-      <Animated.Text style={[styles.brand, { opacity }]}>Somafrik</Animated.Text>
-      <Animated.Text style={[styles.parentBrand, { opacity }]}>par Somafrik</Animated.Text>
       <Animated.Text style={[styles.subtitle, { opacity }]}>
         ERP scolaire mobile et tablette pour tous les rôles.
       </Animated.Text>
@@ -56,17 +54,20 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   logoBox: {
-    width: 112,
-    height: 112,
-    borderRadius: 34,
+    width: "96%",
+    maxWidth: 480,
+    minHeight: 240,
+    borderRadius: 20,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
-  logoImage: { width: 104, height: 104, resizeMode: "contain" },
+  logoImage: { width: "100%", height: 220, resizeMode: "contain" },
   brand: { color: "#0F172A", fontSize: 40, fontWeight: "900" },
   parentBrand: {
     color: "#0F766E",

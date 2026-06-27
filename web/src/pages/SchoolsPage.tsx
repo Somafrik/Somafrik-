@@ -1,16 +1,16 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { scopedSchools } from "../lib/scope";
 import { normalize } from "../lib/format";
-import {
-  canManageRolePermissions,
-} from "../lib/permissions";
-import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions } from "../lib/usePermissionContext";
 import {
   COUNTRY_ADMIN_ROLE,
   isSchoolAwaitingSuperadminValidation,
+  isSuperAdminRole,
   PENDING_VALIDATION_STATUS,
+  resolveSchoolValidationStatus,
   VALIDATED_STATUS,
 } from "../lib/orgHierarchy";
 import { Card, SectionHeader } from "../components/ui/Card";
@@ -37,20 +37,25 @@ const EMPTY_SCHOOL: School = {
 };
 
 export function SchoolsPage() {
-  const { session } = useAuth();
+  const { session, setActiveSchool } = useAuth();
+  const navigate = useNavigate();
   const { state, update } = useData();
-  const ctx = usePermissionContext();
   const { showToast } = useToast();
 
   const allSchools = scopedSchools(session?.user ?? null, state);
-  const canValidateSchool = canManageRolePermissions(ctx);
-  const isCountryAdminView = session?.user?.role === COUNTRY_ADMIN_ROLE;
+  const canValidateSchool = isSuperAdminRole(session?.user?.role);
   const { canCreate, canUpdate, canSuspend } = useFeaturePermissions("Établissements");
+  const pendingSchoolsCount = useMemo(
+    () => allSchools.filter(isSchoolAwaitingSuperadminValidation).length,
+    [allSchools],
+  );
+  const isCountryAdminView = session?.user?.role === COUNTRY_ADMIN_ROLE;
 
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
+  const [validationFilter, setValidationFilter] = useState("");
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<School | null>(null);
   const [editing, setEditing] = useState<School | null>(null);
@@ -74,9 +79,14 @@ export function SchoolsPage() {
       const matchesCountry = !country || school.country === country;
       const matchesType = !type || school.type === type;
       const matchesStatus = !status || school.status === status;
-      return matchesQuery && matchesCountry && matchesType && matchesStatus;
+      const matchesValidation =
+        !validationFilter ||
+        (validationFilter === PENDING_VALIDATION_STATUS
+          ? isSchoolAwaitingSuperadminValidation(school)
+          : school.validationStatus === validationFilter);
+      return matchesQuery && matchesCountry && matchesType && matchesStatus && matchesValidation;
     });
-  }, [allSchools, search, country, type, status]);
+  }, [allSchools, search, country, type, status, validationFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -105,6 +115,20 @@ export function SchoolsPage() {
     );
     await persistSchools(next);
     setDetail(null);
+  }
+
+  async function validateAllPendingSchools() {
+    const pending = state.schools.filter(isSchoolAwaitingSuperadminValidation);
+    if (!pending.length) return;
+    const validatedBy = session?.user?.identifier ?? session?.user?.firstName ?? "Super Admin";
+    const validatedAt = new Date().toISOString();
+    const pendingCodes = new Set(pending.map((school) => school.code));
+    const next = state.schools.map((s) =>
+      pendingCodes.has(s.code)
+        ? { ...s, validationStatus: VALIDATED_STATUS, validatedBy, validatedAt }
+        : s,
+    );
+    await persistSchools(next, `${pending.length} établissement(s) validé(s).`);
   }
 
   async function validateSchool(school: School) {
@@ -170,6 +194,11 @@ export function SchoolsPage() {
     setEditing(null);
   }
 
+  function pilotSchool(school: School) {
+    setActiveSchool(school.code);
+    navigate("/etablissement");
+  }
+
   const columns: Column<School>[] = [
     {
       key: "name",
@@ -184,8 +213,44 @@ export function SchoolsPage() {
     { key: "type", header: "Type" },
     { key: "country", header: "Pays" },
     { key: "city", header: "Ville" },
-    { key: "validationStatus", header: "Validation", render: (s) => <StatusBadge status={s.validationStatus} /> },
+    { key: "validationStatus", header: "Validation", render: (s) => <StatusBadge status={resolveSchoolValidationStatus(s)} /> },
     { key: "status", header: "Statut", render: (s) => <StatusBadge status={s.status} /> },
+    ...(canValidateSchool
+      ? [
+          {
+            key: "actions",
+            header: "Actions",
+            align: "right" as const,
+            render: (s: School) => (
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    pilotSchool(s);
+                  }}
+                >
+                  Piloter
+                </Button>
+                {isSchoolAwaitingSuperadminValidation(s) ? (
+                  <Button
+                    size="sm"
+                    disabled={busy}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void validateSchool(s);
+                    }}
+                  >
+                    Valider
+                  </Button>
+                ) : null}
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -195,15 +260,22 @@ export function SchoolsPage() {
           title="Établissements"
           description={`${filtered.length} établissement(s) dans votre périmètre.`}
           actions={
-            canCreate ? (
-              <Button onClick={openCreateFlow}>
-                Nouvel établissement
-              </Button>
-            ) : undefined
+            <>
+              {canValidateSchool && pendingSchoolsCount > 0 ? (
+                <Button variant="secondary" disabled={busy} onClick={() => void validateAllPendingSchools()}>
+                  Valider ({pendingSchoolsCount})
+                </Button>
+              ) : null}
+              {canCreate ? (
+                <Button onClick={openCreateFlow}>
+                  Nouvel établissement
+                </Button>
+              ) : null}
+            </>
           }
         />
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Input
             placeholder="Rechercher…"
             value={search}
@@ -238,6 +310,19 @@ export function SchoolsPage() {
               { value: "", label: "Tous les statuts" },
               { value: "Actif", label: "Actif" },
               { value: "Suspendu", label: "Suspendu" },
+            ]}
+          />
+          <Select
+            value={validationFilter}
+            onChange={(e) => {
+              setValidationFilter(e.target.value);
+              resetPage();
+            }}
+            options={[
+              { value: "", label: "Toutes validations" },
+              { value: PENDING_VALIDATION_STATUS, label: "En attente de validation" },
+              { value: VALIDATED_STATUS, label: "Validé" },
+              { value: "Rejeté", label: "Rejeté" },
             ]}
           />
         </div>
@@ -347,7 +432,7 @@ export function SchoolsPage() {
             <DetailRow label="Email" value={detail.email} />
             <DetailRow label="Plan" value={detail.subscriptionPlan} />
             <DetailRow label="Abonnement" value={detail.subscriptionStatus} />
-            <DetailRow label="Validation" value={detail.validationStatus} />
+            <DetailRow label="Validation" value={resolveSchoolValidationStatus(detail)} />
             <DetailRow label="Statut" value={detail.status} />
           </dl>
           </>

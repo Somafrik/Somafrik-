@@ -1,13 +1,22 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
-import { getLiveKpis, scopedCountries, scopedSchools } from "../lib/scope";
+import { getLiveKpis, scopedCountries, scopedSchools, scopedUsers } from "../lib/scope";
 import { formatMetric, isInternalSchoolRole } from "../lib/format";
-import { PLATFORM_LEVELS } from "../lib/orgHierarchy";
+import { canAccessSchoolOperationalViews } from "../lib/superadminSchoolContext";
+import {
+  isSchoolAwaitingSuperadminValidation,
+  isSuperAdminRole,
+  isUserAwaitingSuperadminValidation,
+  PLATFORM_LEVELS,
+  VALIDATED_STATUS,
+} from "../lib/orgHierarchy";
 import { NAV_ITEMS } from "../lib/constants";
 import { canReadView, hasBackOfficePermission, hasSchoolPilotageAccess } from "../lib/permissions";
 import { usePermissionContext } from "../lib/usePermissionContext";
 import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { useToast } from "../components/ui/Toast";
 import type { Kpi } from "../lib/scope";
 
 const KPI_FEATURES: Record<string, string | null> = {
@@ -31,22 +40,105 @@ function filterKpisByPermissions(kpis: Kpi[], ctx: ReturnType<typeof usePermissi
 
 export function OverviewPage() {
   const { session } = useAuth();
-  const { state } = useData();
+  const { state, update } = useData();
+  const { showToast } = useToast();
   const ctx = usePermissionContext();
   const user = session?.user ?? null;
   const kpis = filterKpisByPermissions(getLiveKpis(user, state), ctx);
   const quickLinks = NAV_ITEMS.filter((item) => item.view !== "overview" && canReadView(ctx, item.view));
-  const showEstablishmentHub = isInternalSchoolRole(user?.role) && hasSchoolPilotageAccess(ctx);
+  const showEstablishmentHub =
+    canAccessSchoolOperationalViews(session) && hasSchoolPilotageAccess(ctx);
   const countries = scopedCountries(user, state);
   const schools = scopedSchools(user, state);
+  const platformUsers = scopedUsers(user, state);
+  const isSuperadmin = isSuperAdminRole(user?.role);
+  const pendingSchools = schools.filter(isSchoolAwaitingSuperadminValidation);
+  const pendingUsers = platformUsers.filter(isUserAwaitingSuperadminValidation);
+  const hasPendingValidations = isSuperadmin && (pendingSchools.length > 0 || pendingUsers.length > 0);
 
   const structureLevels = PLATFORM_LEVELS.map((level) => ({
     ...level,
     value: level.key === "pays" ? countries.length : schools.length,
   }));
 
+  async function validateAllPending() {
+    if (!isSuperadmin) return;
+    const validatedBy = session?.user?.identifier ?? session?.user?.firstName ?? "Super Admin";
+    const validatedAt = new Date().toISOString();
+    const pendingSchoolCodes = new Set(
+      state.schools.filter(isSchoolAwaitingSuperadminValidation).map((school) => school.code),
+    );
+    const pendingUserIds = new Set(
+      state.users.filter(isUserAwaitingSuperadminValidation).map((account) => account.id),
+    );
+    if (!pendingSchoolCodes.size && !pendingUserIds.size) return;
+
+    try {
+      await update({
+        schools: state.schools.map((school) =>
+          pendingSchoolCodes.has(school.code)
+            ? { ...school, validationStatus: VALIDATED_STATUS, validatedBy, validatedAt }
+            : school,
+        ),
+        users: state.users.map((account) =>
+          pendingUserIds.has(account.id)
+            ? {
+                ...account,
+                status: "Actif",
+                validationStatus: VALIDATED_STATUS,
+                validatedBy,
+                validatedAt,
+              }
+            : account,
+        ),
+      });
+      showToast(
+        `${pendingSchoolCodes.size} établissement(s) et ${pendingUserIds.size} compte(s) validé(s).`,
+        "success",
+      );
+    } catch {
+      showToast("Échec de la validation", "error");
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {hasPendingValidations ? (
+        <Card className="border-amber/30 bg-amber/10 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-amber">Validations en attente</p>
+              <p className="mt-1 text-sm text-muted">
+                {pendingSchools.length > 0
+                  ? `${pendingSchools.length} établissement(s) à valider`
+                  : null}
+                {pendingSchools.length > 0 && pendingUsers.length > 0 ? " • " : null}
+                {pendingUsers.length > 0 ? `${pendingUsers.length} compte(s) Admin École à valider` : null}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {pendingSchools.length > 0 ? (
+                <Link
+                  to="/etablissements"
+                  className="rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-brand/40"
+                >
+                  Voir établissements
+                </Link>
+              ) : null}
+              {pendingUsers.length > 0 ? (
+                <Link
+                  to="/utilisateurs"
+                  className="rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:border-brand/40"
+                >
+                  Voir utilisateurs
+                </Link>
+              ) : null}
+              <Button onClick={() => void validateAllPending()}>Tout valider</Button>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       {!isInternalSchoolRole(user?.role) ? (
         <Card className="p-5">
           <p className="text-xs font-bold uppercase tracking-wide text-brand">Structure Somafrik</p>

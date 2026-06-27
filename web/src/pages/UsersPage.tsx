@@ -4,8 +4,7 @@ import { useData } from "../context/DataContext";
 import { scopedCountries, scopedSchools, scopedUsers } from "../lib/scope";
 import { getCurrentSchool } from "../lib/establishment";
 import { isInternalSchoolRole, normalize, getInitials, resolveCountryScopeFromSchool } from "../lib/format";
-import { canManageRolePermissions } from "../lib/permissions";
-import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
+import { useFeaturePermissions } from "../lib/usePermissionContext";
 import {
   applyRoleChangeToUser,
   buildNewUserDraft,
@@ -20,6 +19,7 @@ import {
   COUNTRY_ADMIN_ROLE,
   isPendingValidationStatus,
   isSuperAdminRole,
+  isUserAwaitingSuperadminValidation,
   PENDING_VALIDATION_STATUS,
   VALIDATED_STATUS,
 } from "../lib/orgHierarchy";
@@ -53,12 +53,15 @@ function toCsv(users: UserAccount[], schools: School[]): string {
 export function UsersPage() {
   const { session } = useAuth();
   const { state, update } = useData();
-  const ctx = usePermissionContext();
   const { showToast } = useToast();
 
   const allUsers = scopedUsers(session?.user ?? null, state);
   const isSuperadminView = isSuperAdminRole(session?.user?.role);
-  const canValidateAccount = canManageRolePermissions(ctx);
+  const canValidateAccount = isSuperAdminRole(session?.user?.role);
+  const pendingAccountsCount = useMemo(
+    () => allUsers.filter(isUserAwaitingSuperadminValidation).length,
+    [allUsers],
+  );
   const isCountryAdminView = session?.user?.role === COUNTRY_ADMIN_ROLE;
   const school = getCurrentSchool(session?.user ?? null, state);
   const schoolCode = session?.user?.schoolCode;
@@ -66,6 +69,7 @@ export function UsersPage() {
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [validationFilter, setValidationFilter] = useState("");
   const [detail, setDetail] = useState<UserAccount | null>(null);
   const [editing, setEditing] = useState<UserAccount | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,9 +111,14 @@ export function UsersPage() {
           normalize(v).includes(q),
         );
       const matchesRole = !roleFilter || u.role === roleFilter;
-      return matchesQuery && matchesRole;
+      const matchesValidation =
+        !validationFilter ||
+        (validationFilter === PENDING_VALIDATION_STATUS
+          ? isUserAwaitingSuperadminValidation(u)
+          : (u.validationStatus ?? u.status) === validationFilter);
+      return matchesQuery && matchesRole && matchesValidation;
     });
-  }, [allUsers, search, roleFilter]);
+  }, [allUsers, search, roleFilter, validationFilter]);
 
   async function persistUsers(next: UserAccount[], message: string, syncedUser?: UserAccount) {
     setBusy(true);
@@ -134,6 +143,30 @@ export function UsersPage() {
     try {
       await persistUsers(next, `Compte ${nextStatus.toLowerCase()}`);
       setDetail(null);
+    } catch {
+      /* toast déjà affiché */
+    }
+  }
+
+  async function validateAllPendingAccounts() {
+    const pending = state.users.filter(isUserAwaitingSuperadminValidation);
+    if (!pending.length) return;
+    const validatedBy = session?.user?.identifier ?? session?.user?.firstName ?? "Super Admin";
+    const validatedAt = new Date().toISOString();
+    const pendingIds = new Set(pending.map((user) => user.id));
+    const next = state.users.map((u) =>
+      pendingIds.has(u.id)
+        ? {
+            ...u,
+            status: "Actif",
+            validationStatus: VALIDATED_STATUS,
+            validatedBy,
+            validatedAt,
+          }
+        : u,
+    );
+    try {
+      await persistUsers(next, `${pending.length} compte(s) validé(s).`);
     } catch {
       /* toast déjà affiché */
     }
@@ -277,7 +310,34 @@ export function UsersPage() {
     },
     { key: "role", header: "Rôle" },
     { key: "schoolCode", header: "Établissement", render: (u) => getUserEstablishmentLabel(u, state.schools) },
+    {
+      key: "validationStatus",
+      header: "Validation",
+      render: (u) => <StatusBadge status={u.validationStatus ?? (isUserAwaitingSuperadminValidation(u) ? PENDING_VALIDATION_STATUS : u.status)} />,
+    },
     { key: "status", header: "Statut", render: (u) => <StatusBadge status={u.status} /> },
+    ...(canValidateAccount
+      ? [
+          {
+            key: "actions",
+            header: "Actions",
+            align: "right" as const,
+            render: (u: UserAccount) =>
+              isUserAwaitingSuperadminValidation(u) ? (
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void validateAccount(u);
+                  }}
+                >
+                  Valider
+                </Button>
+              ) : null,
+          },
+        ]
+      : []),
   ];
 
   const isEditingExisting = Boolean(editing?.id && state.users.some((u) => u.id === editing.id));
@@ -306,6 +366,11 @@ export function UsersPage() {
           }
           actions={
             <div className="flex gap-2">
+              {canValidateAccount && pendingAccountsCount > 0 ? (
+                <Button variant="secondary" size="sm" disabled={busy} onClick={() => void validateAllPendingAccounts()}>
+                  Valider ({pendingAccountsCount})
+                </Button>
+              ) : null}
               <Button variant="secondary" size="sm" onClick={exportCsv} disabled={!filtered.length}>
                 Exporter CSV
               </Button>
@@ -317,7 +382,7 @@ export function UsersPage() {
             </div>
           }
         />
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Input
             placeholder="Rechercher un utilisateur…"
             value={search}
@@ -327,6 +392,15 @@ export function UsersPage() {
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
             options={[{ value: "", label: "Tous les rôles" }, ...roleOptions.map((r) => ({ value: r, label: r }))]}
+          />
+          <Select
+            value={validationFilter}
+            onChange={(e) => setValidationFilter(e.target.value)}
+            options={[
+              { value: "", label: "Toutes validations" },
+              { value: PENDING_VALIDATION_STATUS, label: "En attente de validation" },
+              { value: VALIDATED_STATUS, label: "Validé" },
+            ]}
           />
         </div>
         <div className="mt-4">
@@ -347,7 +421,7 @@ export function UsersPage() {
         footer={
           detail ? (
             (() => {
-              const detailPending = isPendingValidationStatus(detail.validationStatus ?? detail.status);
+              const detailPending = isUserAwaitingSuperadminValidation(detail);
               // Tant que le compte est en attente de validation, aucune action n'est
               // possible hormis sa validation par le Super Admin.
               if (detailPending) {
@@ -396,7 +470,7 @@ export function UsersPage() {
       >
         {detail ? (
           <>
-            {isPendingValidationStatus(detail.validationStatus ?? detail.status) ? (
+            {isUserAwaitingSuperadminValidation(detail) ? (
               <div className="mb-4 rounded-xl border border-amber/30 bg-amber/10 p-4 text-sm text-ink">
                 <p className="font-bold text-amber">En attente de validation</p>
                 <p className="mt-1 text-muted">

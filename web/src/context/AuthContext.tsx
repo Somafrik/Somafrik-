@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, setAccessTokenProvider } from "../api/client";
-import { normalizePlatformRole } from "../lib/orgHierarchy";
+import { normalizePlatformRole, isSuperAdminRole } from "../lib/orgHierarchy";
 import type { LoginProfile, Session } from "../types";
 
 interface LoginInput {
@@ -26,6 +26,8 @@ interface AuthContextValue {
   logout: () => void;
   changePassword: (newPassword: string) => Promise<void>;
   setSession: (session: Session | null) => void;
+  /** Superadmin : sélectionne l'établissement pour piloter les modules scolaires. */
+  setActiveSchool: (schoolCode: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -102,6 +104,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, [setSession]);
 
+  const setActiveSchool = useCallback(
+    (schoolCode: string | null) => {
+      const current = sessionRef.current;
+      if (!current?.user || !isSuperAdminRole(current.user.role)) return;
+      const code = schoolCode?.trim().toUpperCase() || undefined;
+      setSession({
+        ...current,
+        activeSchoolCode: code,
+        user: {
+          ...current.user,
+          schoolCode: code,
+        },
+      });
+    },
+    [setSession],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -110,8 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       changePassword,
       setSession,
+      setActiveSchool,
     }),
-    [session, login, logout, changePassword, setSession],
+    [session, login, logout, changePassword, setSession, setActiveSchool],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

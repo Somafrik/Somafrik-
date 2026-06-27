@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { SOMAFRIK_LOGO_URL } from "../lib/brand";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../components/ui/Toast";
 import { Button } from "../components/ui/Button";
@@ -106,13 +107,11 @@ export function LoginPage() {
     <div className="grid min-h-screen lg:grid-cols-2">
       <section className="relative hidden flex-col justify-between bg-gradient-to-br from-brand to-brand-700 p-12 text-white lg:flex">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-lg font-black">
-            SF
-          </div>
-          <div>
-            <p className="text-lg font-black">Somafrik</p>
-            <p className="text-sm text-white/70">ERP scolaire SaaS</p>
-          </div>
+          <img
+            src={SOMAFRIK_LOGO_URL}
+            alt="Logo Somafrik"
+            className="h-36 w-auto max-w-[560px] object-contain"
+          />
         </div>
 
         <div className="max-w-md space-y-4">
@@ -130,6 +129,13 @@ export function LoginPage() {
 
       <section className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md space-y-6">
+          <div className="flex justify-center lg:hidden">
+            <img
+              src={SOMAFRIK_LOGO_URL}
+              alt="Logo Somafrik"
+              className="h-32 w-auto max-w-[min(100%,520px)] object-contain"
+            />
+          </div>
           <div>
             <Link
               to="/"

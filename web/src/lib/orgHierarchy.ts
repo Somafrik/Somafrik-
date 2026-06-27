@@ -21,16 +21,46 @@ export function isPendingValidationStatus(status?: string): boolean {
   return value === "en attente de validation" || value === "en attente";
 }
 
+export function isSchoolValidated(school?: { validationStatus?: string }): boolean {
+  return school?.validationStatus === VALIDATED_STATUS;
+}
+
+export function resolveSchoolValidationStatus(school?: {
+  validationStatus?: string;
+  validationRequestedBy?: string;
+}): string {
+  if (!school) return PENDING_VALIDATION_STATUS;
+  if (school.validationStatus === VALIDATED_STATUS) return VALIDATED_STATUS;
+  if (school.validationStatus === "Rejeté") return "Rejeté";
+  if (isPendingValidationStatus(school.validationStatus)) return PENDING_VALIDATION_STATUS;
+  if (school.validationRequestedBy) return PENDING_VALIDATION_STATUS;
+  return PENDING_VALIDATION_STATUS;
+}
+
 /** Établissement créé par Admin Pays, en attente de validation Super Admin. */
 export function isSchoolAwaitingSuperadminValidation(school?: {
   validationStatus?: string;
   validationRequestedBy?: string;
 }): boolean {
   if (!school) return false;
-  const status = school.validationStatus;
+  const status = school.validationStatus?.trim();
   if (status === VALIDATED_STATUS || status === "Rejeté") return false;
-  if (isPendingValidationStatus(status)) return true;
-  return Boolean(school.validationRequestedBy);
+  return true;
+}
+
+/** Compte Admin School créé par Admin Pays, en attente de validation Super Admin. */
+export function isUserAwaitingSuperadminValidation(user?: {
+  role?: string;
+  status?: string;
+  validationStatus?: string;
+  validationRequestedBy?: string;
+}): boolean {
+  if (!user || user.role !== SCHOOL_ADMIN_ROLE) return false;
+  if (user.validationStatus === VALIDATED_STATUS) return false;
+  if (user.validationStatus === "Rejeté") return false;
+  if (isPendingValidationStatus(user.validationStatus ?? user.status)) return true;
+  if (user.validationRequestedBy) return true;
+  return user.status !== "Actif";
 }
 
 export function normalizePlatformRole(role?: string): string {

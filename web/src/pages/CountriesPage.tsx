@@ -70,7 +70,6 @@ function validateCountry(
 export function CountriesPage() {
   const { session } = useAuth();
   const { state, update } = useData();
-  const ctx = usePermissionContext();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<Country | null>(null);

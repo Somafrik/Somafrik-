@@ -1,1 +1,7 @@
 .expo/
+dist/
+release.keystore
+android/keystore.properties
+android/app/release.keystore
+.env
+.env.local

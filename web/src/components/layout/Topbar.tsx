@@ -2,6 +2,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
 import { displayRoleName, getInitials } from "../../lib/format";
 import { Button } from "../ui/Button";
+import { SuperadminSchoolSelector } from "./SuperadminSchoolSelector";
 
 export function Topbar({ title }: { title: string }) {
   const { session, logout } = useAuth();
@@ -11,10 +12,12 @@ export function Topbar({ title }: { title: string }) {
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-line bg-white/90 px-6 py-3 backdrop-blur">
-      <div>
+      <div className="min-w-0 flex-1">
         <h1 className="text-lg font-bold text-ink">{title}</h1>
         {scope?.label ? <p className="text-xs text-muted">{scope.label}</p> : null}
       </div>
+
+      <SuperadminSchoolSelector />
 
       <div className="flex items-center gap-3">
         {error ? (

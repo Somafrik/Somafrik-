@@ -93,10 +93,6 @@ export default function RoleSelectionScreen({ navigation }: Props) {
           <View style={styles.mark}>
             <Image source={somafrikLogo} style={styles.markLogo} />
           </View>
-          <View style={styles.headerText}>
-            <Text style={styles.brand}>Somafrik</Text>
-            <Text style={styles.subtitle}>ERP scolaire par Somafrik</Text>
-          </View>
         </View>
 
         <View style={styles.hero}>
@@ -209,22 +205,25 @@ const styles = StyleSheet.create({
     paddingTop: 54,
   },
   header: {
-    flexDirection: "row",
     alignItems: "center",
     marginBottom: 32,
   },
   mark: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
+    width: "100%",
+    maxWidth: 320,
+    height: 120,
+    borderRadius: 12,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 0,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    alignSelf: "center",
   },
-  markLogo: { width: 52, height: 52, resizeMode: "contain" },
+  markLogo: { width: "100%", height: 108, resizeMode: "contain" },
   headerText: {
     flex: 1,
   },
@@ -346,8 +345,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   logo: {
-    width: 52,
-    height: 52,
+    width: 140,
+    height: 76,
     borderRadius: 8,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
@@ -355,8 +354,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderWidth: 1,
     borderColor: "#D1FAE5",
+    paddingHorizontal: 6,
   },
-  schoolLogoImage: { width: 48, height: 48, resizeMode: "contain" },
+  schoolLogoImage: { width: 128, height: 68, resizeMode: "contain" },
   schoolCopy: {
     flex: 1,
     minWidth: 0,
