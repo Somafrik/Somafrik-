@@ -9,21 +9,36 @@ function isLocalhostUrl(url: string) {
   return /:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(url);
 }
 
+function extractHost(value?: string): string | null {
+  if (!value) return null;
+  const raw = String(value).replace(/^exp:\/\//, "").replace(/^https?:\/\//, "");
+  const host = raw.split(":")[0]?.trim();
+  if (!host || isLocalhostUrl(`http://${host}`)) {
+    return null;
+  }
+  return host;
+}
+
 /** IP de la machine de dev (PC) telle qu'Expo Go la voit via Metro. */
 function getDevMachineHost(): string | null {
+  const extra = Constants.expoConfig?.extra as { packagerHost?: string } | undefined;
+
   const candidates = [
+    extra?.packagerHost,
+    process.env.REACT_NATIVE_PACKAGER_HOSTNAME,
     Constants.expoGoConfig?.debuggerHost,
     (Constants.expoConfig as { hostUri?: string } | null)?.hostUri,
     (Constants.manifest2 as { extra?: { expoClient?: { hostUri?: string } } } | null)?.extra?.expoClient
       ?.hostUri,
-    (Constants as { manifest?: { debuggerHost?: string } }).manifest?.debuggerHost,
+    (Constants as { manifest?: { debuggerHost?: string; hostUri?: string } }).manifest?.debuggerHost,
+    (Constants as { manifest?: { debuggerHost?: string; hostUri?: string } }).manifest?.hostUri,
+    (Constants as { manifest?: { extra?: { expoClient?: { hostUri?: string } } } }).manifest?.extra
+      ?.expoClient?.hostUri,
   ];
 
   for (const value of candidates) {
-    if (!value) continue;
-    const raw = String(value).replace(/^exp:\/\//, "").replace(/^https?:\/\//, "");
-    const host = raw.split(":")[0]?.trim();
-    if (host && !isLocalhostUrl(`http://${host}`)) {
+    const host = extractHost(value);
+    if (host) {
       return host;
     }
   }

@@ -1,6 +1,7 @@
 /** @type {import("@expo/config").ExpoConfig} */
 module.exports = ({ config }) => {
   const apiUrl = String(process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000").replace(/\/$/, "");
+  const packagerHost = String(process.env.REACT_NATIVE_PACKAGER_HOSTNAME ?? "").trim();
 
   return {
     ...config,
@@ -11,6 +12,7 @@ module.exports = ({ config }) => {
     extra: {
       ...config.extra,
       apiUrl,
+      packagerHost: packagerHost || undefined,
       demoMode: process.env.EXPO_PUBLIC_DEMO_MODE === "true",
     },
     ios: {
