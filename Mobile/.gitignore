@@ -1,3 +1,4 @@
 .expo/
+.env.local
 release.keystore
 android/keystore.properties
