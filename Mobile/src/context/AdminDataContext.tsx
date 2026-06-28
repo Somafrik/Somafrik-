@@ -21,8 +21,16 @@ import {
   TeacherAssignment,
   UserAccount,
 } from "../data/catalog";
-import { resolveEffectivePermissions, roleLabelFromSessionRole } from "../domain/security/permissions";
+import { enrichSessionPermissions } from "../domain/security/permissions";
 import { removeSchoolClassFromState } from "../lib/classRules";
+import {
+  ALL_SCHOOLS_CODE,
+  pickInitialSchoolCode,
+  userRequiresSchoolSelection,
+  writeStoredSchoolCode,
+} from "../lib/activeSchool";
+import { normalize } from "../lib/format";
+import { scopeBackOfficeForSession, scopedSchools, type PlatformNotification } from "../lib/scope";
 import { getAcademicConfig, getBackOfficeState, getClasses, getCourses, getNotes, getPresences, getStudents, saveBackOfficeState, BackOfficeStatePayload } from "../services/api";
 import { SYNC_INTERVAL_MS } from "../config/env";
 import { useAuth } from "./AuthContext";
@@ -60,8 +68,13 @@ type AdminDataContextValue = {
   usersData: UserAccount[];
   announcementsData: Announcement[];
   messagesData: SchoolMessage[];
+  notificationsData: PlatformNotification[];
   rolePermissionsData: Record<string, string[]>;
   academicConfigData: AcademicManagementConfig;
+  activeSchoolCode: string;
+  availableSchools: SchoolProfile[];
+  requiresSchoolSelection: boolean;
+  setActiveSchoolCode: (code: string) => void;
   syncStatus: "idle" | "syncing" | "synced" | "offline";
   getItems: (entity: AdminEntity) => any[];
   createItem: (entity: AdminEntity, item: any) => void;
@@ -70,6 +83,8 @@ type AdminDataContextValue = {
   upsertPresenceItems: (items: PresenceItem[]) => void;
   upsertNoteItem: (item: NoteItem) => void;
   updateRoleFeatureAccess: (role: string, feature: string, permissions: string[], enabled: boolean) => void;
+  upsertNotification: (item: PlatformNotification) => void;
+  updateNotifications: (items: PlatformNotification[]) => void;
 };
 
 const AdminDataContext = createContext<AdminDataContextValue | undefined>(undefined);
@@ -104,9 +119,51 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   const [usersData, setUsersData] = useState<UserAccount[]>([]);
   const [announcementsData, setAnnouncementsData] = useState<Announcement[]>([]);
   const [messagesData, setMessagesData] = useState<SchoolMessage[]>([]);
+  const [notificationsData, setNotificationsData] = useState<PlatformNotification[]>([]);
   const [rolePermissionsData, setRolePermissionsData] = useState<Record<string, string[]>>({});
   const [academicConfigData, setAcademicConfigData] = useState<AcademicManagementConfig>(emptyAcademicConfig);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
+  const [activeSchoolCode, setActiveSchoolCodeState] = useState("");
+
+  const scopeUser = useMemo(
+    () =>
+      session
+        ? {
+            role: session.role,
+            countryScope: session.user.countryScope ?? session.user.countryCode,
+            schoolCode: session.user.schoolCode ?? session.school.code,
+          }
+        : null,
+    [session],
+  );
+
+  const availableSchools = useMemo(() => {
+    if (!scopeUser) return [] as SchoolProfile[];
+    return scopedSchools(scopeUser, {
+      schools: schoolsData,
+      users: usersData,
+      countries: countriesData,
+      subscriptions: subscriptionsData,
+      notifications: notificationsData,
+    }) as SchoolProfile[];
+  }, [scopeUser, schoolsData, usersData, countriesData, subscriptionsData, notificationsData]);
+
+  useEffect(() => {
+    const codes = availableSchools.map((school) => school.code);
+    setActiveSchoolCodeState((current) => {
+      const next = pickInitialSchoolCode(scopeUser, codes);
+      if (!current) return next;
+      if (codes.some((code) => normalize(code) === normalize(current))) return current;
+      return next;
+    });
+  }, [scopeUser?.role, scopeUser?.countryScope, availableSchools.map((s) => s.code).join("|")]);
+
+  const setActiveSchoolCode = (code: string) => {
+    setActiveSchoolCodeState(code);
+    writeStoredSchoolCode(code);
+  };
+
+  const requiresSchoolSelection = userRequiresSchoolSelection(scopeUser);
 
   const stateSnapshot = useMemo(
     () => ({
@@ -125,6 +182,7 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       users: usersData,
       announcements: announcementsData,
       messages: messagesData,
+      notifications: notificationsData,
       rolePermissions: rolePermissionsData,
       academicConfigs: { [academicConfigData.schoolCode]: academicConfigData },
     }),
@@ -146,11 +204,17 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       usersData,
       rolePermissionsData,
       academicConfigData,
+      notificationsData,
     ]
   );
   const scopedStateSnapshot = useMemo(
-    () => scopeBackOfficePayload(stateSnapshot, session),
-    [session, stateSnapshot]
+    () =>
+      scopeBackOfficeForSession(
+        stateSnapshot,
+        session,
+        requiresSchoolSelection ? activeSchoolCode : undefined,
+      ),
+    [session, stateSnapshot, activeSchoolCode, requiresSchoolSelection]
   );
 
   useEffect(() => {
@@ -215,31 +279,33 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
   }, [session?.accessToken]);
 
   const applySyncedState = (payload: BackOfficeStatePayload) => {
-    const scopedPayload = scopeBackOfficePayload(payload, session);
-    applyArray(scopedPayload.students, setStudentsData);
-    applyArray(scopedPayload.teachers, setTeachersData);
-    applyArray(scopedPayload.classes, setClassesData);
-    applyArray(scopedPayload.countries, setCountriesData);
-    applyArray(scopedPayload.courses, setCoursesData);
-    applyArray(scopedPayload.assignments, setAssignmentsData);
-    applyArray(scopedPayload.payments, setPaymentsData);
-    applyArray(scopedPayload.subscriptions, setSubscriptionsData);
-    applyArray(scopedPayload.paymentStatuses, setPaymentStatusesData);
-    applyArray(scopedPayload.presences, setPresencesData);
-    applyArray(scopedPayload.notes, setNotesData);
-    applyArray(scopedPayload.schools, setSchoolsData);
-    applyArray(scopedPayload.users, setUsersData);
-    applyArray(scopedPayload.announcements, setAnnouncementsData);
-    applyArray(scopedPayload.messages, setMessagesData);
+    applyArray(payload.students, setStudentsData);
+    applyArray(payload.teachers, setTeachersData);
+    applyArray(payload.classes, setClassesData);
+    applyArray(payload.countries, setCountriesData);
+    applyArray(payload.courses, setCoursesData);
+    applyArray(payload.assignments, setAssignmentsData);
+    applyArray(payload.payments, setPaymentsData);
+    applyArray(payload.subscriptions, setSubscriptionsData);
+    applyArray(payload.paymentStatuses, setPaymentStatusesData);
+    applyArray(payload.presences, setPresencesData);
+    applyArray(payload.notes, setNotesData);
+    applyArray(payload.schools, setSchoolsData);
+    applyArray(payload.users, setUsersData);
+    applyArray(payload.announcements, setAnnouncementsData);
+    applyArray(payload.messages, setMessagesData);
+    applyArray(payload.notifications, setNotificationsData);
     if (payload.rolePermissions && typeof payload.rolePermissions === "object") {
       setRolePermissionsData(payload.rolePermissions);
     }
-    if (scopedPayload.academicConfigs && typeof scopedPayload.academicConfigs === "object") {
-      const configs = scopedPayload.academicConfigs as Record<string, AcademicManagementConfig>;
-      const firstConfig = Object.values(configs)[0];
-      if (firstConfig) {
-        setAcademicConfigData(firstConfig);
-      }
+    if (payload.academicConfigs && typeof payload.academicConfigs === "object") {
+      const configs = payload.academicConfigs as Record<string, AcademicManagementConfig>;
+      const targetCode =
+        activeSchoolCode && activeSchoolCode !== ALL_SCHOOLS_CODE
+          ? activeSchoolCode
+          : session?.user?.schoolCode ?? session?.school?.code;
+      const config = (targetCode && configs[targetCode]) || Object.values(configs)[0];
+      if (config) setAcademicConfigData(config);
     }
   };
 
@@ -248,21 +314,15 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const roleLabel = roleLabelFromSessionRole(session.role);
-    const merged = resolveEffectivePermissions(roleLabel, session.user?.permissions ?? session.permissions, rolePermissionsData);
+    const enriched = enrichSessionPermissions(session, rolePermissionsData);
+    if (!enriched) return;
+
     const currentPermissions = session.permissions ?? session.user.permissions ?? [];
-    if (sameStringSet(currentPermissions, merged)) {
+    if (sameStringSet(currentPermissions, enriched.permissions ?? [])) {
       return;
     }
 
-    setSession({
-      ...session,
-      permissions: merged,
-      user: {
-        ...session.user,
-        permissions: merged,
-      },
-    });
+    setSession(enriched);
   }, [rolePermissionsData, session?.accessToken, session?.role]);
 
   const persistSyncedState = (nextState: BackOfficeStatePayload) => {
@@ -356,8 +416,13 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
       usersData: (state.users ?? []) as UserAccount[],
       announcementsData: (state.announcements ?? []) as Announcement[],
       messagesData: (state.messages ?? []) as SchoolMessage[],
+      notificationsData: (state.notifications ?? []) as PlatformNotification[],
       rolePermissionsData,
       academicConfigData,
+      activeSchoolCode,
+      availableSchools,
+      requiresSchoolSelection,
+      setActiveSchoolCode,
       syncStatus,
       getItems: (entity) => state[entity],
       createItem: (entity, item) => commitEntity(entity, (items) => [applyItemScope(entity, item, session, state), ...items]),
@@ -413,6 +478,17 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
           return nextItems;
         }),
       updateRoleFeatureAccess,
+      upsertNotification: (item) => {
+        setNotificationsData((current) => {
+          const next = [item, ...current.filter((row) => row.id !== item.id)];
+          persistSyncedState({ ...stateSnapshot, notifications: next });
+          return next;
+        });
+      },
+      updateNotifications: (items) => {
+        setNotificationsData(items);
+        persistSyncedState({ ...stateSnapshot, notifications: items });
+      },
     };
   }, [
     announcementsData,
@@ -432,6 +508,9 @@ export function AdminDataProvider({ children }: { children: React.ReactNode }) {
     teachersData,
     usersData,
     rolePermissionsData,
+    activeSchoolCode,
+    availableSchools,
+    requiresSchoolSelection,
     session?.accessToken,
     session?.role,
     session?.school.code,
@@ -452,50 +531,6 @@ function applyArray<T>(value: unknown, setter: React.Dispatch<React.SetStateActi
   if (Array.isArray(value)) {
     setter(value as T[]);
   }
-}
-
-function scopeBackOfficePayload<T extends BackOfficeStatePayload>(payload: T, session: any): T {
-  if (!session || session.role === "super_admin") {
-    return payload;
-  }
-
-  const schoolCode = getSessionSchoolCode(session);
-  if (!schoolCode || session.role === "country_admin") {
-    return payload;
-  }
-
-  const students = filterBySchool(payload.students, schoolCode) as Student[];
-  const studentIds = new Set(students.map((item) => item.id));
-  const classNames = new Set(students.map((item) => item.className).filter(Boolean));
-  const classes = filterRows(payload.classes, (item) => rowInSchool(item, schoolCode) || classNames.has(item.name)) as SchoolClass[];
-  classes.forEach((item) => item.name && classNames.add(item.name));
-  const teachers = filterRows(payload.teachers, (item) =>
-    rowInSchool(item, schoolCode) ||
-    (item.assignedClasses ?? []).some((className: string) => classNames.has(className)) ||
-    (item.assignments ?? []).some((assignment: TeacherAssignment) => classNames.has(assignment.className))
-  ) as Teacher[];
-  const teacherIds = new Set(teachers.map((item) => item.id));
-
-  return {
-    ...payload,
-    schools: filterRows(payload.schools, (item) => item.code === schoolCode),
-    users: filterRows(payload.users, (item) => item.schoolCode === schoolCode),
-    students,
-    teachers,
-    classes,
-    courses: filterRows(payload.courses, (item) => rowInSchool(item, schoolCode) || classNames.has(item.className)),
-    assignments: filterRows(payload.assignments, (item) =>
-      rowInSchool(item, schoolCode) || classNames.has(item.className) || teacherIds.has(item.teacherId)
-    ),
-    payments: filterRows(payload.payments, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
-    paymentStatuses: filterRows(payload.paymentStatuses, (item) => rowInSchool(item, schoolCode)),
-    subscriptions: filterRows(payload.subscriptions, (item) => item.schoolCode === schoolCode),
-    presences: filterRows(payload.presences, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
-    notes: filterRows(payload.notes, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
-    announcements: filterRows(payload.announcements, (item) => rowInSchool(item, schoolCode)),
-    messages: filterRows(payload.messages, (item) => rowInSchool(item, schoolCode) || studentIds.has(item.studentId)),
-    academicConfigs: filterAcademicConfigs(payload.academicConfigs, schoolCode),
-  };
 }
 
 function getSessionSchoolCode(session: any) {

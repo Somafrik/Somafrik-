@@ -3,13 +3,9 @@ import { VIEW_PERMISSION_FEATURES } from "./constants";
 import { getInternalRoleDefaults } from "./internalRoleDefaults";
 import { isInternalSchoolRole, normalize, isSchoolAdminRole } from "./format";
 import { canSchoolAdminMutateTeachers } from "./pedagogyGovernance";
-import {
-  isSuperAdminRole,
-  SUPERADMIN_MANAGED_ROLES,
-} from "./orgHierarchy";
+import { isSuperAdminRole, COUNTRY_ADMIN_ROLE, SUPERADMIN_MANAGED_ROLES } from "./orgHierarchy";
 import {
   isEstablishmentOperationalRole,
-  COUNTRY_ADMIN_ROLE,
   COUNTRY_SCOPE_MODULES,
   normalizeManagedRolePermissions,
 } from "./roleGovernance";
@@ -149,6 +145,13 @@ export function canManageRolePermissions(ctx: PermissionContext): boolean {
   return getCurrentRolePermissions(ctx).includes("ALL_PRIVILEGES");
 }
 
+/** Configuration académique établissement (niveaux, classes, matières…). */
+export function canManageEstablishmentSettings(ctx: PermissionContext): boolean {
+  if (!ctx.user) return false;
+  if (isSuperAdminRole(ctx.user.role)) return true;
+  return hasBackOfficePermission(ctx, "Paramètres Établissement", "UPDATE");
+}
+
 export function getFeaturePermissions(ctx: PermissionContext, feature: string): FeaturePermissions {
   return {
     canRead: hasBackOfficePermission(ctx, feature, "READ"),
@@ -209,6 +212,7 @@ export function canReadView(ctx: PermissionContext, viewName: string): boolean {
     return isInternalSchoolRole(ctx.user?.role);
   }
   if (viewName === "configuration") {
+    if (isSuperAdminRole(ctx.user?.role)) return true;
     if (!isInternalSchoolRole(ctx.user?.role)) return false;
     return (
       hasBackOfficePermission(ctx, "Paramètres Établissement", "READ") ||

@@ -1,18 +1,26 @@
-import type { AdminEntity } from "../../context/AdminDataContext";
+import { normalize, isInternalSchoolRole, isSchoolAdminRole } from "../../lib/format";
+import { getInternalRoleDefaults } from "../../lib/internalRoleDefaults";
+import { canSchoolAdminMutateTeachers } from "../../lib/pedagogyGovernance";
+import {
+  isSuperAdminRole,
+  COUNTRY_ADMIN_ROLE,
+  sessionRoleToPlatformRole,
+} from "../../lib/orgHierarchy";
+import { COUNTRY_SCOPE_MODULES } from "../../lib/roleGovernance";
+import { SCHOOL_ENTITY_VIEWS, VIEW_PERMISSION_FEATURES, ENTITY_VIEW_MAP } from "../../lib/constants";
 
 export type SecurityAction = "READ" | "CREATE" | "UPDATE" | "DELETE" | "SUSPEND";
 
 export const SUPER_ADMIN_ROLE = "Super Administrateur Somafrik";
 export const LEGACY_SUPER_ADMIN_ROLE = "Super Administrateur OKAFRIK";
 
-export function isSuperAdminRole(role?: string) {
-  return role === SUPER_ADMIN_ROLE || role === LEGACY_SUPER_ADMIN_ROLE;
+export function isSuperAdminSessionRole(role?: string) {
+  return role === "super_admin" || isSuperAdminRole(role);
 }
 
-const crudActions: SecurityAction[] = ["READ", "CREATE", "UPDATE", "DELETE", "SUSPEND"];
 const schoolAdminForbiddenFeatures = new Set(["Établissements", "Abonnements"]);
 
-export const entityFeatureMap: Partial<Record<AdminEntity, string>> = {
+export const entityFeatureMap: Record<string, string> = {
   schools: "Établissements",
   countries: "Pays",
   users: "Utilisateurs",
@@ -58,31 +66,16 @@ export const routeFeatureMap: Record<string, string> = {
   MobilePayment: "Paiements",
   OfflineMode: "Documents",
   Synchronization: "Documents",
+  Configuration: "Paramètres Établissement",
+  PlatformNotifications: "Notifications",
+  Permissions: "Droits par rôle",
 };
 
-function normalize(value?: string) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-}
-
-const COUNTRY_PRIVILEGE_FEATURES = new Set([
-  "pays",
-  "etablissements",
-  "abonnements",
-  "utilisateurs",
-  "rapports",
-]);
+const COUNTRY_PRIVILEGE_FEATURES = new Set(["pays", "etablissements", "abonnements", "utilisateurs", "rapports"]);
 
 function countryPrivilegeAllows(normalizedFeature: string, action: SecurityAction) {
-  if (!COUNTRY_PRIVILEGE_FEATURES.has(normalizedFeature)) {
-    return false;
-  }
-  if (normalizedFeature === "pays") {
-    return action === "READ";
-  }
+  if (!COUNTRY_PRIVILEGE_FEATURES.has(normalizedFeature)) return false;
+  if (normalizedFeature === "pays") return action === "READ";
   return true;
 }
 
@@ -94,12 +87,8 @@ function permissionMatchesFeature(
   if (normalizedPermission === "country-privileges") {
     return countryPrivilegeAllows(normalizedFeature, action);
   }
-  if (normalizedPermission === "all-privileges") {
-    return true;
-  }
-  if (!normalizedPermission.includes(normalizedFeature)) {
-    return false;
-  }
+  if (normalizedPermission === "all-privileges") return true;
+  if (!normalizedPermission.includes(normalizedFeature)) return false;
   if (action === "READ") {
     return (
       normalizedPermission.includes("voir") ||
@@ -115,7 +104,13 @@ function permissionMatchesFeature(
       normalizedPermission.includes("organiser") ||
       normalizedPermission.includes("creer") ||
       normalizedPermission.includes("ajouter") ||
-      normalizedPermission.includes("modifier")
+      normalizedPermission.includes("modifier") ||
+      normalizedPermission.includes("messages") ||
+      normalizedPermission.includes("annonces") ||
+      normalizedPermission.includes("appel") ||
+      normalizedPermission.includes("eleve") ||
+      normalizedPermission.includes("note") ||
+      normalizedPermission.includes("classe")
     );
   }
   return (
@@ -132,99 +127,169 @@ export function resolveEffectivePermissions(
   rolePermissions: Record<string, string[]> = {},
 ): string[] {
   const fromUser = userPermissions ?? [];
-  const fromRole =
-    role && Array.isArray(rolePermissions[role])
-      ? rolePermissions[role]
-      : isSuperAdminRole(role) && Array.isArray(rolePermissions[LEGACY_SUPER_ADMIN_ROLE])
-        ? rolePermissions[LEGACY_SUPER_ADMIN_ROLE]
-        : [];
-  return [...new Set([...fromUser, ...fromRole])];
+  const fromRole = role && Array.isArray(rolePermissions[role]) ? rolePermissions[role] : [];
+  const fromDefaults = getInternalRoleDefaults(role);
+  const merged = [...new Set([...fromUser, ...fromRole, ...fromDefaults])];
+  if (isSuperAdminRole(role) && !merged.includes("ALL_PRIVILEGES")) {
+    merged.push("ALL_PRIVILEGES");
+  }
+  return merged;
 }
 
 export function roleLabelFromSessionRole(role?: string) {
-  if (role === "super_admin") return "Super Administrateur Somafrik";
-  if (role === "country_admin") return "Admin Pays";
-  if (role === "school_admin") return "Admin School";
-  if (role === "principal" || role === "prefet") return "Préfet des études";
-  if (role === "secretary") return "Secrétaire";
-  if (role === "teacher") return "Enseignant";
-  if (role === "parent_student") return "Parent";
-  if (role === "student") return "Élève / Étudiant";
-  return role;
+  return sessionRoleToPlatformRole(role);
 }
 
-export function hasSecurityPermission(session: any, feature: string | undefined, action: SecurityAction = "READ") {
-  if (!feature) {
-    return true;
-  }
+export function getEffectivePermissionsForSession(
+  session: any,
+  rolePermissions: Record<string, string[]> = {},
+): string[] {
+  if (!session) return [];
+  const roleLabel = roleLabelFromSessionRole(session.role) || session.user?.role;
+  return resolveEffectivePermissions(
+    roleLabel,
+    session.permissions ?? session.user?.permissions,
+    session.rolePermissions ?? rolePermissions,
+  );
+}
 
-  if ((session?.role === "school_admin" || session?.user?.role === "Admin School") && schoolAdminForbiddenFeatures.has(feature)) {
-    return false;
-  }
+export function enrichSessionPermissions(session: any, rolePermissions: Record<string, string[]> = {}) {
+  if (!session) return null;
+  const permissions = getEffectivePermissionsForSession(session, rolePermissions);
+  return {
+    ...session,
+    permissions,
+    user: {
+      ...session.user,
+      permissions,
+    },
+  };
+}
 
-  const permissions = new Set<string>(session?.permissions ?? session?.user?.permissions ?? []);
+export function buildPermissionSession(session: any) {
+  const roleLabel = roleLabelFromSessionRole(session?.role);
+  const permissions = resolveEffectivePermissions(
+    roleLabel,
+    session?.permissions ?? session?.user?.permissions,
+    session?.rolePermissions ?? {},
+  );
+  return {
+    ...session,
+    permissions,
+    platformRole: roleLabel,
+  };
+}
 
-  if (permissions.has("ALL_PRIVILEGES")) {
-    return true;
-  }
-
-  if (permissions.has("COUNTRY_PRIVILEGES")) {
+function hasSecurityPermissionInternal(
+  permissions: Set<string>,
+  feature: string,
+  action: SecurityAction,
+): boolean {
+  if (permissions.has("ALL_PRIVILEGES")) return true;
+  if (permissions.has("COUNTRY_PRIVILEGES") && action === "READ") {
     return countryPrivilegeAllows(normalize(feature), action);
   }
-
-  if (permissions.has(`${feature}:CRUD`)) {
-    return true;
-  }
-
+  if (permissions.has(`${feature}:CRUD`)) return true;
   if (action === "READ" && (permissions.has(`${feature}:R`) || permissions.has(`${feature}:READ`))) {
     return true;
   }
+  if (permissions.has(`${feature}:${action}`)) return true;
 
-  if (permissions.has(`${feature}:${action}`)) {
-    return true;
+  const normalizedFeature = normalize(feature);
+  return [...permissions].some((permission) =>
+    permissionMatchesFeature(normalize(permission), normalizedFeature, action),
+  );
+}
+
+export function hasSecurityPermission(session: any, feature: string | undefined, action: SecurityAction = "READ") {
+  if (!feature) return true;
+  if (isSuperAdminSessionRole(session?.role)) return true;
+
+  const platformRole = roleLabelFromSessionRole(session?.role);
+  if (
+    (session?.role === "school_admin" || isSchoolAdminRole(platformRole)) &&
+    schoolAdminForbiddenFeatures.has(feature)
+  ) {
+    return false;
   }
 
+  if (
+    (session?.role === "school_admin" || isSchoolAdminRole(platformRole)) &&
+    feature === "Enseignants" &&
+    !canSchoolAdminMutateTeachers(action)
+  ) {
+    return false;
+  }
+
+  const permissions = new Set<string>(getEffectivePermissionsForSession(session));
+
   if (feature === "Pays") {
-    return permissions.has("Contrôler tous les pays");
+    return permissions.has("Contrôler tous les pays") || hasSecurityPermissionInternal(permissions, feature, action);
   }
 
   if (feature === "Abonnements") {
     return (
       permissions.has("Gérer abonnements") ||
-      permissions.has("Suivre abonnements pays")
+      permissions.has("Suivre abonnements pays") ||
+      hasSecurityPermissionInternal(permissions, feature, action)
     );
   }
 
-  if (feature === "Affectations") {
-    return (
-      permissions.has("Gérer affectations") ||
-      permissions.has("Gérer enseignants") ||
-      permissions.has("Enseignants:CRUD")
-    );
-  }
-
-  const normalizedFeature = normalize(feature);
-  return [...permissions].some((permission) => {
-    const normalizedPermission = normalize(permission);
-    if (
-      normalizedPermission === "country-privileges" &&
-      ["etablissements", "abonnements", "utilisateurs", "rapports"].includes(normalizedFeature)
-    ) {
-      return true;
-    }
-    return permissionMatchesFeature(normalizedPermission, normalizedFeature, action);
-  });
+  return hasSecurityPermissionInternal(permissions, feature, action);
 }
 
-export function canReadEntity(session: any, entity?: AdminEntity) {
-  const feature = entity ? entityFeatureMap[entity] : undefined;
+export function canReadView(session: any, viewName: string): boolean {
+  if (isSuperAdminSessionRole(session?.role)) return true;
+  if (viewName === "overview") return true;
+
+  if (viewName === "Permissions") {
+    return isSuperAdminSessionRole(session?.role);
+  }
+
+  if (session?.role === "country_admin") {
+    if (SCHOOL_ENTITY_VIEWS.has(viewName) || viewName === "establishment" || viewName === "Configuration") {
+      return false;
+    }
+    const feature = VIEW_PERMISSION_FEATURES[viewName];
+    if (feature && !COUNTRY_SCOPE_MODULES.has(feature) && feature !== "Rapports") {
+      return false;
+    }
+  }
+
+  if (viewName === "establishment" || viewName === "SchoolManagement") {
+    return isInternalSchoolRole(session?.role) || isInternalSchoolRole(sessionRoleToPlatformRole(session?.role));
+  }
+
+  if (viewName === "Configuration") {
+    if (isSuperAdminSessionRole(session?.role)) return true;
+    if (!isInternalSchoolRole(session?.role)) return false;
+    return (
+      hasSecurityPermission(session, "Paramètres Établissement", "READ") ||
+      session?.role === "school_admin" ||
+      hasSecurityPermission(session, "Élèves", "READ") ||
+      hasSecurityPermission(session, "Enseignants", "READ") ||
+      hasSecurityPermission(session, "Utilisateurs", "READ")
+    );
+  }
+
+  const feature = VIEW_PERMISSION_FEATURES[viewName];
+  if (feature === null) return true;
+  if (!feature) return hasSecurityPermission(session, routeFeatureMap[viewName], "READ");
+  return hasSecurityPermission(session, feature, "READ");
+}
+
+export function canReadEntity(session: any, entity?: string) {
+  if (!entity) return false;
+  const view = ENTITY_VIEW_MAP[entity] ?? entity;
+  if (!canReadView(session, view)) return false;
+  const feature = entityFeatureMap[entity];
   return Boolean(feature) && hasSecurityPermission(session, feature, "READ");
 }
 
-export function canMutateEntity(session: any, entity: AdminEntity, action: Exclude<SecurityAction, "READ">) {
+export function canMutateEntity(session: any, entity: string, action: Exclude<SecurityAction, "READ">) {
   const feature = entityFeatureMap[entity];
   if (
-    (session?.role === "school_admin" || session?.user?.role === "Admin School") &&
+    (session?.role === "school_admin" || isSchoolAdminRole(sessionRoleToPlatformRole(session?.role))) &&
     entity === "teachers" &&
     action !== "CREATE"
   ) {
@@ -234,15 +299,15 @@ export function canMutateEntity(session: any, entity: AdminEntity, action: Exclu
 }
 
 export function canReadRoute(session: any, routeName?: string) {
+  if (routeName && canReadView(session, routeName)) return true;
   const feature = routeName ? routeFeatureMap[routeName] : undefined;
   return Boolean(feature) && hasSecurityPermission(session, feature, "READ");
 }
 
 export function matrixPermissions(access: "R" | "CRUD" | "-") {
-  if (access === "-") {
-    return [];
-  }
-
-  const actions = access === "CRUD" ? crudActions : ["READ"];
-  return actions.map((action) => action);
+  if (access === "-") return [];
+  const actions: SecurityAction[] = access === "CRUD" ? ["READ", "CREATE", "UPDATE", "DELETE", "SUSPEND"] : ["READ"];
+  return actions;
 }
+
+export { isSuperAdminRole } from "../../lib/orgHierarchy";

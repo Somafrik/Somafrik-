@@ -3,10 +3,17 @@ import { normalize } from "./format";
 
 const STORAGE_KEY = "somafrik.activeSchoolCode";
 
+/** Sélection globale Superadmin / Admin Pays (tous les établissements du périmètre). */
+export const ALL_SCHOOLS_CODE = "*";
+
+export function isAllSchoolsSelection(code?: string | null): boolean {
+  return !code || code === ALL_SCHOOLS_CODE;
+}
+
 /** Compte plateforme sans établissement fixe (Super Admin, Admin Pays). */
 export function userRequiresSchoolSelection(user: SessionUser | null): boolean {
   if (!user) return false;
-  return !user.schoolCode || user.schoolCode === "*";
+  return !user.schoolCode || user.schoolCode === ALL_SCHOOLS_CODE;
 }
 
 export function readStoredSchoolCode(): string {
@@ -30,7 +37,7 @@ export function pickInitialSchoolCode(
   user: SessionUser | null,
   availableCodes: string[],
 ): string {
-  if (user?.schoolCode && user.schoolCode !== "*") {
+  if (user?.schoolCode && user.schoolCode !== ALL_SCHOOLS_CODE) {
     return user.schoolCode;
   }
   const stored = readStoredSchoolCode();
@@ -45,5 +52,19 @@ export function withSchoolScope(user: SessionUser | null, schoolCode: string): S
   if (!user) return null;
   if (!userRequiresSchoolSelection(user)) return user;
   if (!schoolCode) return user;
+  if (isAllSchoolsSelection(schoolCode)) {
+    return { ...user, schoolCode: ALL_SCHOOLS_CODE };
+  }
   return { ...user, schoolCode };
+}
+
+/** Codes établissements cibles pour une action (un seul ou tout le périmètre). */
+export function resolveTargetSchoolCodes(
+  activeSchoolCode: string,
+  availableSchoolCodes: string[],
+): string[] {
+  if (isAllSchoolsSelection(activeSchoolCode)) {
+    return availableSchoolCodes;
+  }
+  return activeSchoolCode ? [activeSchoolCode] : [];
 }

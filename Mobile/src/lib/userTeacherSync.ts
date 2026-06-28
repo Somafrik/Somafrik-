@@ -72,7 +72,7 @@ function buildTeacherRow(user: UserAccount, existing?: Row): Row {
     phone: user.phone ?? existing?.phone ?? "",
     email: user.email ?? existing?.email ?? "",
     status: user.status === "Suspendu" ? "Suspendu" : "Actif",
-    password: user.temporaryPassword ?? user.password ?? existing?.password ?? "",
+    password: user.temporaryPassword ?? existing?.password ?? "",
     assignments: Array.isArray(existing?.assignments) ? existing.assignments : [],
     assignedClasses: Array.isArray(existing?.assignedClasses) ? existing.assignedClasses : [],
   };

@@ -31,9 +31,12 @@ import {
   SupportScreen,
   SynchronizationScreen,
 } from "../screens/MvpUtilityScreens";
+import PermissionsScreen from "../screens/PermissionsScreen";
+import ConfigurationScreen from "../screens/ConfigurationScreen";
+import PlatformNotificationsScreen from "../screens/PlatformNotificationsScreen";
 import { AdminEntity } from "../context/AdminDataContext";
 import { useAuth } from "../context/AuthContext";
-import { canReadRoute } from "../domain/security/permissions";
+import { canReadRoute, canReadView } from "../domain/security/permissions";
 
 export type UserRole =
   | "super_admin"
@@ -99,6 +102,9 @@ export type RootStackParamList = {
   MobilePayment: undefined;
   OfflineMode: undefined;
   Synchronization: undefined;
+  Configuration: undefined;
+  PlatformNotifications: undefined;
+  Permissions: undefined;
   AdminCrud: {
     entity: AdminEntity;
     filter?: "paid" | "pending";
@@ -233,6 +239,19 @@ export default function AppNavigator() {
         )}
         {canReadRoute(session, "Support") && (
           <Stack.Screen name="Support" component={SupportScreen} options={{ title: "Support" }} />
+        )}
+        {canReadView(session, "Configuration") && (
+          <Stack.Screen name="Configuration" component={ConfigurationScreen} options={{ title: "Configuration" }} />
+        )}
+        {canReadView(session, "PlatformNotifications") && (
+          <Stack.Screen
+            name="PlatformNotifications"
+            component={PlatformNotificationsScreen}
+            options={{ title: "Notifications plateforme" }}
+          />
+        )}
+        {canReadView(session, "Permissions") && (
+          <Stack.Screen name="Permissions" component={PermissionsScreen} options={{ title: "Droits par rôle" }} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

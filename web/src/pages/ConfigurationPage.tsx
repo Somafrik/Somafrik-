@@ -30,11 +30,12 @@ import { getEstablishmentMetrics } from "../lib/establishment";
 import { isPlatformBackOfficeRole } from "../lib/orgHierarchy";
 import { CONFIGURATION_USER_ACCOUNTS, CONFIGURATION_USER_MODULES } from "../lib/entityModules";
 import { scopedUsers } from "../lib/scope";
-import { formatSchoolOption } from "../lib/superadminCrudPath";
-import { hasBackOfficePermission, canAccessSchoolBackOffice } from "../lib/permissions";
+import { isAllSchoolsSelection, resolveTargetSchoolCodes } from "../lib/activeSchool";
+import { buildSchoolSelectOptions } from "../lib/superadminCrudPath";
+import { hasBackOfficePermission, canAccessSchoolBackOffice, canManageEstablishmentSettings } from "../lib/permissions";
 import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
 import { useActiveSchool } from "../context/ActiveSchoolContext";
-import { isSchoolAdminRole, formatMetric, displayRoleName } from "../lib/format";
+import { isSchoolAdminRole, formatMetric, displayRoleName, normalize } from "../lib/format";
 import {
   applyRoleRenames,
   canDelegateSchoolPermission,
@@ -65,14 +66,42 @@ export function ConfigurationPage() {
   const { showToast } = useToast();
   const user = session?.user ?? null;
   const {
-    activeSchoolCode: schoolCode,
-    activeSchool: school,
+    activeSchoolCode,
+    activeSchool,
     availableSchools,
     requiresSelection,
     scopedUser,
-    setActiveSchoolCode,
   } = useActiveSchool();
-  const academicConfig = (state.academicConfigs?.[schoolCode ?? ""] ?? {}) as Record<string, unknown>;
+
+  const [configTarget, setConfigTarget] = useState(
+    () => activeSchoolCode || availableSchools[0]?.code || "",
+  );
+
+  useEffect(() => {
+    if (!requiresSelection) return;
+    setConfigTarget((current) => {
+      if (isAllSchoolsSelection(current)) return current;
+      const fallback = activeSchoolCode || availableSchools[0]?.code || "";
+      if (!fallback) return current;
+      if (!current || !availableSchools.some((item) => normalize(item.code) === normalize(current))) {
+        return fallback;
+      }
+      return current;
+    });
+  }, [activeSchoolCode, availableSchools, requiresSelection]);
+
+  const configSchool = isAllSchoolsSelection(configTarget)
+    ? null
+    : availableSchools.find((item) => normalize(item.code) === normalize(configTarget)) ?? null;
+
+  const targetSchoolCodes = useMemo(
+    () => resolveTargetSchoolCodes(configTarget, availableSchools.map((item) => item.code)),
+    [configTarget, availableSchools],
+  );
+  const isBulkConfiguration = isAllSchoolsSelection(configTarget) && targetSchoolCodes.length >= 2;
+  const academicConfig = (
+    isBulkConfiguration ? {} : (state.academicConfigs?.[configTarget ?? ""] ?? {})
+  ) as Record<string, unknown>;
 
   const [savingSection, setSavingSection] = useState<SavingSection>(null);
   const [academicFormKey, setAcademicFormKey] = useState(0);
@@ -88,11 +117,14 @@ export function ConfigurationPage() {
   const users = scopedUsers(scopedUser, state);
   const metrics = getEstablishmentMetrics(scopedUser, state, users);
   const settingsPermissions = useFeaturePermissions("Paramètres Établissement");
-  const canConfigure = settingsPermissions.canUpdate;
+  const canConfigure = canManageEstablishmentSettings(ctx);
+  const canReadSettings = settingsPermissions.canRead || canConfigure;
   const showRolePilotage = isSchoolAdminRole(user?.role);
   const configuredUserRoles = useMemo(
-    () => getSchoolPilotageRoles(state, schoolCode).filter((role) => !isPlatformBackOfficeRole(role)),
-    [state.academicConfigs, schoolCode],
+    () => getSchoolPilotageRoles(state, isBulkConfiguration ? undefined : configTarget).filter(
+      (role) => !isPlatformBackOfficeRole(role),
+    ),
+    [state.academicConfigs, configTarget, isBulkConfiguration],
   );
   const delegableFeatures = useMemo(() => getDelegableSchoolFeatures(ctx), [ctx]);
   const effectiveRolePermissions = rolePermissionDraft ?? state.rolePermissions;
@@ -114,10 +146,10 @@ export function ConfigurationPage() {
   const showUserManagement = userManagementModules.length > 0 || canManageAccounts;
 
   const resolvedPeriodRows = useMemo(() => applySystemActivePeriod(periodRows), [periodRows]);
-  const classNamesForSubjects = useMemo(
-    () => getSchoolAcademicLists(state, schoolCode).classNames,
-    [state.academicConfigs, schoolCode],
-  );
+  const classNamesForSubjects = useMemo(() => {
+    if (isBulkConfiguration) return DEFAULT_CLASS_NAMES;
+    return getSchoolAcademicLists(state, configTarget).classNames;
+  }, [isBulkConfiguration, state.academicConfigs, configTarget]);
   const subjectsByClass = useMemo(
     () => resolveSubjectsByClass(academicConfig, classNamesForSubjects),
     [academicConfig, classNamesForSubjects, academicFormKey],
@@ -125,13 +157,13 @@ export function ConfigurationPage() {
   useEffect(() => {
     setAcademicFormKey((current) => current + 1);
     setRolePermissionDraft(null);
-  }, [schoolCode]);
+  }, [configTarget]);
 
   useEffect(() => {
     const mode = coercePeriodMode(academicConfig.periodMode);
     setPeriodMode(mode);
     setPeriodRows(normalizeStoredPeriods(academicConfig.periods, mode));
-  }, [academicFormKey, schoolCode]);
+  }, [academicFormKey, configTarget]);
 
   useEffect(() => {
     if (!selectedPilotageRole && configuredUserRoles.length) {
@@ -167,7 +199,7 @@ export function ConfigurationPage() {
     );
   }
 
-  if (requiresSelection && !schoolCode) {
+  if (requiresSelection && !configTarget && !availableSchools.length) {
     return (
       <Card className="p-6">
         <p className="text-sm font-semibold text-muted">
@@ -183,20 +215,28 @@ export function ConfigurationPage() {
     partial: Record<string, unknown>,
     successMessage: string,
   ) {
-    if (!canConfigure || !schoolCode) return;
+    const codes = resolveTargetSchoolCodes(configTarget, availableSchools.map((item) => item.code));
+    if (!canConfigure || !codes.length) {
+      if (!canConfigure) {
+        showToast("Vous n'avez pas les droits pour modifier cette configuration.", "error");
+      }
+      return;
+    }
     setSavingSection(section);
     try {
-      await update({
-        academicConfigs: {
-          ...state.academicConfigs,
-          [schoolCode]: {
-            ...(typeof academicConfig === "object" ? academicConfig : {}),
-            schoolCode,
-            ...partial,
-          },
-        },
-      });
-      showToast(successMessage, "success");
+      const nextConfigs = { ...state.academicConfigs };
+      for (const code of codes) {
+        const existing = (nextConfigs[code] ?? {}) as Record<string, unknown>;
+        nextConfigs[code] = {
+          ...(typeof existing === "object" ? existing : {}),
+          schoolCode: code,
+          ...partial,
+        };
+      }
+      await update({ academicConfigs: nextConfigs });
+      const bulkSuffix =
+        codes.length > 1 ? ` (${codes.length} établissements)` : "";
+      showToast(`${successMessage}${bulkSuffix}`, "success");
       setAcademicFormKey((current) => current + 1);
     } catch {
       showToast("Échec de l'enregistrement", "error");
@@ -323,32 +363,40 @@ export function ConfigurationPage() {
 
   async function handleSubjectsSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canConfigure || !schoolCode || !selectedSubjectClass) {
-      showToast("Sélectionnez d'abord une classe", "error");
+    const codes = resolveTargetSchoolCodes(configTarget, availableSchools.map((item) => item.code));
+    if (!canConfigure || !codes.length || !selectedSubjectClass) {
+      if (!canConfigure) {
+        showToast("Vous n'avez pas les droits pour modifier cette configuration.", "error");
+      } else {
+        showToast("Sélectionnez d'abord une classe", "error");
+      }
       return;
     }
     const form = new FormData(event.currentTarget);
     const className = String(form.get("subjectClass") ?? selectedSubjectClass);
     const subjects = parseListLines(String(form.get("subjects") ?? ""));
-    const nextByClass = {
-      ...subjectsByClass,
-      [className]: subjects,
-    };
 
     setSavingSection("subjects");
     try {
-      await update({
-        academicConfigs: {
-          ...state.academicConfigs,
-          [schoolCode]: {
-            ...(typeof academicConfig === "object" ? academicConfig : {}),
-            schoolCode,
-            subjectsByClass: nextByClass,
-            subjects: getAllSchoolSubjects(nextByClass),
-          },
-        },
-      });
-      showToast(`Matières enregistrées pour ${className}`, "success");
+      const nextConfigs = { ...state.academicConfigs };
+      for (const code of codes) {
+        const existing = (nextConfigs[code] ?? {}) as Record<string, unknown>;
+        const classNames = getSchoolAcademicLists({ ...state, academicConfigs: nextConfigs }, code).classNames;
+        const currentByClass = resolveSubjectsByClass(existing, classNames);
+        const nextByClass = {
+          ...currentByClass,
+          [className]: subjects,
+        };
+        nextConfigs[code] = {
+          ...(typeof existing === "object" ? existing : {}),
+          schoolCode: code,
+          subjectsByClass: nextByClass,
+          subjects: getAllSchoolSubjects(nextByClass),
+        };
+      }
+      await update({ academicConfigs: nextConfigs });
+      const bulkSuffix = codes.length > 1 ? ` (${codes.length} établissements)` : "";
+      showToast(`Matières enregistrées pour ${className}${bulkSuffix}`, "success");
       setAcademicFormKey((current) => current + 1);
     } catch {
       showToast("Échec de l'enregistrement", "error");
@@ -359,39 +407,65 @@ export function ConfigurationPage() {
 
   async function handleUserRolesSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canConfigure || !schoolCode) return;
+    const codes = resolveTargetSchoolCodes(configTarget, availableSchools.map((item) => item.code));
+    if (!canConfigure || !codes.length) {
+      if (!canConfigure) {
+        showToast("Vous n'avez pas les droits pour modifier cette configuration.", "error");
+      }
+      return;
+    }
     const form = new FormData(event.currentTarget);
-    const oldRoles =
-      Array.isArray(academicConfig.userRoles) && (academicConfig.userRoles as string[]).length
-        ? (academicConfig.userRoles as string[])
-        : DEFAULT_USER_ROLES;
     const newRoles = parseListLines(String(form.get("userRoles") ?? "")).filter(
       (role) => !isPlatformBackOfficeRole(role),
     );
-    const migrations = detectRoleRenames(oldRoles, newRoles);
-    const renamed = applyRoleRenames(state, migrations);
 
     setSavingSection("userRoles");
     try {
+      let nextConfigs = { ...state.academicConfigs };
+      let nextUsers = state.users;
+      let nextRolePermissions = state.rolePermissions;
+      let renamedLabels = "";
+
+      for (const code of codes) {
+        const existing = (nextConfigs[code] ?? {}) as Record<string, unknown>;
+        const oldRoles =
+          Array.isArray(existing.userRoles) && (existing.userRoles as string[]).length
+            ? (existing.userRoles as string[])
+            : DEFAULT_USER_ROLES;
+        const migrations = detectRoleRenames(oldRoles, newRoles);
+        if (Object.keys(migrations).length) {
+          const renamed = applyRoleRenames(
+            { ...state, academicConfigs: nextConfigs, users: nextUsers, rolePermissions: nextRolePermissions },
+            migrations,
+          );
+          nextUsers = renamed.users;
+          nextRolePermissions = renamed.rolePermissions;
+          if (!renamedLabels) {
+            renamedLabels = Object.entries(migrations)
+              .map(([from, to]) => `« ${from} » → « ${to} »`)
+              .join(", ");
+          }
+        }
+        nextConfigs[code] = {
+          ...(typeof existing === "object" ? existing : {}),
+          schoolCode: code,
+          userRoles: newRoles,
+        };
+      }
+
       await update({
-        academicConfigs: {
-          ...state.academicConfigs,
-          [schoolCode]: {
-            ...(typeof academicConfig === "object" ? academicConfig : {}),
-            schoolCode,
-            userRoles: newRoles,
-          },
-        },
-        ...(Object.keys(migrations).length ? renamed : {}),
+        academicConfigs: nextConfigs,
+        ...(nextUsers !== state.users ? { users: nextUsers } : {}),
+        ...(nextRolePermissions !== state.rolePermissions
+          ? { rolePermissions: nextRolePermissions }
+          : {}),
       });
-      if (Object.keys(migrations).length) {
-        setRolePermissionDraft(null);
-        const renamedLabels = Object.entries(migrations)
-          .map(([from, to]) => `« ${from} » → « ${to} »`)
-          .join(", ");
-        showToast(`Rôles enregistrés (${renamedLabels})`, "success");
+      setRolePermissionDraft(null);
+      const bulkSuffix = codes.length > 1 ? ` (${codes.length} établissements)` : "";
+      if (renamedLabels) {
+        showToast(`Rôles enregistrés (${renamedLabels})${bulkSuffix}`, "success");
       } else {
-        showToast("Rôles enregistrés", "success");
+        showToast(`Rôles enregistrés${bulkSuffix}`, "success");
       }
       setAcademicFormKey((current) => current + 1);
     } catch {
@@ -446,7 +520,7 @@ export function ConfigurationPage() {
     }
   }
 
-  const showAcademicConfig = canConfigure;
+  const showAcademicConfig = canConfigure || canReadSettings;
 
   if (!showAcademicConfig && !showUserManagement && !showRolePilotage) {
     return (
@@ -462,25 +536,33 @@ export function ConfigurationPage() {
     <div className="space-y-6">
       <Card className="bg-gradient-to-br from-slate-800 to-brand p-6 text-white">
         <p className="text-sm font-semibold text-white/75">Configuration</p>
-        {requiresSelection && availableSchools.length > 1 ? (
+        {requiresSelection && availableSchools.length >= 2 ? (
           <div className="mt-3 max-w-md">
             <Field label="Établissement à configurer">
               <Select
-                value={schoolCode}
-                onChange={(e) => setActiveSchoolCode(e.target.value)}
-                options={availableSchools.map(formatSchoolOption)}
+                value={configTarget}
+                onChange={(e) => setConfigTarget(e.target.value)}
+                options={buildSchoolSelectOptions(availableSchools)}
               />
             </Field>
           </div>
         ) : null}
-        <h2 className="mt-3 text-2xl font-black">{school?.name ?? "Mon établissement"}</h2>
+        <h2 className="mt-3 text-2xl font-black">
+          {isBulkConfiguration
+            ? `Tous les établissements (${targetSchoolCodes.length})`
+            : (configSchool?.name ?? activeSchool?.name ?? "Mon établissement")}
+        </h2>
         <p className="mt-2 text-sm text-white/85">
-          {school
-            ? `${school.code} • ${school.city ?? "Ville non renseignée"}`
-            : "Code établissement : " + (schoolCode ?? "—")}
+          {isBulkConfiguration
+            ? `Périmètre actif : ${targetSchoolCodes.length} établissement${targetSchoolCodes.length > 1 ? "s" : ""}`
+            : configSchool
+              ? `${configSchool.code} • ${configSchool.city ?? "Ville non renseignée"}`
+              : "Code établissement : " + (configTarget ?? "—")}
         </p>
         <p className="mt-3 max-w-3xl text-sm text-white/80">
-          Chaque section s'enregistre pour cet établissement uniquement. Modifiez puis cliquez sur Enregistrer.
+          {isBulkConfiguration
+            ? "Chaque section enregistrée sera appliquée à tous les établissements de votre périmètre."
+            : "Chaque section s'enregistre pour cet établissement uniquement. Modifiez puis cliquez sur Enregistrer."}
         </p>
       </Card>
 
@@ -775,11 +857,12 @@ export function ConfigurationPage() {
                 <textarea
                   name="levels"
                   rows={4}
+                  readOnly={!canConfigure}
                   defaultValue={(academicConfig.levels as string[] | undefined)?.join("\n") ?? DEFAULT_LEVELS.join("\n")}
                   className="input-base w-full"
                 />
               </Field>
-              <Button type="submit" disabled={savingSection === "levels"}>
+              <Button type="submit" disabled={!canConfigure || savingSection === "levels"}>
                 Enregistrer
               </Button>
             </form>

@@ -117,7 +117,7 @@ export function LoginPage() {
 
         <div className="max-w-md space-y-4">
           <h2 className="text-3xl font-black leading-tight">
-            La plateforme de gouvernance scolaire, du pays à la classe.
+            La plateforme qui simplifie la gestion de votre établissement scolaire
           </h2>
           <p className="text-white/80">
             Établissements, utilisateurs, droits, élèves, enseignants, présences, notes,

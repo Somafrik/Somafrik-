@@ -184,6 +184,11 @@ class PostgresRepository {
       "id"
     );
     const courses = this.buildCourses(classRows, subjectRows, gradeRows);
+    const teacherLoginByUserId = new Map(
+      teacherRows
+        .filter((teacher) => teacher.user_id)
+        .map((teacher) => [teacher.user_id, this.extractTeacherLoginId(teacher.teacher_code)])
+    );
     const teachers = teacherRows.map((teacher) => this.mapTeacher(teacher, gradeRows, teacherAssignmentRows));
     const notes = gradeRows.map((grade) => this.mapGrade(grade));
     const payments = paymentRows.map((payment) => this.mapPayment(payment));
@@ -198,7 +203,7 @@ class PostgresRepository {
       platformSchools: schoolRows.map((row) => this.mapSchool(row, subscriptionRows.find((sub) => sub.school_code === row.school_code))),
       countries: countryRows.map((country) => this.mapCountry(country)),
       subscriptions: subscriptionRows.map((subscription) => this.mapSubscription(subscription)),
-      userAccounts: userRows.map((user) => this.mapUser(user, schoolByCode)),
+      userAccounts: userRows.map((user) => this.mapUser(user, schoolByCode, teacherLoginByUserId)),
       teachers,
       classes,
       courses,
@@ -1573,10 +1578,11 @@ class PostgresRepository {
     };
   }
 
-  mapUser(user, schoolByCode) {
+  mapUser(user, schoolByCode, teacherLoginByUserId = new Map()) {
     const role = roleFromDb[user.role] ?? user.role;
     const school = role === "Admin Pays" ? null : user.school_code ? schoolByCode.get(user.school_code) : null;
-    const identifier = this.getUserIdentifier(user, role);
+    const teacherLoginId = teacherLoginByUserId.get(user.id) ?? "";
+    const identifier = this.getUserIdentifier(user, role, teacherLoginId);
     const countryCode = school?.iso_code ?? this.getCountryCodeForUser(user, role);
     const countryScope = this.getCountryScopeForUser(school, countryCode);
 
@@ -1632,7 +1638,12 @@ class PostgresRepository {
     return countryCode;
   }
 
-  getUserIdentifier(user, role) {
+  extractTeacherLoginId(code) {
+    const match = String(code ?? "").match(/(ENS-\d+)$/i);
+    return match ? match[1].toUpperCase() : "";
+  }
+
+  getUserIdentifier(user, role, teacherLoginId = "") {
     const aliases = {
       "USR-2026-000001": "admin",
       "USR-2026-000002": "superadmin",
@@ -1650,8 +1661,19 @@ class PostgresRepository {
       if (match) return `admin-${match[1].toLowerCase()}`;
     }
 
-    if (role === "Enseignant" && /^ENS-\d+$/i.test(String(user.user_code))) {
-      return user.user_code;
+    if (role === "Enseignant") {
+      if (teacherLoginId) {
+        return teacherLoginId;
+      }
+
+      const fromUserCode = this.extractTeacherLoginId(user.user_code);
+      if (fromUserCode) {
+        return fromUserCode;
+      }
+
+      if (/^ENS-\d+$/i.test(String(user.user_code))) {
+        return String(user.user_code).toUpperCase();
+      }
     }
 
     return user.user_code || user.phone || user.email;
@@ -1670,6 +1692,8 @@ class PostgresRepository {
       schoolId: teacher.school_id,
       schoolCode: teacher.school_code,
       publicId: teacher.teacher_code,
+      userId: teacher.user_id,
+      identifier: this.extractTeacherLoginId(teacher.teacher_code),
       name: [teacher.first_name, teacher.last_name].filter(Boolean).join(" ") || teacher.teacher_code,
       firstName: teacher.first_name,
       gender: "",

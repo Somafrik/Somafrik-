@@ -86,7 +86,7 @@ class AuthService {
     const loginKey = this.getLoginAttemptKey(schoolCode, identifier);
     this.assertLoginNotLocked(loginKey);
 
-    const managedUser = this.findManagedUser(identifier, schoolCode);
+    const managedUser = this.findManagedUser(identifier, schoolCode, role);
     if (!managedUser) {
       this.recordFailedLoginAttempt(loginKey);
       throw new BusinessError(
@@ -116,16 +116,69 @@ class AuthService {
     };
   }
 
-  findManagedUser(identifier, schoolCode) {
-    const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
+  userMatchesIdentifier(user, identifier) {
     const normalizedIdentifier = normalizeText(identifier);
+    const fields = ["identifier", "phone", "publicId", "email"];
+
+    return fields.some((field) => {
+      const value = normalizeText(user[field]);
+      if (value !== normalizedIdentifier) {
+        return false;
+      }
+
+      // Le téléphone sur un compte élève réfère le parent, pas un identifiant de connexion.
+      if (isStudentRole(user.role) && field === "phone") {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  findManagedUser(identifier, schoolCode, preferredMobileRole = null) {
+    const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
+
+    const matches = this.userAccounts.filter(
+      (user) =>
+        (user.schoolCode === "*" || user.schoolCode === normalizedSchoolCode) &&
+        this.userMatchesIdentifier(user, identifier)
+    );
+
+    if (matches.length > 1 && preferredMobileRole) {
+      const preferred = matches.find(
+        (user) => this.getManagedMobileRole(user)?.role === preferredMobileRole
+      );
+      if (preferred) {
+        return preferred;
+      }
+    }
+
+    if (matches.length > 1 && /^\+?\d/.test(String(identifier).trim())) {
+      const parentMatch = matches.find((user) => user.role === "Parent");
+      if (parentMatch) {
+        return parentMatch;
+      }
+    }
+
+    if (matches[0]) {
+      return matches[0];
+    }
+
+    const teacher = this.teachers.find(
+      (item) =>
+        (!item.schoolCode || normalizeText(item.schoolCode) === normalizeText(normalizedSchoolCode)) &&
+        [item.identifier, item.publicId, item.id].some(
+          (value) => normalizeText(value) === normalizeText(identifier)
+        )
+    );
+    if (!teacher?.userId) {
+      return undefined;
+    }
 
     return this.userAccounts.find(
       (user) =>
         (user.schoolCode === "*" || user.schoolCode === normalizedSchoolCode) &&
-        [user.identifier, user.phone, user.publicId, user.email].some(
-          (value) => normalizeText(value) === normalizedIdentifier
-        )
+        String(user.id) === String(teacher.userId)
     );
   }
 

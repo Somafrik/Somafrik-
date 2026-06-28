@@ -1,0 +1,71 @@
+export const VIEW_PERMISSION_FEATURES: Record<string, string | null> = {
+  overview: null,
+  establishment: null,
+  configuration: "Paramètres Établissement",
+  countries: "Pays",
+  schools: "Établissements",
+  subscriptions: "Abonnements",
+  notifications: "Notifications",
+  users: "Utilisateurs",
+  reports: "Rapports",
+  permissions: "Droits par rôle",
+  students: "Élèves",
+  teachers: "Enseignants",
+  classes: "Classes",
+  courses: "Matières",
+  assignments: "Affectations",
+  payments: "Paiements",
+  announcements: "Notifications",
+  messages: "Messages",
+  presences: "Présences",
+  notes: "Notes",
+  exams: "Examens",
+  bulletins: "Bulletins",
+  documents: "Documents",
+  Timetable: "Années Académiques",
+  ReportCards: "Bulletins",
+  Documents: "Documents",
+  Reports: "Rapports",
+  Audit: "Utilisateurs",
+  SchoolManagement: "Établissements",
+  Configuration: "Paramètres Établissement",
+  PlatformNotifications: "Notifications",
+  Permissions: "Droits par rôle",
+};
+
+export const CRUD_ACTIONS = [
+  { key: "READ", label: "Lire" },
+  { key: "CREATE", label: "Creer" },
+  { key: "UPDATE", label: "Modifier" },
+  { key: "DELETE", label: "Supprimer" },
+  { key: "SUSPEND", label: "Suspendre" },
+] as const;
+
+export const CRUD_PERMISSION_MODULES = [
+  "Pays", "Établissements", "Abonnements", "Utilisateurs", "Classes", "Élèves",
+  "Enseignants", "Affectations", "Présences", "Notes", "Bulletins", "Paiements",
+  "Notifications", "Messages", "Documents", "Rapports", "Paramètres Établissement",
+  "Années Académiques", "Matières", "Examens",
+] as const;
+
+export const ENTITY_VIEW_MAP: Record<string, string> = {
+  countries: "countries",
+  schools: "schools",
+  subscriptions: "subscriptions",
+  users: "users",
+  students: "students",
+  teachers: "teachers",
+  classes: "classes",
+  courses: "courses",
+  assignments: "assignments",
+  payments: "payments",
+  paymentStatuses: "configuration",
+  announcements: "announcements",
+  messages: "messages",
+};
+
+export const SCHOOL_ENTITY_VIEWS = new Set([
+  "classes", "courses", "assignments", "payments", "messages", "presences", "notes",
+  "exams", "bulletins", "documents", "announcements", "students", "teachers",
+  "Timetable", "ReportCards",
+]);

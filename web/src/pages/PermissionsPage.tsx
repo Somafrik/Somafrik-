@@ -80,7 +80,10 @@ export function PermissionsPage() {
 
   const roleOptions = useMemo(
     () => [
-      { value: "", label: schoolCode ? "Choisir le rôle cible…" : "Sélectionnez d'abord un établissement" },
+      {
+        value: "",
+        label: schoolCode ? "Choisir le rôle cible…" : "Sélectionnez d'abord un établissement",
+      },
       ...managedRoles.map((role) => ({ value: role, label: role })),
     ],
     [managedRoles, schoolCode],

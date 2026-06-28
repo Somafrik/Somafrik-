@@ -15,12 +15,14 @@ import * as ImagePicker from "expo-image-picker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { AdminEntity, useAdminData } from "../context/AdminDataContext";
-import { messageThemes, rolePermissions, DEFAULT_CLASS_NAMES, DEFAULT_LEVELS, DEFAULT_SUBJECTS, DEFAULT_TRACKS } from "../data/catalog";
+import { messageThemes, rolePermissions, DEFAULT_CLASS_NAMES, DEFAULT_LEVELS, DEFAULT_SUBJECTS, DEFAULT_TRACKS, UserAccount } from "../data/catalog";
 import { useAuth } from "../context/AuthContext";
 import { canMutateEntity, canReadEntity, hasSecurityPermission, isSuperAdminRole, SecurityAction } from "../domain/security/permissions";
 import { resetUserPassword as resetUserPasswordOnBackend } from "../services/api";
 import { removeSchoolClassFromState } from "../lib/classRules";
 import { formatTeacherClasses } from "../lib/teacherClasses";
+import { validateCourseTeacherRule } from "../lib/pedagogyGovernance";
+import { PENDING_VALIDATION_STATUS } from "../lib/orgHierarchy";
 import { useFloatingTabBarLayout } from "../lib/screenLayout";
 import { isTeacherUserRole, upsertTeacherFromUser } from "../lib/userTeacherSync";
 
@@ -508,12 +510,14 @@ export default function AdminCrudScreen({ route }: Props) {
       createItem(entity as any, nextItem as any);
     }
 
-    if (entity === "users" && isTeacherUserRole(nextItem.role)) {
-      const syncedTeachers = upsertTeacherFromUser(teachersData, nextItem);
+    if (entity === "users") {
+      const userItem = nextItem as UserAccount;
+      if (isTeacherUserRole(userItem.role)) {
+      const syncedTeachers = upsertTeacherFromUser(teachersData, userItem);
       const syncedTeacher = syncedTeachers.find(
         (teacher) =>
-          String(teacher.userId ?? "") === String(nextItem.id) ||
-          normalize(String(teacher.identifier ?? "")) === normalize(String(nextItem.identifier ?? ""))
+          String(teacher.userId ?? "") === String(userItem.id) ||
+          normalize(String(teacher.identifier ?? "")) === normalize(String(userItem.identifier ?? ""))
       );
       if (syncedTeacher) {
         const existsInTeachers = teachersData.some(
@@ -524,6 +528,7 @@ export default function AdminCrudScreen({ route }: Props) {
         } else {
           createItem("teachers", syncedTeacher);
         }
+      }
       }
     }
 
@@ -1624,6 +1629,10 @@ function formToItem(entity: AdminEntity, form: Record<string, string>, id?: stri
       maxStudents: Number(form.maxStudents) || 500,
       maxTeachers: Number(form.maxTeachers) || 50,
       createdAt: form.createdAt || formatDate(new Date()),
+      validationStatus:
+        context?.session?.role === "country_admin" && !id ? PENDING_VALIDATION_STATUS : form.validationStatus,
+      validationRequestedBy:
+        context?.session?.role === "country_admin" && !id ? context?.session?.user?.name : form.validationRequestedBy,
     };
   }
 
@@ -1955,35 +1964,7 @@ function validateBusinessRules({
   }
 
   if (entity === "courses") {
-    const className = normalize(item.className);
-    const courseName = normalize(item.name);
-    const teacherId = normalize(item.teacherId);
-
-    if (!teacherId) {
-      return "Cours impossible : sélectionnez l'enseignant responsable pour cette classe.";
-    }
-
-    const duplicateCourse = coursesData.find(
-      (courseItem) =>
-        String(courseItem.id ?? "") !== String(editingId ?? "") &&
-        normalize(courseItem.className) === className &&
-        normalize(courseItem.name) === courseName
-    );
-
-    if (duplicateCourse && normalize(duplicateCourse.teacherId) !== teacherId) {
-      return `Cours impossible : « ${item.name} » est déjà affecté à un autre enseignant pour la classe ${item.className}.`;
-    }
-
-    const duplicateAssignment = assignmentsData.find(
-      (assignment) =>
-        normalize(assignment.className) === className && normalize(assignment.course) === courseName
-    );
-
-    if (duplicateAssignment && normalize(duplicateAssignment.teacherId) !== teacherId) {
-      return `Cours impossible : « ${item.name} » est déjà affecté à un autre enseignant pour la classe ${item.className}.`;
-    }
-
-    return null;
+    return validateCourseTeacherRule(item, coursesData, assignmentsData, editingId);
   }
 
   if (entity !== "assignments") {

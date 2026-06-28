@@ -729,6 +729,18 @@ function applyStoredUserOverlay(dataset, storedState) {
     const base = byKey.get(key) ?? {};
     const merged = { ...base, ...stored };
 
+    const baseLoginId = String(base.identifier ?? "").trim();
+    const storedLoginId = String(stored.identifier ?? "").trim();
+    if (
+      baseLoginId &&
+      storedLoginId &&
+      baseLoginId !== storedLoginId &&
+      /^(ENS-\d+|ELE-\d+)$/i.test(baseLoginId) &&
+      /^USR-/i.test(storedLoginId)
+    ) {
+      merged.identifier = baseLoginId;
+    }
+
     if (!merged.password && !merged.passwordHash && !merged.pinHash && merged.temporaryPassword) {
       merged.password = merged.temporaryPassword;
     }
@@ -1687,7 +1699,11 @@ function buildPrincipal(response, rolePermissionsMap = null) {
     rawRole === "Super Administrateur OKAFRIK" ? "Super Administrateur Somafrik" : rawRole;
   const schoolCode = role === "Admin Pays" ? "*" : user.schoolCode ?? school.code ?? "*";
   const countryCode = user.countryCode ?? countryCodeFromScope(user.countryScope) ?? school.countryCode ?? countryCodeFromSchoolOrCountry(schoolCode, school.country);
-  const permissions = mergeRolePermissions(role, user.permissions ?? rbacService.permissionsFor(role), rolePermissionsMap);
+  const permissions = mergeRolePermissions(
+    role,
+    [...new Set([...(user.permissions ?? []), ...rbacService.permissionsFor(role)])],
+    rolePermissionsMap
+  );
 
   return {
     sub: user.id ?? user.publicId ?? user.matricule ?? "anonymous",

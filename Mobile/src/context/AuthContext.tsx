@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { LoginResponse, logout as logoutSession } from "../services/api";
+import { enrichSessionPermissions } from "../domain/security/permissions";
 
 type AuthContextValue = {
   session: LoginResponse | null;
@@ -16,8 +17,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const saveSession = (nextSession: LoginResponse | null) => {
-    setSession(nextSession);
-    setSelectedStudentId(nextSession?.user.children?.[0]?.id ?? nextSession?.user.id ?? null);
+    const enriched = enrichSessionPermissions(nextSession);
+    setSession(enriched);
+    setSelectedStudentId(enriched?.user.children?.[0]?.id ?? enriched?.user.id ?? null);
   };
 
   const value = useMemo(

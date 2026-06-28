@@ -83,8 +83,10 @@ Write-Host "  Web (build) : http://localhost:5000/web/"
 if (-not $CoreOnly) {
   Write-Host "  Web (dev)   : http://localhost:5173/web/"
   $expoPort = if ($env:EXPO_PORT) { $env:EXPO_PORT } else { "8083" }
+  $packagerHost = if ($env:REACT_NATIVE_PACKAGER_HOSTNAME) { $env:REACT_NATIVE_PACKAGER_HOSTNAME } else { "VOTRE_IP_WIFI" }
   Write-Host "  Expo Metro  : port $expoPort"
-  Write-Host "  QR Code     : docker compose logs -f mobile"
+  Write-Host "  Expo Go URL : exp://${packagerHost}:$expoPort"
+  Write-Host "  Mobile      : npm run mobile:docker"
 }
 Write-Host ""
 Write-Host "Logs : docker compose logs -f"

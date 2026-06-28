@@ -22,12 +22,16 @@ import { getPaymentStats, getPresenceStats, getStudentAcademicSummary } from "..
 import { canReadEntity, canReadRoute } from "../domain/security/permissions";
 import { buildOverflowQuickActionItems } from "../navigation/roleTabPreferences";
 import { useFloatingTabBarLayout } from "../lib/screenLayout";
+import SchoolSelector from "../components/SchoolSelector";
+import { useResponsiveLayout } from "../hooks/useResponsiveLayout";
 
 export default function HomeScreen({ navigation }: any) {
   const { scrollContentPaddingBottom } = useFloatingTabBarLayout();
   const scrollContentStyle = [styles.scrollContent, { paddingBottom: scrollContentPaddingBottom }];
   const { session, selectedStudentId } = useAuth();
-  const { studentsData, paymentsData, presencesData, announcementsData, messagesData, schoolsData, usersData } = useAdminData();
+  const { studentsData, paymentsData, presencesData, announcementsData, messagesData, schoolsData, usersData, countriesData, subscriptionsData } = useAdminData();
+  const { isTablet, horizontalPadding, contentMaxWidth } = useResponsiveLayout();
+  const isPlatformAdmin = session?.role === "super_admin" || session?.role === "country_admin";
   const currentSchool =
     schoolsData.find((item) => item.code === session?.school.code || item.code === session?.user.schoolCode) ??
     session?.school ??
@@ -493,6 +497,45 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.schoolTagline}>{currentSchool.slogan}</Text>
           </View>
         </TouchableOpacity>
+
+        {isPlatformAdmin && <SchoolSelector />}
+
+        {isPlatformAdmin && (
+          <View style={[styles.statsGrid, isTablet && styles.statsGridTablet]}>
+            <StatCard
+              icon="earth-outline"
+              value={String(countriesData.length)}
+              label="Pays"
+              color="#2563EB"
+              bg="#EFF6FF"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "countries" })}
+            />
+            <StatCard
+              icon="business-outline"
+              value={String(schoolsData.length)}
+              label="Etablissements"
+              color="#7C3AED"
+              bg="#F5F3FF"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "schools" })}
+            />
+            <StatCard
+              icon="cube-outline"
+              value={String(subscriptionsData.length)}
+              label="Abonnements"
+              color="#EA580C"
+              bg="#FFF7ED"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "subscriptions" })}
+            />
+            <StatCard
+              icon="people-outline"
+              value={String(usersData.length)}
+              label="Admins etablissement"
+              color="#16A34A"
+              bg="#ECFDF5"
+              onPress={() => navigation.navigate("AdminCrud", { entity: "users" })}
+            />
+          </View>
+        )}
 
         {/* Bienvenue */}
         <TouchableOpacity
@@ -1133,6 +1176,9 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
     marginBottom: 26,
+  },
+  statsGridTablet: {
+    gap: 16,
   },
 
   statCard: {

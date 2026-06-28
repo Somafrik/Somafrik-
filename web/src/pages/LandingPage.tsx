@@ -173,10 +173,7 @@ export function LandingPage() {
                 Solution SaaS multi-pays et multi-établissements
               </span>
               <h1 className="mt-5 text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-                La plateforme de gouvernance scolaire,{" "}
-                <span className="bg-gradient-to-r from-brand to-teal bg-clip-text text-transparent">
-                  du pays à la classe.
-                </span>
+                La plateforme qui simplifie la gestion de votre établissement scolaire
               </h1>
               <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-600">
                 Une application ERP interne pour piloter les établissements scolaires et universitaires :
