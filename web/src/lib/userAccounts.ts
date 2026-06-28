@@ -18,6 +18,7 @@ import {
   SUPER_ADMIN_ROLE,
 } from "./orgHierarchy";
 import { isTeacherUserRole } from "./userTeacherSync";
+import { resolveEffectivePermissions } from "./permissions";
 
 const PLATFORM_ROLES = new Set([SUPER_ADMIN_ROLE, COUNTRY_ADMIN_ROLE, SCHOOL_ADMIN_ROLE]);
 

@@ -44,6 +44,7 @@ export function NotificationsPage() {
   const { state, update } = useData();
   const [busy, setBusy] = useState(false);
   const [composing, setComposing] = useState<PlatformNotification | null>(null);
+  const { showToast } = useToast();
 
   const rows = scopedNotifications(session?.user ?? null, state);
   const { canCreate, canUpdate, canDelete } = useFeaturePermissions("Notifications");

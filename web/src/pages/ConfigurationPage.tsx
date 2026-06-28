@@ -26,13 +26,15 @@ import {
   type AcademicPeriodRow,
   type PeriodMode,
 } from "../lib/academicPeriods";
-import { getCurrentSchool, getEstablishmentMetrics } from "../lib/establishment";
+import { getEstablishmentMetrics } from "../lib/establishment";
 import { isPlatformBackOfficeRole } from "../lib/orgHierarchy";
 import { CONFIGURATION_USER_ACCOUNTS, CONFIGURATION_USER_MODULES } from "../lib/entityModules";
 import { scopedUsers } from "../lib/scope";
-import { hasBackOfficePermission } from "../lib/permissions";
+import { formatSchoolOption } from "../lib/superadminCrudPath";
+import { hasBackOfficePermission, canAccessSchoolBackOffice } from "../lib/permissions";
 import { useFeaturePermissions, usePermissionContext } from "../lib/usePermissionContext";
-import { isInternalSchoolRole, isSchoolAdminRole, formatMetric, displayRoleName } from "../lib/format";
+import { useActiveSchool } from "../context/ActiveSchoolContext";
+import { isSchoolAdminRole, formatMetric, displayRoleName } from "../lib/format";
 import {
   applyRoleRenames,
   canDelegateSchoolPermission,
@@ -62,7 +64,14 @@ export function ConfigurationPage() {
   const ctx = usePermissionContext();
   const { showToast } = useToast();
   const user = session?.user ?? null;
-  const schoolCode = user?.schoolCode;
+  const {
+    activeSchoolCode: schoolCode,
+    activeSchool: school,
+    availableSchools,
+    requiresSelection,
+    scopedUser,
+    setActiveSchoolCode,
+  } = useActiveSchool();
   const academicConfig = (state.academicConfigs?.[schoolCode ?? ""] ?? {}) as Record<string, unknown>;
 
   const [savingSection, setSavingSection] = useState<SavingSection>(null);
@@ -76,9 +85,8 @@ export function ConfigurationPage() {
   const [rolePermissionDraft, setRolePermissionDraft] = useState<Record<string, string[]> | null>(null);
   const [selectedSubjectClass, setSelectedSubjectClass] = useState("");
 
-  const school = getCurrentSchool(user, state);
-  const users = scopedUsers(user, state);
-  const metrics = getEstablishmentMetrics(user, state, users);
+  const users = scopedUsers(scopedUser, state);
+  const metrics = getEstablishmentMetrics(scopedUser, state, users);
   const settingsPermissions = useFeaturePermissions("Paramètres Établissement");
   const canConfigure = settingsPermissions.canUpdate;
   const showRolePilotage = isSchoolAdminRole(user?.role);
@@ -115,6 +123,11 @@ export function ConfigurationPage() {
     [academicConfig, classNamesForSubjects, academicFormKey],
   );
   useEffect(() => {
+    setAcademicFormKey((current) => current + 1);
+    setRolePermissionDraft(null);
+  }, [schoolCode]);
+
+  useEffect(() => {
     const mode = coercePeriodMode(academicConfig.periodMode);
     setPeriodMode(mode);
     setPeriodRows(normalizeStoredPeriods(academicConfig.periods, mode));
@@ -144,11 +157,22 @@ export function ConfigurationPage() {
     }
   }, [classNamesForSubjects, selectedSubjectClass]);
 
-  if (!isInternalSchoolRole(user?.role)) {
+  if (!canAccessSchoolBackOffice(user?.role)) {
     return (
       <Card className="p-6">
         <p className="text-sm font-semibold text-muted">
           La configuration établissement est réservée aux comptes internes d'une école.
+        </p>
+      </Card>
+    );
+  }
+
+  if (requiresSelection && !schoolCode) {
+    return (
+      <Card className="p-6">
+        <p className="text-sm font-semibold text-muted">
+          Aucun établissement disponible dans votre périmètre. Créez ou validez un établissement avant de
+          configurer.
         </p>
       </Card>
     );
@@ -438,14 +462,25 @@ export function ConfigurationPage() {
     <div className="space-y-6">
       <Card className="bg-gradient-to-br from-slate-800 to-brand p-6 text-white">
         <p className="text-sm font-semibold text-white/75">Configuration</p>
-        <h2 className="mt-1 text-2xl font-black">{school?.name ?? "Mon établissement"}</h2>
+        {requiresSelection && availableSchools.length > 1 ? (
+          <div className="mt-3 max-w-md">
+            <Field label="Établissement à configurer">
+              <Select
+                value={schoolCode}
+                onChange={(e) => setActiveSchoolCode(e.target.value)}
+                options={availableSchools.map(formatSchoolOption)}
+              />
+            </Field>
+          </div>
+        ) : null}
+        <h2 className="mt-3 text-2xl font-black">{school?.name ?? "Mon établissement"}</h2>
         <p className="mt-2 text-sm text-white/85">
           {school
             ? `${school.code} • ${school.city ?? "Ville non renseignée"}`
             : "Code établissement : " + (schoolCode ?? "—")}
         </p>
         <p className="mt-3 max-w-3xl text-sm text-white/80">
-          Chaque section s'enregistre indépendamment. Modifiez puis cliquez sur Enregistrer.
+          Chaque section s'enregistre pour cet établissement uniquement. Modifiez puis cliquez sur Enregistrer.
         </p>
       </Card>
 

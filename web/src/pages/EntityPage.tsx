@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
+import { useActiveSchool } from "../context/ActiveSchoolContext";
 import { Card, SectionHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Table, type Column } from "../components/ui/Table";
@@ -95,13 +96,14 @@ export function EntityPage({ entity }: EntityPageProps) {
   const { session } = useAuth();
   const { state, update } = useData();
   const { showToast } = useToast();
+  const { activeSchoolCode: schoolCode, scopedUser } = useActiveSchool();
+  const scopeUser = scopedUser ?? session?.user ?? null;
 
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
 
   const { canRead, canCreate, canUpdate, canDelete } = useFeaturePermissions(module?.feature ?? "Élèves");
-  const schoolCode = session?.user?.schoolCode;
   const academicLists = useMemo(
     () => getSchoolAcademicLists(state, schoolCode),
     [state, schoolCode],
@@ -109,14 +111,9 @@ export function EntityPage({ entity }: EntityPageProps) {
   const assignmentOptions = useMemo(
     () =>
       module?.key === "assignments"
-        ? getAssignmentSelectOptions(
-            session?.user ?? null,
-            state,
-            String(editing?.className ?? ""),
-            schoolCode,
-          )
+        ? getAssignmentSelectOptions(scopeUser, state, String(editing?.className ?? ""), schoolCode)
         : null,
-    [module?.key, session?.user, state, editing?.className, schoolCode],
+    [module?.key, scopeUser, state, editing?.className, schoolCode],
   );
 
   function getSelectOptionsForField(field: NonNullable<typeof module>["fields"][number]) {
@@ -170,7 +167,7 @@ export function EntityPage({ entity }: EntityPageProps) {
     if (field.optionsKey === "teachers") {
       const teacherOptions =
         module?.key === "courses"
-          ? scopedTeachers(session?.user ?? null, state).map((teacher) => ({
+          ? scopedTeachers(scopeUser, state).map((teacher) => ({
               value: getTeacherDisplayName(teacher),
               label: getTeacherDisplayName(teacher),
             }))
@@ -186,17 +183,17 @@ export function EntityPage({ entity }: EntityPageProps) {
     return [];
   }
 
-  const school = getCurrentSchool(session?.user ?? null, state);
+  const school = getCurrentSchool(scopeUser, state);
 
   const rows = useMemo(() => {
     if (!module) return [];
-    const scoped = getScopedEntityRows(module.key, session?.user ?? null, state);
+    const scoped = getScopedEntityRows(module.key, scopeUser, state);
     const q = search.trim().toLowerCase();
     if (!q) return scoped;
     return scoped.filter((row) =>
       Object.values(row).some((value) => String(value ?? "").toLowerCase().includes(q)),
     );
-  }, [module, search, session?.user, state]);
+  }, [module, search, scopeUser, state]);
 
   if (!module) {
     return <Navigate to="/etablissement" replace />;
@@ -230,7 +227,6 @@ export function EntityPage({ entity }: EntityPageProps) {
     nextItem: Record<string, unknown>,
     nextEntityRows: Record<string, unknown>[],
   ): Partial<BackOfficeState> {
-    const schoolCode = session?.user?.schoolCode;
     const baseState: BackOfficeState = {
       ...state,
       [key]: nextEntityRows,
@@ -280,7 +276,6 @@ export function EntityPage({ entity }: EntityPageProps) {
     event.preventDefault();
     if (!editing || !module) return;
 
-    const schoolCode = session?.user?.schoolCode;
     let workingItem = { ...editing };
 
     const missingRequired = module.fields.find(
@@ -292,7 +287,7 @@ export function EntityPage({ entity }: EntityPageProps) {
     }
 
     if (module.key === "courses") {
-      const teachers = scopedTeachers(session?.user ?? null, state);
+      const teachers = scopedTeachers(scopeUser, state);
       const teacherName = String(workingItem.teacherName ?? "").trim();
       const teacher = findTeacherByName(teachers, teacherName);
       workingItem = {
@@ -302,8 +297,8 @@ export function EntityPage({ entity }: EntityPageProps) {
       };
       const courseConflict = validateCourseTeacherRule(
         workingItem,
-        getScopedEntityRows("courses", session?.user ?? null, state),
-        getScopedEntityRows("assignments", session?.user ?? null, state),
+        getScopedEntityRows("courses", scopeUser, state),
+        getScopedEntityRows("assignments", scopeUser, state),
         editing.id ? String(editing.id) : undefined,
       );
       if (courseConflict) {
@@ -313,14 +308,14 @@ export function EntityPage({ entity }: EntityPageProps) {
     }
 
     if (module.key === "assignments") {
-      const teachers = scopedTeachers(session?.user ?? null, state);
+      const teachers = scopedTeachers(scopeUser, state);
       workingItem = prepareAssignmentForSave(workingItem, teachers, schoolCode);
-      const scopedAssignments = getScopedEntityRows("assignments", session?.user ?? null, state);
+      const scopedAssignments = getScopedEntityRows("assignments", scopeUser, state);
       const conflict = validateAssignmentConflict(
         workingItem,
         scopedAssignments,
-        scopedCourses(session?.user ?? null, state),
-        scopedClasses(session?.user ?? null, state),
+        scopedCourses(scopeUser, state),
+        scopedClasses(scopeUser, state),
         teachers,
         editing.id ? String(editing.id) : undefined,
         state,
@@ -345,8 +340,8 @@ export function EntityPage({ entity }: EntityPageProps) {
     }
 
     const scopedItem = applySchoolScopeToItem(module.key, workingItem, schoolCode, state);
-    const linkedItem = linkStudentFromName(module.key, scopedItem, session?.user ?? null, state);
-    const current = getScopedEntityRows(module.key, session?.user ?? null, state);
+    const linkedItem = linkStudentFromName(module.key, scopedItem, scopeUser, state);
+    const current = getScopedEntityRows(module.key, scopeUser, state);
     const exists = Boolean(linkedItem.id) && current.some((row) => row.id === linkedItem.id);
 
     if (exists && !canUpdate) {
@@ -398,7 +393,7 @@ export function EntityPage({ entity }: EntityPageProps) {
           };
         })();
 
-    const nextAllRows = mergeScopedEntityRows(module.key, session?.user ?? null, state, nextItem);
+    const nextAllRows = mergeScopedEntityRows(module.key, scopeUser, state, nextItem);
     const patch = buildPedagogyPatch(module.key, nextItem, nextAllRows);
 
     try {
@@ -429,7 +424,7 @@ export function EntityPage({ entity }: EntityPageProps) {
 
     const nextAllRows = deleteScopedEntityRow(
       module.key,
-      session?.user ?? null,
+      scopeUser,
       state,
       String(row.id),
     );
@@ -471,7 +466,7 @@ export function EntityPage({ entity }: EntityPageProps) {
                   module.key === "assignments"
                     ? normalizeAssignmentForm(
                         { ...row },
-                        scopedTeachers(session?.user ?? null, state),
+                        scopedTeachers(scopeUser, state),
                       )
                     : { ...row };
                 setEditing(next);
@@ -514,7 +509,7 @@ export function EntityPage({ entity }: EntityPageProps) {
                     return;
                   }
                   if (module.key === "teachers") {
-                    const code = session?.user?.schoolCode;
+                    const code = schoolCode;
                     if (!code || code === "*") {
                       showToast("Code établissement requis pour générer l'identifiant", "error");
                       return;

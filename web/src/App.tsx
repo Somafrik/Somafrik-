@@ -15,6 +15,7 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { EstablishmentPage } from "./pages/EstablishmentPage";
 import { ConfigurationPage } from "./pages/ConfigurationPage";
 import { EntityPage } from "./pages/EntityPage";
+import { ActiveSchoolProvider } from "./context/ActiveSchoolContext";
 
 export default function App() {
   return (
@@ -25,7 +26,9 @@ export default function App() {
         element={
           <ProtectedRoute>
             <DataProvider>
-              <AppLayout />
+              <ActiveSchoolProvider>
+                <AppLayout />
+              </ActiveSchoolProvider>
             </DataProvider>
           </ProtectedRoute>
         }

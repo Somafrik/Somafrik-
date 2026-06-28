@@ -15,7 +15,7 @@ import {
   getUserFormFieldPolicy,
   validateUserAccount,
 } from "../lib/userAccounts";
-import { applyUserTeacherSync, isTeacherUserRole, syncSingleUserToTeachers } from "../lib/userTeacherSync";
+import { applyUserTeacherSync, syncSingleUserToTeachers } from "../lib/userTeacherSync";
 import {
   COUNTRY_ADMIN_ROLE,
   isPendingValidationStatus,

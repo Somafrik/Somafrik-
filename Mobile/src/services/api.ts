@@ -288,16 +288,20 @@ export function getReportCardPdfUrl(studentId: string, period = "Trimestre 1") {
 function buildApiConnectionError(error: unknown) {
   const reason = error instanceof Error ? error.message : "Connexion API impossible";
   const apiUrl = getApiBaseUrl();
+  const rootUrl = resolveApiRootUrl();
   if (isUsingLocalhostOnDevice()) {
     return new Error(
       `${reason}\n\nSur téléphone, localhost ne fonctionne pas.\n` +
         `Mettez l'IP du PC dans Mobile/.env.local :\n` +
         `EXPO_PUBLIC_API_URL=http://VOTRE_IP:5000\n` +
-        `Puis relancez : npm run start:clear`
+        `Puis rebuild l'application.`
     );
   }
   return new Error(
-    `${reason}\n\nAdresse utilisée : ${apiUrl}\n` +
-      `Vérifiez que le backend tourne (port 5000) et que le téléphone est sur le même Wi‑Fi.`
+    `${reason}\n\nAPI : ${apiUrl}\n` +
+      `Backend attendu : ${rootUrl}\n` +
+      `1) Lancez scripts\\start-backend.ps1 sur le PC\n` +
+      `2) Même Wi-Fi que le téléphone\n` +
+      `3) Testez ${rootUrl}/api/health dans le navigateur du téléphone`
   );
 }

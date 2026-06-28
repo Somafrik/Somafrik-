@@ -1,74 +1,94 @@
-# Somafrik MVP
+# Somafrik — Plateforme de gouvernance scolaire
 
-Somafrik est prêt à être lancé en MVP avec PostgreSQL, API backend, Backoffice web et application mobile Expo.
+Somafrik unifie la gestion éducative, du pays à la classe. Stack Docker : PostgreSQL, API backend, BackOffice web (Vite) et Expo mobile.
 
-## Démarrage rapide
+## Prérequis
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows)
+- Copier `.env.example` vers `.env` et adapter l’IP Wi‑Fi si besoin
+
+## Démarrage (tout sur Docker)
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up -d postgres backend
+npm run docker:up
 ```
 
-BackOffice :
-
-```text
-http://localhost:5000/backoffice
-```
-
-API santé :
-
-```text
-http://localhost:5000/api/health
-```
-
-Mobile Expo :
+Ou avec le script (détecte l’IP LAN pour le mobile) :
 
 ```powershell
-npm --prefix Mobile run start -- --clear
+powershell -ExecutionPolicy Bypass -File scripts\docker-up.ps1
 ```
 
-Mobile Expo avec Docker Desktop :
+**Important :** n’utilisez pas `npm run backend` en parallèle — un seul backend sur le port 5000.
+
+## URLs
+
+| Service | URL |
+|---------|-----|
+| API santé | http://localhost:5000/api/health |
+| BackOffice legacy | http://localhost:5000/backoffice/ |
+| Web React (build intégré) | http://localhost:5000/web/ |
+| Web React (dev, hot reload) | http://localhost:5173/web/ |
+| PostgreSQL (hôte) | localhost:5433 |
+| Expo Metro (mobile) | port 8083 — QR dans les logs |
 
 ```powershell
-docker compose up -d postgres backend mobile
-docker compose logs -f mobile
+npm run docker:logs:mobile   # QR Code Expo
+npm run docker:logs          # tous les services
 ```
 
-Dans `.env`, remplacez `ADRESSE_IP_DU_PC` par l'adresse Wi-Fi du PC, par exemple `192.168.1.141`. Le téléphone doit être sur le même Wi-Fi et ouvrir le QR Code affiché dans les logs du service `somafrik-mobile`.
+## Mobile sur téléphone
 
-Gardez `EXPO_PUBLIC_DEMO_MODE=false` pour forcer l'application mobile à utiliser l'API et PostgreSQL. Le mode `true` sert uniquement aux démonstrations hors connexion.
+Dans `.env`, l’IP Wi‑Fi du PC doit être correcte :
 
-Si le port Expo `8081` ou `8082` est déjà utilisé, gardez `EXPO_PORT=8083` dans `.env` puis relancez le service mobile.
+```env
+REACT_NATIVE_PACKAGER_HOSTNAME=192.168.1.35
+EXPO_PUBLIC_API_URL=http://192.168.1.35:5000
+EXPO_PUBLIC_DEMO_MODE=false
+```
+
+Le téléphone et le PC doivent être sur le **même Wi‑Fi**. Test : `http://VOTRE_IP:5000/api/health` depuis le navigateur du téléphone.
+
+## Arrêt
+
+```powershell
+npm run docker:down
+# ou avec suppression des données Postgres :
+powershell -ExecutionPolicy Bypass -File scripts\docker-down.ps1 -Volumes
+```
+
+## Stack minimale (sans web-dev ni mobile)
+
+```powershell
+npm run docker:up:core
+```
 
 ## Comptes de démonstration
 
-BackOffice Super Admin :
+BackOffice web (`http://localhost:5173/web/`) :
+
+| Profil | Identifiant | Mot de passe | Code établissement |
+|--------|-------------|--------------|-------------------|
+| Super Admin | `superadmin` | `1234` | — |
+| Admin école | `admin` | `1234` | `CD-2026-0001` |
+
+Mobile :
 
 ```text
 Code établissement : CD-2026-0001
-Identifiant : superadmin@somafrik.app
-Mot de passe : 1234
+Enseignant : ENS-0001 / PIN 1234
+Élève : ELE-0001 / PIN 1234
 ```
 
-Mobile élève :
+## Vérification auth stable
 
-```text
-Code établissement : CD-2026-0001
-Identifiant : ELE-0001
-PIN : 1234
-```
-
-Mobile enseignant :
-
-```text
-Code établissement : CD-2026-0001
-Identifiant : ENS-0001
-PIN : 1234
-```
+1. `http://localhost:5000/api/health` → `"database": "postgresql"`
+2. Connexion web sur `http://localhost:5173/web/` (proxy Vite → backend Docker)
+3. Mobile : `EXPO_PUBLIC_DEMO_MODE=false` et même backend Docker
 
 ## Avant usage réel
 
 - Changez `POSTGRES_PASSWORD` et `JWT_SECRET` dans `.env`.
-- Gardez `SOMAFRIK_DB_REQUIRED=true` pour éviter un démarrage en mode démo si PostgreSQL est indisponible.
-- Définissez `CORS_ORIGINS` avec les URL réellement utilisées.
-- Vérifiez que `/api/health` répond avec `database: "postgresql"`.
+- Gardez `SOMAFRIK_DB_REQUIRED=true`.
+- Définissez `CORS_ORIGINS` avec vos URL réelles.

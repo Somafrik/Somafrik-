@@ -1,13 +1,19 @@
 import { useAuth } from "../../context/AuthContext";
 import { useData } from "../../context/DataContext";
+import { useActiveSchool } from "../../context/ActiveSchoolContext";
 import { displayRoleName, getInitials } from "../../lib/format";
+import { formatSchoolOption } from "../../lib/superadminCrudPath";
 import { Button } from "../ui/Button";
+import { Field, Select } from "../ui/Field";
 
 export function Topbar({ title }: { title: string }) {
   const { session, logout } = useAuth();
   const { loading, error, refresh } = useData();
+  const { requiresSelection, availableSchools, activeSchoolCode, setActiveSchoolCode } = useActiveSchool();
   const user = session?.user;
   const scope = session?.scope;
+
+  const showSchoolPicker = requiresSelection && availableSchools.length > 0;
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-line bg-white/90 px-6 py-3 backdrop-blur">
@@ -17,6 +23,17 @@ export function Topbar({ title }: { title: string }) {
       </div>
 
       <div className="flex items-center gap-3">
+        {showSchoolPicker ? (
+          <div className="hidden min-w-[220px] md:block">
+            <Field label="Établissement actif">
+              <Select
+                value={activeSchoolCode}
+                onChange={(e) => setActiveSchoolCode(e.target.value)}
+                options={availableSchools.map(formatSchoolOption)}
+              />
+            </Field>
+          </div>
+        ) : null}
         {error ? (
           <p className="max-w-xs truncate text-xs text-danger" title={error}>
             {error}

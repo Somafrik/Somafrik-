@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useData } from "../context/DataContext";
 import { Card, SectionHeader } from "../components/ui/Card";
-import { formatMetric, isInternalSchoolRole } from "../lib/format";
-import { getCurrentSchool, getEstablishmentMetrics } from "../lib/establishment";
+import { formatMetric } from "../lib/format";
+import { getEstablishmentMetrics } from "../lib/establishment";
 import {
   ENTITY_MODULE_GROUP_LABELS,
   ENTITY_MODULE_GROUP_ORDER,
@@ -13,20 +13,29 @@ import {
   SCHOOL_ENTITY_SIDEBAR_VIEWS,
 } from "../lib/entityModules";
 import { scopedUsers } from "../lib/scope";
-import { canReadView, hasBackOfficePermission } from "../lib/permissions";
+import { canReadView, hasBackOfficePermission, canAccessSchoolBackOffice } from "../lib/permissions";
 import { usePermissionContext } from "../lib/usePermissionContext";
+import { useActiveSchool } from "../context/ActiveSchoolContext";
+import { formatSchoolOption } from "../lib/superadminCrudPath";
 import { NAV_ITEMS } from "../lib/constants";
+import { Field, Select } from "../components/ui/Field";
 
 export function EstablishmentPage() {
   const { session } = useAuth();
   const { state } = useData();
   const ctx = usePermissionContext();
   const user = session?.user ?? null;
+  const {
+    activeSchoolCode: schoolCode,
+    activeSchool: school,
+    availableSchools,
+    requiresSelection,
+    scopedUser,
+    setActiveSchoolCode,
+  } = useActiveSchool();
 
-  const school = getCurrentSchool(user, state);
-  const users = scopedUsers(user, state);
-  const metrics = getEstablishmentMetrics(user, state, users);
-  const schoolCode = user?.schoolCode;
+  const users = scopedUsers(scopedUser, state);
+  const metrics = getEstablishmentMetrics(scopedUser, state, users);
 
   const modules = useMemo(
     () =>
@@ -52,7 +61,7 @@ export function EstablishmentPage() {
     [ctx],
   );
 
-  if (!isInternalSchoolRole(user?.role)) {
+  if (!canAccessSchoolBackOffice(user?.role)) {
     return (
       <Card className="p-6">
         <p className="text-sm font-semibold text-muted">
@@ -66,7 +75,18 @@ export function EstablishmentPage() {
     <div className="space-y-6">
       <Card className="bg-gradient-to-br from-teal to-brand p-6 text-white">
         <p className="text-sm font-semibold text-white/75">Pilotage établissement</p>
-        <h2 className="mt-1 text-2xl font-black">{school?.name ?? "Mon établissement"}</h2>
+        {requiresSelection && availableSchools.length > 1 ? (
+          <div className="mt-3 max-w-md">
+            <Field label="Établissement">
+              <Select
+                value={schoolCode}
+                onChange={(e) => setActiveSchoolCode(e.target.value)}
+                options={availableSchools.map(formatSchoolOption)}
+              />
+            </Field>
+          </div>
+        ) : null}
+        <h2 className="mt-3 text-2xl font-black">{school?.name ?? "Mon établissement"}</h2>
         <p className="mt-2 text-sm text-white/85">
           {school
             ? `${school.code} • ${school.city ?? "Ville non renseignée"} • ${school.type ?? "Établissement"}`

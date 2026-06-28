@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { NAV_ITEMS } from "../../lib/constants";
 import { SCHOOL_ENTITY_SIDEBAR_VIEWS } from "../../lib/entityModules";
 import { isInternalSchoolRole } from "../../lib/format";
-import { canReadView } from "../../lib/permissions";
+import { canReadView, canAccessSchoolBackOffice } from "../../lib/permissions";
 import { COUNTRY_ADMIN_ROLE } from "../../lib/orgHierarchy";
 import { usePermissionContext } from "../../lib/usePermissionContext";
 import { useAuth } from "../../context/AuthContext";
@@ -15,9 +15,10 @@ export function Sidebar() {
   const { session } = useAuth();
   const role = session?.user?.role;
   const internalSchool = isInternalSchoolRole(role);
+  const schoolBackOffice = canAccessSchoolBackOffice(role);
 
   const visible = NAV_ITEMS.filter((item) => {
-    if (item.schoolOnly && !internalSchool) return false;
+    if (item.schoolOnly && !schoolBackOffice) return false;
     return canReadView(ctx, item.view);
   });
 
@@ -66,7 +67,7 @@ export function Sidebar() {
           <NavLinks items={visible.filter((item) => item.view === "overview")} />
         </div>
 
-        {internalSchool && schoolItems.length ? (
+        {schoolBackOffice && schoolItems.length ? (
           <div>
             <p className="px-3 pb-2 text-[11px] font-black uppercase tracking-wide text-brand">
               Mon établissement

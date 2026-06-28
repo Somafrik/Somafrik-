@@ -14,7 +14,6 @@ import type { Subscription } from "../types";
 export function SubscriptionsPage() {
   const { session } = useAuth();
   const { state, update } = useData();
-  const ctx = usePermissionContext();
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
 

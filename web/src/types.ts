@@ -95,6 +95,8 @@ export interface UserAccount {
   permissions?: string[];
   hasTemporaryPassword?: boolean;
   temporaryPassword?: string;
+  birthDate?: string;
+  password?: string;
   createdAt?: string;
   lastLoginAt?: string;
   createdBy?: string;

@@ -18,7 +18,16 @@
     "check": "node -c backend/server.js && node -c backend/db/postgresRepository.js && node --check BackOffice/app.js && cd Mobile && npx tsc --noEmit",
     "check:api": "node scripts/verify-api-connections.js",
     "check:suspension": "node scripts/verify-suspension.js",
+    "sync:env": "powershell -ExecutionPolicy Bypass -File scripts/sync-env.ps1",
     "web:build": "npm --prefix web run build",
-    "web:dev": "npm --prefix web run dev"
+    "web:dev": "npm --prefix web run dev",
+    "docker:up": "docker compose up -d --build",
+    "docker:up:core": "docker compose up -d --build postgres backend",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:logs:backend": "docker compose logs -f backend",
+    "docker:logs:mobile": "docker compose logs -f mobile",
+    "docker:logs:web": "docker compose logs -f web-dev",
+    "docker:build": "docker compose build backend"
   }
 }

@@ -15,6 +15,9 @@ RUN npx vite build
 # --- Étape 2: image backend (Node.js + Express) ---
 FROM node:22-alpine
 
+# Healthcheck docker compose (wget)
+RUN apk add --no-cache wget
+
 WORKDIR /app
 
 COPY backend/package*.json ./

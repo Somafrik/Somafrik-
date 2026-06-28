@@ -1,5 +1,5 @@
 import type { SessionUser } from "../types";
-import { CRUD_PERMISSION_MODULES, VIEW_PERMISSION_FEATURES } from "./constants";
+import { VIEW_PERMISSION_FEATURES } from "./constants";
 import { getInternalRoleDefaults } from "./internalRoleDefaults";
 import { isInternalSchoolRole, normalize, isSchoolAdminRole } from "./format";
 import { canSchoolAdminMutateTeachers } from "./pedagogyGovernance";
@@ -17,17 +17,9 @@ import { SCHOOL_ENTITY_SIDEBAR_VIEWS } from "./entityModules";
 
 const SCHOOL_ADMIN_FORBIDDEN_FEATURES = new Set(["Établissements", "Abonnements"]);
 
-/** Modules plateforme toujours accessibles au Super Admin (consultation + CRUD). */
-const SUPERADMIN_PLATFORM_FEATURES = new Set([
-  "Organisations",
-  "Pays",
-  "Établissements",
-  "Abonnements",
-  "Utilisateurs",
-  "Rapports",
-  "Notifications",
-  "Droits par rôle",
-]);
+export function canAccessSchoolBackOffice(role?: string): boolean {
+  return isSuperAdminRole(role) || isInternalSchoolRole(role);
+}
 
 export interface PermissionContext {
   user: SessionUser | null;
@@ -51,7 +43,11 @@ export function resolveEffectivePermissions(
   const fromUser = userPermissions ?? [];
   const fromRole = role && Array.isArray(rolePermissions[role]) ? rolePermissions[role] : [];
   const fromDefaults = getInternalRoleDefaults(role);
-  return [...new Set([...fromUser, ...fromRole, ...fromDefaults])];
+  const merged = [...new Set([...fromUser, ...fromRole, ...fromDefaults])];
+  if (isSuperAdminRole(role) && !merged.includes("ALL_PRIVILEGES")) {
+    merged.push("ALL_PRIVILEGES");
+  }
+  return merged;
 }
 
 export function getCurrentRolePermissions(ctx: PermissionContext): string[] {
@@ -169,6 +165,8 @@ export function hasBackOfficePermission(
   action: string = "READ",
 ): boolean {
   if (!ctx.user) return false;
+  if (isSuperAdminRole(ctx.user.role)) return true;
+
   const normalizedAction = action === "R" ? "READ" : action;
   const featureList = Array.isArray(features) ? features : [features];
 
@@ -178,16 +176,6 @@ export function hasBackOfficePermission(
     !canSchoolAdminMutateTeachers(normalizedAction)
   ) {
     return false;
-  }
-
-  if (isSuperAdminRole(ctx.user.role)) {
-    if (
-      featureList.some(
-        (feature) => !feature || SUPERADMIN_PLATFORM_FEATURES.has(feature),
-      )
-    ) {
-      return true;
-    }
   }
 
   if (
@@ -206,6 +194,7 @@ export function hasBackOfficePermission(
 }
 
 export function canReadView(ctx: PermissionContext, viewName: string): boolean {
+  if (isSuperAdminRole(ctx.user?.role)) return true;
   if (viewName === "overview") return true;
   if (ctx.user?.role === COUNTRY_ADMIN_ROLE) {
     if (SCHOOL_ENTITY_SIDEBAR_VIEWS.has(viewName) || viewName === "establishment" || viewName === "configuration") {
@@ -233,6 +222,7 @@ export function canReadView(ctx: PermissionContext, viewName: string): boolean {
 }
 
 export function hasSchoolPilotageAccess(ctx: PermissionContext): boolean {
+  if (isSuperAdminRole(ctx.user?.role)) return true;
   const schoolFeatures = [
     "Utilisateurs",
     "Classes",

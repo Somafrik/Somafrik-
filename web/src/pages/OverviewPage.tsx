@@ -5,7 +5,7 @@ import { getLiveKpis, scopedCountries, scopedSchools } from "../lib/scope";
 import { formatMetric, isInternalSchoolRole } from "../lib/format";
 import { PLATFORM_LEVELS } from "../lib/orgHierarchy";
 import { NAV_ITEMS } from "../lib/constants";
-import { canReadView, hasBackOfficePermission, hasSchoolPilotageAccess } from "../lib/permissions";
+import { canReadView, hasBackOfficePermission, hasSchoolPilotageAccess, canAccessSchoolBackOffice } from "../lib/permissions";
 import { usePermissionContext } from "../lib/usePermissionContext";
 import { Card } from "../components/ui/Card";
 import type { Kpi } from "../lib/scope";
@@ -36,7 +36,7 @@ export function OverviewPage() {
   const user = session?.user ?? null;
   const kpis = filterKpisByPermissions(getLiveKpis(user, state), ctx);
   const quickLinks = NAV_ITEMS.filter((item) => item.view !== "overview" && canReadView(ctx, item.view));
-  const showEstablishmentHub = isInternalSchoolRole(user?.role) && hasSchoolPilotageAccess(ctx);
+  const showEstablishmentHub = canAccessSchoolBackOffice(user?.role) && hasSchoolPilotageAccess(ctx);
   const countries = scopedCountries(user, state);
   const schools = scopedSchools(user, state);
 

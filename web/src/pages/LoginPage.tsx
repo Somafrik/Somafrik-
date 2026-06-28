@@ -117,7 +117,7 @@ export function LoginPage() {
 
         <div className="max-w-md space-y-4">
           <h2 className="text-3xl font-black leading-tight">
-            Centralisez la gestion scolaire, du pays à la classe.
+            La plateforme de gouvernance scolaire, du pays à la classe.
           </h2>
           <p className="text-white/80">
             Établissements, utilisateurs, droits, élèves, enseignants, présences, notes,
